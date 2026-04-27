@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local app runtime data
+config.json
+cache_sql/
+
+# PyInstaller build outputs
+build/
+dist/
+*.spec.bak
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Excel data exports / user data
+*.xlsx
+*.xls
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
