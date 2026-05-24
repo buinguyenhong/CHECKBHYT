@@ -201,6 +201,29 @@ class BHYTLauncher:
             cursor="hand2"
         )
         btn_browse.pack(side=tk.RIGHT, padx=(10, 0), ipady=5, ipadx=10)
+
+        # Port selection
+        lbl_port = tk.Label(
+            self.frame_install, 
+            text="CỔNG DỊCH VỤ DÀNH CHO MẠNG LAN BỆNH VIỆN (PORT)", 
+            font=("Segoe UI", 9, "bold"), 
+            bg=self.card_bg, 
+            fg=self.text_sec
+        )
+        lbl_port.pack(anchor=tk.W, pady=(0, 5))
+        
+        ent_port = tk.Entry(
+            self.frame_install, 
+            textvariable=self.port_val, 
+            font=("Segoe UI", 11, "bold"), 
+            bg="#0f172a", 
+            fg="#60a5fa", 
+            insertbackground=self.text_main, 
+            bd=1, 
+            relief=tk.SOLID, 
+            width=12
+        )
+        ent_port.pack(anchor=tk.W, pady=(0, 20), ipady=6)
         
         # Step 2: Install requirements
         lbl_step2 = tk.Label(
@@ -241,30 +264,7 @@ class BHYTLauncher:
     # TAB 2: THÔNG TIN HỆ THỐNG & ĐIỀU KHIỂN (SYSTEM INFO)
     # ========================================================
     def setup_sys_tab(self):
-        # 1. Cổng Dịch vụ (Port Selection)
-        lbl_port = tk.Label(
-            self.frame_sys, 
-            text="CỔNG DỊCH VỤ DÀNH CHO MẠNG LAN BỆNH VIỆN (PORT)", 
-            font=("Segoe UI", 9, "bold"), 
-            bg=self.card_bg, 
-            fg=self.text_sec
-        )
-        lbl_port.pack(anchor=tk.W, pady=(0, 5))
-        
-        ent_port = tk.Entry(
-            self.frame_sys, 
-            textvariable=self.port_val, 
-            font=("Segoe UI", 11, "bold"), 
-            bg="#0f172a", 
-            fg="#60a5fa", 
-            insertbackground=self.text_main, 
-            bd=1, 
-            relief=tk.SOLID, 
-            width=12
-        )
-        ent_port.pack(anchor=tk.W, pady=(0, 15), ipady=6)
-        
-        # 2. Server Status Badge (Glow status)
+        # 1. Server Status Badge (Glow status)
         status_frame = tk.Frame(self.frame_sys, bg=self.card_bg)
         status_frame.pack(fill=tk.X, pady=(0, 15))
         
