@@ -5,7 +5,7 @@ import socket
 import threading
 import subprocess
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
 
 # Cấu hình lưu trữ
 CONFIG_FILE = "launcher_config.json"
@@ -14,7 +14,7 @@ class BHYTLauncher:
     def __init__(self, root):
         self.root = root
         self.root.title("CheckBHYT LAN WebApp Launcher")
-        self.root.geometry("620x520")
+        self.root.geometry("620x560")
         self.root.resizable(False, False)
         
         # Thiết lập chủ đề màu sắc Glassmorphic Dark-Theme
@@ -32,14 +32,15 @@ class BHYTLauncher:
         # Biến điều khiển
         self.folder_path = tk.StringVar()
         self.port_val = tk.StringVar(value="8000")
-        self.status_text = tk.StringVar(value="Đang quét...")
+        self.status_text = tk.StringVar(value="Đang kiểm tra...")
         self.status_color = self.accent_orange
+        self.active_tab = "install"      # 'install' | 'sys'
         
-        # Load cấu hình cũ nếu có
+        # Load cấu hình cũ
         self.load_config()
         
-        # Tạo giao diện
-        self.create_widgets()
+        # Tạo giao diện chính
+        self.create_layouts()
         
         # Bắt đầu luồng kiểm tra trạng thái định kỳ
         self.stop_check_event = threading.Event()
@@ -56,7 +57,6 @@ class BHYTLauncher:
             except Exception:
                 pass
         
-        # Nếu chưa cấu hình, tự động nhận dạng thư mục hiện tại của Launcher làm mặc định
         if not self.folder_path.get():
             current_dir = os.path.dirname(os.path.abspath(__file__))
             if os.path.exists(os.path.join(current_dir, "web_app")):
@@ -73,10 +73,10 @@ class BHYTLauncher:
         except Exception:
             pass
 
-    def create_widgets(self):
+    def create_layouts(self):
         # 1. Header Title
         header_frame = tk.Frame(self.root, bg=self.bg_color)
-        header_frame.pack(fill=tk.X, padx=30, pady=25)
+        header_frame.pack(fill=tk.X, padx=30, pady=(20, 15))
         
         lbl_title = tk.Label(
             header_frame, 
@@ -89,29 +89,92 @@ class BHYTLauncher:
         
         lbl_sub = tk.Label(
             header_frame, 
-            text="Công cụ quản trị, build và khởi chạy ngầm máy chủ đối soát mạng nội bộ", 
-            font=("Segoe UI", 10), 
+            text="Công cụ cấu hình, cài đặt dependencies và quản lý server LAN chạy ngầm", 
+            font=("Segoe UI", 9), 
             bg=self.bg_color, 
             fg=self.text_sec
         )
         lbl_sub.pack(anchor=tk.W, pady=3)
 
-        # 2. Main Config Card
-        card_frame = tk.Frame(self.root, bg=self.card_bg, bd=1, relief=tk.FLAT)
-        card_frame.pack(fill=tk.BOTH, padx=30, expand=True)
+        # 2. Navigation Tabs Buttons
+        tab_nav_frame = tk.Frame(self.root, bg=self.bg_color)
+        tab_nav_frame.pack(fill=tk.X, padx=30, pady=(0, 15))
         
-        # Thư mục Git
-        lbl_folder = tk.Label(
-            card_frame, 
-            text="THƯ MỤC DỰ ÁN (GIT CLONED FOLDER)", 
+        self.btn_tab_install = tk.Button(
+            tab_nav_frame, 
+            text="1. Cài đặt lần đầu", 
+            font=("Segoe UI", 10, "bold"),
+            command=lambda: self.switch_tab("install"),
+            bd=0,
+            cursor="hand2"
+        )
+        self.btn_tab_install.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(0, 5))
+        
+        self.btn_tab_sys = tk.Button(
+            tab_nav_frame, 
+            text="2. Thông tin hệ thống", 
+            font=("Segoe UI", 10, "bold"),
+            command=lambda: self.switch_tab("sys"),
+            bd=0,
+            cursor="hand2"
+        )
+        self.btn_tab_sys.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(5, 0))
+
+        # 3. Tab Container (Card)
+        self.card_container = tk.Frame(self.root, bg=self.card_bg, bd=1, relief=tk.FLAT)
+        self.card_container.pack(fill=tk.BOTH, padx=30, expand=True, pady=(0, 20))
+
+        # --- TAB 1 FRAME: INSTALLATION ---
+        self.frame_install = tk.Frame(self.card_container, bg=self.card_bg)
+        self.setup_install_tab()
+        
+        # --- TAB 2 FRAME: SYSTEM INFO & CONTROL ---
+        self.frame_sys = tk.Frame(self.card_container, bg=self.card_bg)
+        self.setup_sys_tab()
+        
+        # Mặc định mở Tab 1
+        self.switch_tab("install")
+
+    def switch_tab(self, tab_name):
+        self.active_tab = tab_name
+        
+        if tab_name == "install":
+            self.btn_tab_install.configure(bg=self.accent_blue, fg=self.text_main, activebackground=self.accent_blue, activeforeground=self.text_main)
+            self.btn_tab_sys.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
+            self.frame_install.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
+            self.frame_sys.pack_forget()
+        else:
+            self.btn_tab_install.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
+            self.btn_tab_sys.configure(bg=self.accent_blue, fg=self.text_main, activebackground=self.accent_blue, activeforeground=self.text_main)
+            self.frame_sys.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
+            self.frame_install.pack_forget()
+
+    # ========================================================
+    # TAB 1: CÀI ĐẶT LẦN ĐẦU (INSTALLATION)
+    # ========================================================
+    def setup_install_tab(self):
+        # Description
+        lbl_desc = tk.Label(
+            self.frame_install, 
+            text="💡 Các bước cài đặt cơ bản khi khởi động dự án lần đầu tiên:", 
+            font=("Segoe UI", 10, "bold"), 
+            bg=self.card_bg, 
+            fg=self.accent_orange
+        )
+        lbl_desc.pack(anchor=tk.W, pady=(0, 15))
+        
+        # Step 1: Select folder
+        lbl_step1 = tk.Label(
+            self.frame_install, 
+            text="BƯỚC 1: CHỌN THƯ MỤC CHỨA WEBAPP (GIT CLONED FOLDER)", 
             font=("Segoe UI", 9, "bold"), 
             bg=self.card_bg, 
             fg=self.text_sec
         )
-        lbl_folder.pack(anchor=tk.W, padx=20, pady=(20, 5))
+        lbl_step1.pack(anchor=tk.W, pady=(0, 5))
         
-        folder_select_frame = tk.Frame(card_frame, bg=self.card_bg)
-        folder_select_frame.pack(fill=tk.X, padx=20, pady=5)
+        folder_select_frame = tk.Frame(self.frame_install, bg=self.card_bg)
+        folder_select_frame.pack(fill=tk.X, pady=(0, 20))
         
         ent_folder = tk.Entry(
             folder_select_frame, 
@@ -130,6 +193,41 @@ class BHYTLauncher:
             text="Chọn Folder", 
             command=self.browse_folder, 
             font=("Segoe UI", 9, "bold"), 
+            bg="#334155", 
+            fg=self.text_main, 
+            activebackground="#475569", 
+            activeforeground="white", 
+            bd=0, 
+            cursor="hand2"
+        )
+        btn_browse.pack(side=tk.RIGHT, padx=(10, 0), ipady=5, ipadx=10)
+        
+        # Step 2: Install requirements
+        lbl_step2 = tk.Label(
+            self.frame_install, 
+            text="BƯỚC 2: TỰ ĐỘNG CÀI ĐẶT THƯ VIỆN PHỤ THUỘC (DEPENDENCIES)", 
+            font=("Segoe UI", 9, "bold"), 
+            bg=self.card_bg, 
+            fg=self.text_sec
+        )
+        lbl_step2.pack(anchor=tk.W, pady=(0, 5))
+        
+        lbl_step2_sub = tk.Label(
+            self.frame_install, 
+            text="Hệ thống sẽ chạy ngầm lệnh 'pip install -r requirements.txt' để tải tất cả thư viện cần thiết phục vụ vận hành ngoại tuyến (offline LAN).", 
+            font=("Segoe UI", 9), 
+            bg=self.card_bg, 
+            fg=self.text_sec,
+            justify=tk.LEFT,
+            wraplength=500
+        )
+        lbl_step2_sub.pack(anchor=tk.W, pady=(0, 15))
+        
+        self.btn_setup = tk.Button(
+            self.frame_install, 
+            text="Kích hoạt cài đặt thư viện (pip setup)", 
+            command=self.run_setup_thread, 
+            font=("Segoe UI", 10, "bold"), 
             bg=self.accent_blue, 
             fg=self.text_main, 
             activebackground="#2563eb", 
@@ -137,20 +235,24 @@ class BHYTLauncher:
             bd=0, 
             cursor="hand2"
         )
-        btn_browse.pack(side=tk.RIGHT, padx=(10, 0), ipady=5, ipadx=10)
+        self.btn_setup.pack(fill=tk.X, ipady=10, pady=(0, 15))
 
-        # Port selection
+    # ========================================================
+    # TAB 2: THÔNG TIN HỆ THỐNG & ĐIỀU KHIỂN (SYSTEM INFO)
+    # ========================================================
+    def setup_sys_tab(self):
+        # 1. Cổng Dịch vụ (Port Selection)
         lbl_port = tk.Label(
-            card_frame, 
-            text="CỔNG DỊCH VỤ DÀNH CHO LAN (PORT)", 
+            self.frame_sys, 
+            text="CỔNG DỊCH VỤ DÀNH CHO MẠNG LAN BỆNH VIỆN (PORT)", 
             font=("Segoe UI", 9, "bold"), 
             bg=self.card_bg, 
             fg=self.text_sec
         )
-        lbl_port.pack(anchor=tk.W, padx=20, pady=(15, 5))
+        lbl_port.pack(anchor=tk.W, pady=(0, 5))
         
         ent_port = tk.Entry(
-            card_frame, 
+            self.frame_sys, 
             textvariable=self.port_val, 
             font=("Segoe UI", 11, "bold"), 
             bg="#0f172a", 
@@ -158,17 +260,17 @@ class BHYTLauncher:
             insertbackground=self.text_main, 
             bd=1, 
             relief=tk.SOLID, 
-            width=10
+            width=12
         )
-        ent_port.pack(anchor=tk.W, padx=20, pady=5, ipady=6)
-
-        # Trạng thái máy chủ
-        status_frame = tk.Frame(card_frame, bg=self.card_bg)
-        status_frame.pack(fill=tk.X, padx=20, pady=(20, 10))
+        ent_port.pack(anchor=tk.W, pady=(0, 15), ipady=6)
+        
+        # 2. Server Status Badge (Glow status)
+        status_frame = tk.Frame(self.frame_sys, bg=self.card_bg)
+        status_frame.pack(fill=tk.X, pady=(0, 15))
         
         lbl_status_title = tk.Label(
             status_frame, 
-            text="TRẠNG THÁI SERVER DỰA TRÊN PORT:", 
+            text="TRẠNG THÁI SERVER ONLINE:", 
             font=("Segoe UI", 9, "bold"), 
             bg=self.card_bg, 
             fg=self.text_sec
@@ -183,17 +285,16 @@ class BHYTLauncher:
             fg=self.status_color
         )
         self.lbl_status_badge.pack(side=tk.LEFT, padx=10)
-
-        # 3. Action Buttons Section
-        btn_frame = tk.Frame(self.root, bg=self.bg_color)
-        btn_frame.pack(fill=tk.X, padx=30, pady=25)
         
-        # Hàng 1: Build Cài đặt & Bắt đầu chạy ngầm
-        self.btn_setup = tk.Button(
-            btn_frame, 
-            text="Cài đặt thư viện (pip setup)", 
-            command=self.run_setup_thread, 
-            font=("Segoe UI", 10, "bold"), 
+        # 3. Access Link Row
+        link_frame = tk.Frame(self.frame_sys, bg=self.card_bg)
+        link_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        self.btn_copy_link = tk.Button(
+            link_frame, 
+            text="Lấy Link & Copy địa chỉ LAN", 
+            command=self.copy_lan_link, 
+            font=("Segoe UI", 9, "bold"), 
             bg="#334155", 
             fg=self.text_main, 
             activebackground="#475569", 
@@ -201,11 +302,24 @@ class BHYTLauncher:
             bd=0, 
             cursor="hand2"
         )
-        self.btn_setup.grid(row=0, column=0, sticky="ew", padx=(0, 10), pady=(0, 10), ipady=10)
+        self.btn_copy_link.pack(side=tk.LEFT, ipady=6, ipadx=10)
+        
+        self.lbl_lan_address = tk.Label(
+            link_frame, 
+            text="Nhấp nút để lấy liên kết truy cập", 
+            font=("Segoe UI", 10, "italic"), 
+            bg=self.card_bg, 
+            fg=self.accent_green
+        )
+        self.lbl_lan_address.pack(side=tk.LEFT, padx=15)
+        
+        # 4. Action buttons: Start & Stop Server
+        btn_action_frame = tk.Frame(self.frame_sys, bg=self.card_bg)
+        btn_action_frame.pack(fill=tk.X, pady=(10, 0))
         
         self.btn_start = tk.Button(
-            btn_frame, 
-            text="Khởi chạy Server chạy ngầm", 
+            btn_action_frame, 
+            text="Khởi động Server chạy ngầm", 
             command=self.start_server_background, 
             font=("Segoe UI", 10, "bold"), 
             bg=self.accent_green, 
@@ -215,25 +329,10 @@ class BHYTLauncher:
             bd=0, 
             cursor="hand2"
         )
-        self.btn_start.grid(row=0, column=1, sticky="ew", pady=(0, 10), ipady=10)
-        
-        # Hàng 2: Kiểm tra IP & Dừng chạy ngầm
-        self.btn_check_ip = tk.Button(
-            btn_frame, 
-            text="Lấy Link truy cập LAN", 
-            command=self.get_lan_access_link, 
-            font=("Segoe UI", 10, "bold"), 
-            bg="#334155", 
-            fg=self.text_main, 
-            activebackground="#475569", 
-            activeforeground="white", 
-            bd=0, 
-            cursor="hand2"
-        )
-        self.btn_check_ip.grid(row=1, column=0, sticky="ew", padx=(0, 10), ipady=10)
+        self.btn_start.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=10, padx=(0, 5))
         
         self.btn_stop = tk.Button(
-            btn_frame, 
+            btn_action_frame, 
             text="Dừng Server chạy ngầm", 
             command=self.stop_server_background, 
             font=("Segoe UI", 10, "bold"), 
@@ -244,48 +343,44 @@ class BHYTLauncher:
             bd=0, 
             cursor="hand2"
         )
-        self.btn_stop.grid(row=1, column=1, sticky="ew", ipady=10)
-        
-        btn_frame.columnconfigure(0, weight=1)
-        btn_frame.columnconfigure(1, weight=1)
+        self.btn_stop.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=10, padx=(5, 0))
 
+    # ========================================================
+    # LOGIC XỬ LÝ (LOGIC OPERATIONS)
+    # ========================================================
     def browse_folder(self):
-        folder = filedialog.askdirectory(title="Chọn Thư mục Git đã Clone")
+        folder = filedialog.askdirectory(title="Chọn Thư mục chứa WebApp")
         if folder:
             self.folder_path.set(folder)
             self.save_config()
 
-    def validate_setup(self):
+    def validate_inputs(self):
         folder = self.folder_path.get().strip()
         port = self.port_val.get().strip()
         
         if not folder or not os.path.exists(folder):
-            messagebox.showerror("Lỗi", "Vui lòng chọn thư mục dự án (Git cloned folder) hợp lệ!")
+            messagebox.showerror("Cảnh báo thư mục", "Vui lòng chọn thư mục dự án (Git cloned folder) hợp lệ!")
             return False
             
         if not os.path.exists(os.path.join(folder, "web_app", "run.py")):
-            messagebox.showerror("Lỗi", "Không tìm thấy cấu trúc thư mục 'web_app/run.py' tại thư mục đã chọn!")
+            messagebox.showerror("Cảnh báo cấu trúc", "Không tìm thấy cấu trúc thư mục 'web_app/run.py' tại thư mục đã chọn!")
             return False
             
         if not port.isdigit() or not (1024 <= int(port) <= 65535):
-            messagebox.showerror("Lỗi", "Vui lòng nhập cổng dịch vụ hợp lệ (từ 1024 đến 65535)!")
+            messagebox.showerror("Cảnh báo cổng", "Vui lòng nhập cổng dịch vụ hợp lệ (từ 1024 đến 65535)!")
             return False
             
         return True
 
     def run_setup_thread(self):
-        if not self.validate_setup():
+        if not self.validate_inputs():
             return
-            
-        self.btn_setup.configure(state=tk.DISABLED, text="Đang cài đặt thư viện...")
+        self.btn_setup.configure(state=tk.DISABLED, text="Đang tải các thư viện...")
         threading.Thread(target=self.run_setup, daemon=True).start()
 
     def run_setup(self):
         folder = self.folder_path.get().strip()
-        req_path = os.path.join(folder, "requirements.txt")
-        
         try:
-            # Khởi chạy pip install trong tiến trình con
             cmd = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
             process = subprocess.Popen(
                 cmd,
@@ -295,54 +390,48 @@ class BHYTLauncher:
                 text=True,
                 creationflags=0x08000000  # CREATE_NO_WINDOW
             )
-            
-            # Đọc logs nếu có (tùy chọn)
             process.wait()
             
             if process.returncode == 0:
-                messagebox.showinfo("Thành công", "Đã cài đặt các thư viện dependencies thành công! Sẵn sàng khởi chạy máy chủ LAN.")
+                messagebox.showinfo("Thành công", "Cài đặt thành công toàn bộ thư viện dependencies BHYT! Chuyển sang Tab 2 để khởi chạy Server.")
+                self.root.after(0, lambda: self.switch_tab("sys"))
             else:
-                messagebox.showerror("Thất bại", f"Lỗi trong quá trình cài đặt thư viện! Mã lỗi: {process.returncode}")
+                messagebox.showerror("Lỗi cài đặt", f"Cài đặt thất bại, vui lòng kiểm tra kết nối mạng máy tính. Mã lỗi: {process.returncode}")
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể kích hoạt trình cài đặt: {e}")
+            messagebox.showerror("Lỗi hệ thống", f"Không thể kích hoạt bộ cài: {e}")
         finally:
-            self.root.after(0, lambda: self.btn_setup.configure(state=tk.NORMAL, text="Cài đặt thư viện (pip setup)"))
+            self.root.after(0, lambda: self.btn_setup.configure(state=tk.NORMAL, text="Kích hoạt cài đặt thư viện (pip setup)"))
 
     def start_server_background(self):
-        if not self.validate_setup():
+        if not self.validate_inputs():
             return
             
         folder = self.folder_path.get().strip()
         port = self.port_val.get().strip()
         
-        # 1. Lưu cấu hình
         self.save_config()
         
-        # 2. Kiểm tra xem port có đang bị chiếm dụng không
+        # Kiểm tra trùng port
         if self.is_port_active(int(port)):
             res = messagebox.askyesno(
-                "Cảnh báo cổng dịch vụ", 
-                f"Cổng {port} hiện đang hoạt động. Bạn có muốn DỪNG dịch vụ cũ để khởi chạy máy chủ mới hay không?"
+                "Cảnh báo trùng cổng", 
+                f"Cổng {port} hiện đang bận (hoặc máy chủ cũ đang chạy).\nBạn có muốn dừng dịch vụ trên cổng {port} để khởi động máy chủ mới hay không?"
             )
             if res:
-                self.stop_server_background_sync(int(port))
+                self.stop_server_on_port_sync(int(port))
             else:
                 return
 
-        # 3. Chạy Server dưới dạng DETACHED BACKGROUND PROCESS
+        # Chạy máy chủ ngầm decoupled hoàn toàn
         try:
             run_script_path = os.path.join(folder, "web_app", "run.py")
-            
-            # Chuẩn bị biến môi trường
             env = os.environ.copy()
             env["BHYT_PORT"] = str(port)
-            env["BHYT_NO_RELOAD"] = "1"  # Tắt reload để chạy ngầm tối ưu nhất
+            env["BHYT_NO_RELOAD"] = "1"  # Khóa reload tối ưu hóa RAM chạy ngầm
             
-            # Khởi chạy uvicorn nền
             cmd = [sys.executable, run_script_path, "--port", str(port)]
             
-            # Windows creationflags: DETACHED_PROCESS = 0x00000008, CREATE_NO_WINDOW = 0x08000000
-            # Giúp tiến trình chạy ngầm hoàn toàn độc lập và không tắt kể cả khi tắt Launcher GUI
+            # DETACHED_PROCESS = 0x00000008, CREATE_NO_WINDOW = 0x08000000
             subprocess.Popen(
                 cmd,
                 cwd=folder,
@@ -355,11 +444,11 @@ class BHYTLauncher:
                 "Khởi chạy thành công",
                 f"CheckBHYT WebApp đã được khởi chạy thành công trong nền hệ thống Windows!\n"
                 f"Dịch vụ chạy ngầm trên cổng: {port}\n\n"
-                f"Bạn có thể đóng Launcher này, máy chủ LAN vẫn sẽ tiếp tục hoạt động."
+                f"Bạn có thể đóng bảng điều khiển này, máy chủ LAN vẫn hoạt động ổn định."
             )
             
         except Exception as e:
-            messagebox.showerror("Lỗi khởi chạy", f"Không thể chạy tiến trình ngầm: {e}")
+            messagebox.showerror("Lỗi khởi chạy", f"Không thể khởi chạy dịch vụ ngầm: {e}")
 
     def stop_server_background(self):
         port = self.port_val.get().strip()
@@ -367,16 +456,13 @@ class BHYTLauncher:
             messagebox.showerror("Lỗi", "Vui lòng nhập cổng dịch vụ hợp lệ!")
             return
             
-        count = self.stop_server_background_sync(int(port))
+        count = self.stop_server_on_port_sync(int(port))
         if count > 0:
-            messagebox.showinfo("Thành công", f"Đã giải phóng cổng {port} và dừng thành công {count} tiến trình máy chủ chạy ngầm! ✅")
+            messagebox.showinfo("Thành công", f"Đã giải phóng cổng {port} và dừng thành công {count} tiến trình chạy ngầm! ✅")
         else:
-            messagebox.showinfo("Thông báo", f"Không tìm thấy tiến trình nào đang chiếm dụng cổng {port}.")
+            messagebox.showinfo("Thông báo", f"Không có tiến trình nào đang chiếm dụng cổng {port}.")
 
-    def stop_server_background_sync(self, port: int) -> int:
-        """
-        Tìm kiếm tất cả PID chiếm dụng cổng port trên Windows bằng netstat và giải phóng chúng triệt để
-        """
+    def stop_server_on_port_sync(self, port: int) -> int:
         try:
             cmd = f'netstat -ano | findstr :{port}'
             output = subprocess.check_output(cmd, shell=True).decode('utf-8')
@@ -395,12 +481,12 @@ class BHYTLauncher:
         except Exception:
             return 0
 
-    def get_lan_access_link(self):
+    def copy_lan_link(self):
         port = self.port_val.get().strip()
         if not port.isdigit():
             port = "8000"
             
-        # Quét IP LAN
+        # Tìm IP LAN thực tế
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             s.connect(('8.8.8.8', 80))
@@ -412,31 +498,30 @@ class BHYTLauncher:
             
         link = f"http://{ip}:{port}"
         
-        # Sao chép vào clipboard
+        # Hiển thị lên giao diện
+        self.lbl_lan_address.configure(text=link, font=("Segoe UI", 11, "bold"))
+        
+        # Copy vào clipboard
         self.root.clipboard_clear()
         self.root.clipboard_append(link)
         
         messagebox.showinfo(
-            "Liên kết truy cập LAN BHYT",
-            f"Địa chỉ IP máy chủ LAN của bạn:\n{link}\n\n"
-            f"-> [ĐÃ SAO CHÉP LIÊN KẾT VÀO CLIPBOARD]\n\n"
-            f"Bạn hãy gửi địa chỉ này cho các khoa lâm sàng để truy cập nhập ghi chú đối soát."
+            "Đã sao chép liên kết",
+            f"Đã sao chép liên kết mạng nội bộ bệnh viện vào Clipboard:\n{link}\n\n"
+            f"Bạn hãy gửi địa chỉ này cho các khoa lâm sàng lâm sàng để tiến hành nhập giải trình lỗi BHYT."
         )
 
     def is_port_active(self, port: int) -> bool:
-        """
-        Kiểm tra nhanh xem cổng có đang mở/hoạt động không
-        """
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(0.4)
+                s.settimeout(0.3)
                 return s.connect_ex(('127.0.0.1', port)) == 0
         except Exception:
             return False
 
     def status_checking_loop(self):
         """
-        Quét trạng thái cổng định kỳ mỗi 1.5 giây để cập nhật trực quan trên GUI
+        Quét trạng thái cổng định kỳ mỗi 1.2 giây để cập nhật trực quan trên GUI
         """
         while not self.stop_check_event.is_set():
             port_str = self.port_val.get().strip()
@@ -454,7 +539,7 @@ class BHYTLauncher:
                 self.status_text.set("CỔNG KHÔNG HỢP LỆ")
                 self.lbl_status_badge.configure(fg=self.accent_red)
                 
-            self.stop_check_event.wait(1.5)
+            self.stop_check_event.wait(1.2)
 
     def on_closing(self):
         self.stop_check_event.set()
