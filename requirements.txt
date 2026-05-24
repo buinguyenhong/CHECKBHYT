@@ -4,3 +4,8 @@ pyodbc
 pyperclip
 openpyxl
 pyinstaller
+fastapi
+uvicorn
+jinja2
+python-multipart
+sqlalchemy

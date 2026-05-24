@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Admin — Trung tâm Đối soát BHYT BNH</title>
+    <style>
+        :root {
+            --bg-color: #0b1329;
+            --card-bg: rgba(30, 41, 59, 0.45);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-secondary: #94a3b8;
+            
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --success-hover: #059669;
+            --danger: #ef4444;
+            
+            --input-bg: #0f172a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.05) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 40px;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-title h1 {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-title span {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info .username {
+            font-weight: 600;
+            color: #a855f7;
+            background: rgba(168, 85, 247, 0.1);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .btn-logout {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #f87171;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 30px 40px;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* KPI widgets */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .kpi-card .kpi-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-card .kpi-val {
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        /* Tabs setup */
+        .tabs-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .tab-btn.active {
+            color: white;
+            background: var(--primary);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+        }
+
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Layout panels */
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 15px;
+        }
+
+        .panel-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        /* Forms styling */
+        .grid-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .form-control {
+            background: var(--input-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text-main);
+            font-size: 14px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+        }
+
+        .form-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn {
+            background: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-success {
+            background: var(--success);
+            border: none;
+        }
+
+        .btn-success:hover {
+            background: var(--success-hover);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        /* Excel Upload Zone */
+        .upload-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .upload-card {
+            background: rgba(15, 23, 42, 0.3);
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .upload-card:hover {
+            border-color: var(--primary);
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .upload-card p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        /* Tables & Lists */
+        .table-responsive {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        .data-table th, .data-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: rgba(15, 23, 42, 0.8);
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-pending { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+        .badge-waiting { color: #fbbf24; background: rgba(251, 191, 36, 0.1); }
+        .badge-resolved { color: #34d399; background: rgba(52, 211, 153, 0.1); }
+
+        /* Notification / Logs */
+        #logConsole {
+            background: #020617;
+            border: 1px solid #1e293b;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 15px;
+            border-radius: 10px;
+            color: #38bdf8;
+            font-size: 13px;
+            min-height: 150px;
+            max-height: 250px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        /* Modal popup sửa ghi chú & duyệt */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: modalFade 0.3s;
+        }
+
+        @keyframes modalFade {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .btn-close {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        /* PROGRESS BAR STYLING */
+        .progress-container {
+            display: none;
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 0.4s ease-out;
+        }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        .progress-status {
+            font-weight: 700;
+            color: #60a5fa;
+        }
+        .progress-percent {
+            font-weight: 800;
+            color: var(--text-main);
+        }
+        .progress-bar-track {
+            background: rgba(255, 255, 255, 0.05);
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #a855f7 100%);
+            border-radius: 6px;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* OVERDUE AGE ALERTS */
+        .warning-red {
+            background-color: rgba(239, 68, 68, 0.25) !important;
+            color: #fca5a5 !important;
+            font-weight: 600;
+        }
+        .warning-orange {
+            background-color: rgba(245, 158, 11, 0.25) !important;
+            color: #fde047 !important;
+            font-weight: 600;
+        }
+
+        /* VISUAL ANALYTICS DASHBOARD */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .chart-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .chart-card h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-main);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .bar-label {
+            width: 120px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .bar-track {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 6px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 0%;
+        }
+        .bar-val {
+            width: 30px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .donut-chart-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            height: 180px;
+        }
+        .donut-graphic {
+            position: relative;
+            width: 120px;
+            height: 120px;
+        }
+        .donut-graphic svg {
+            transform: rotate(-90deg);
+        }
+        .donut-ring {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 12;
+        }
+        .donut-segment {
+            fill: none;
+            stroke-width: 12;
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.5s ease;
+        }
+        .donut-center-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .donut-center-num {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+        .donut-center-lbl {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        .donut-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header-bar">
+    <div class="header-title">
+        <h1>CheckBHYT Control Center</h1>
+        <span>Phân hệ IT Quản trị & Đối soát BHYT (LAN WebApp)</span>
+    </div>
+    <div class="user-info">
+        <div class="username" id="usernameLabel">IT Admin</div>
+        <button class="btn-logout" id="btnLogout">Đăng xuất</button>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="kpi-row">
+        <div class="kpi-card" style="border-left:4px solid var(--primary);">
+            <div class="kpi-label">Tổng ca SQL</div>
+            <div class="kpi-val" id="kpiSql">0</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--success);">
+            <div class="kpi-label">Đã gửi BHYT</div>
+            <div class="kpi-val" id="kpiSent">0</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #f87171;">
+            <div class="kpi-label">Danh sách Lỗi</div>
+            <div class="kpi-val" id="kpiLoi">0</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #a855f7;">
+            <div class="kpi-label">Danh sách FAIL</div>
+            <div class="kpi-val" id="kpiFail">0</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--success);">
+            <div class="kpi-label">IT Đã Duyệt</div>
+            <div class="kpi-val" id="kpiResolved">0</div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTab('sync')">1. Đồng bộ & Đối soát</button>
+        <button class="tab-btn" onclick="switchTab('fail')">2. Danh sách FAIL (IT Sửa)</button>
+        <button class="tab-btn" onclick="switchTab('review')">3. Chờ Duyệt (Khoa Gửi)</button>
+        <button class="tab-btn" onclick="switchTab('users')">4. Quản lý Khoa Phòng</button>
+        <button class="tab-btn" onclick="switchTab('reports')">5. Xuất báo cáo</button>
+    </div>
+
+    <!-- TAB 1: SYNC & COMPARE -->
+    <div id="tab_sync" class="tab-pane active">
+        <!-- DB Config -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Cấu hình Kết nối SQL Server HIS (LAN Bệnh viện)</h2>
+                <button class="btn btn-primary" onclick="saveConfig()">Lưu cấu hình</button>
+            </div>
+            <div class="grid-form">
+                <div class="form-group">
+                    <label>ODBC Driver</label>
+                    <select class="form-control" id="cfg_driver">
+                        <option value="ODBC Driver 17 for SQL Server">ODBC Driver 17 for SQL Server</option>
+                        <option value="ODBC Driver 18 for SQL Server">ODBC Driver 18 for SQL Server</option>
+                        <option value="SQL Server">SQL Server</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Server IP / Host</label>
+                    <input type="text" class="form-control" id="cfg_server" placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label>Tên Database</label>
+                    <input type="text" class="form-control" id="cfg_database" placeholder="HIS_Database">
+                </div>
+                <div class="form-group">
+                    <label>Kiểu xác thực</label>
+                    <select class="form-control" id="cfg_auth" onchange="toggleAuthFields()">
+                        <option value="Windows Auth">Windows Auth</option>
+                        <option value="SQL Auth">SQL Auth</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>User (SQL Auth)</label>
+                    <input type="text" class="form-control" id="cfg_user" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" class="form-control" id="cfg_password" disabled>
+                </div>
+            </div>
+
+            <div class="grid-form">
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>SP Ngoại trú</label>
+                    <input type="text" class="form-control" id="cfg_sp_op">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>SP Nội trú</label>
+                    <input type="text" class="form-control" id="cfg_sp_ip">
+                </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:25px; margin-top:20px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                <button class="btn btn-success" onclick="testConnection()">Test kết nối SQL Server</button>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" id="cfg_auto_sync_enabled" style="width:18px; height:18px; cursor:pointer;" onchange="toggleAutoSyncTime()">
+                    <label for="cfg_auto_sync_enabled" style="font-size:14px; font-weight:700; color:#fbbf24; cursor:pointer;">Kích hoạt Tự động đồng bộ HIS hàng ngày</label>
+                </div>
+                <div id="autoSyncTimeGroup" style="display:none; align-items:center; gap:8px;">
+                    <label style="font-size:13px; color:var(--text-secondary);">Giờ chạy:</label>
+                    <input type="text" class="form-control" id="cfg_auto_sync_time" style="width:70px; padding:6px 10px; text-align:center;" placeholder="00:30">
+                </div>
+            </div>
+        </div>
+
+        <!-- Excel Imports and Processing -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Nạp dữ liệu Đối soát</h2>
+            </div>
+            
+            <div class="upload-row">
+                <div class="upload-card">
+                    <h3>1) Tải danh sách BHYT đã gửi (listbh.xlsx)</h3>
+                    <p>Nhận diện các ca đã được ghi nhận trên cổng BHYT</p>
+                    <input type="file" id="fileListbh" accept=".xlsx" style="display:none" onchange="uploadFile('listbh')">
+                    <button class="btn btn-primary" onclick="document.getElementById('fileListbh').click()">Chọn File listbh.xlsx</button>
+                    <div style="margin-top:10px; font-size:12px; color:var(--success);" id="lblListbhStatus">Chưa tải tệp</div>
+                </div>
+
+                <div class="upload-card">
+                    <h3>2) Tải chi tiết file lỗi (HoSoLoiChiTiet.xlsx)</h3>
+                    <p>Nhận diện chi tiết mã lỗi trả về từ cổng BHYT</p>
+                    <input type="file" id="fileLoi" accept=".xlsx" style="display:none" onchange="uploadFile('loi')">
+                    <button class="btn btn-primary" onclick="document.getElementById('fileLoi').click()">Chọn File HoSoLoiChiTiet.xlsx</button>
+                    <div style="margin-top:10px; font-size:12px; color:var(--success);" id="lblLoiStatus">Chưa tải tệp</div>
+                </div>
+            </div>
+
+            <div class="grid-form" style="max-width: 600px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Từ ngày</label>
+                    <input type="date" class="form-control" id="sync_from">
+                </div>
+                <div class="form-group">
+                    <label>Đến ngày</label>
+                    <input type="date" class="form-control" id="sync_to">
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
+                <div style="display:flex; gap: 15px;">
+                    <button class="btn btn-success" style="padding:12px 24px;" id="btnStartSync" onclick="runComparison()">Kích hoạt Đồng bộ & Đối soát CSDL HIS</button>
+                </div>
+                
+                <!-- PROGRESS BAR -->
+                <div class="progress-container" id="syncProgressContainer">
+                    <div class="progress-header">
+                        <span class="progress-status" id="syncProgressStatus">Sẵn sàng đối soát...</span>
+                        <span class="progress-percent" id="syncProgressPercent">0%</span>
+                    </div>
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="syncProgressBarFill"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Console -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Trạng thái hệ thống / Log Console</h2>
+                <button class="btn" style="padding:4px 10px; font-size:12px;" onclick="clearConsole()">Xoá Log</button>
+            </div>
+            <div id="logConsole">Hệ thống sẵn sàng. Vui lòng kiểm tra cấu hình SQL và nạp tệp Excel để tiến hành đối soát.</div>
+        </div>
+    </div>
+
+    <!-- TAB 2: MANUAL FAIL LIST -->
+    <div id="tab_fail" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Danh sách ca FAIL (Có trong SQL HIS nhưng chưa đẩy cổng và không có trong danh sách lỗi)</h2>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-success" onclick="resetSelectedFail('Ngoại trú')">Chạy Reset Ngoại trú</button>
+                    <button class="btn btn-success" onclick="resetSelectedFail('Nội trú')">Chạy Reset Nội trú</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table" id="failTable">
+                    <thead>
+                        <tr>
+                            <th>Mã liên kết</th>
+                            <th>Họ tên</th>
+                            <th>Mã thẻ</th>
+                            <th>Tên khoa</th>
+                            <th>Ngày ra viện</th>
+                            <th>Loại ca</th>
+                            <th>Ghi chú xử lý IT</th>
+                            <th>Trạng thái</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="failBody">
+                        <!-- Ajax data -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: REVIEW / PENDING CLINIC LIST -->
+    <div id="tab_review" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Danh sách ca Khoa đã xử lý lỗi (Chờ IT xác nhận và Reset SQL)</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table" id="reviewTable">
+                    <thead>
+                        <tr>
+                            <th>Mã liên kết</th>
+                            <th>Họ tên</th>
+                            <th>Mã thẻ</th>
+                            <th>Khoa điều trị</th>
+                            <th>Mã lỗi</th>
+                            <th>Ý kiến/Ghi chú của Khoa</th>
+                            <th>Loại ca</th>
+                            <th>Trạng thái</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reviewBody">
+                        <!-- Ajax data -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: USERS MANAGEMENT -->
+    <div id="tab_users" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Thêm tài khoản truy cập mới cho các Khoa / Phòng</h2>
+            </div>
+            <div class="grid-form" id="userForm">
+                <div class="form-group">
+                    <label>Tên đăng nhập</label>
+                    <input type="text" class="form-control" id="usr_username" placeholder="khoangoai">
+                </div>
+                <div class="form-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" class="form-control" id="usr_password" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label>Vai trò</label>
+                    <select class="form-control" id="usr_role" onchange="toggleUserDept()">
+                        <option value="user">Khoa phòng lâm sàng</option>
+                        <option value="admin">Quản trị viên IT</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tên khoa liên kết (Đúng theo tên trên HIS)</label>
+                    <input type="text" class="form-control" id="usr_dept" placeholder="Khám bệnh" list="dept_list">
+                    <datalist id="dept_list"></datalist>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="createUserAccount()">Tạo tài khoản</button>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Danh sách tài khoản hiện tại</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Tên đăng nhập</th>
+                            <th>Vai trò</th>
+                            <th>Khoa phòng liên kết</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userListBody">
+                        <!-- Ajax data -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 5: REPORTS & EXPORT -->
+    <div id="tab_reports" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Xuất báo cáo Excel kết quả đối soát</h2>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:20px;">
+                <div class="upload-card">
+                    <h3>Dữ liệu SQL HIS đã nạp</h3>
+                    <p>Xuất toàn bộ tệp đối soát CSDL đã tải</p>
+                    <button class="btn btn-primary" onclick="exportData('/api/export/sql_list')">Tải file sql_list.xlsx</button>
+                </div>
+                <div class="upload-card">
+                    <h3>Danh sách ca FAIL</h3>
+                    <p>Danh sách các ca cần kiểm tra thủ công</p>
+                    <button class="btn btn-danger" onclick="exportData('/api/export/fail')">Tải file DANH_SACH_FAIL.xlsx</button>
+                </div>
+                <div class="upload-card">
+                    <h3>Danh sách KÈM LỖI</h3>
+                    <p>Danh sách mã lỗi được phân theo Khoa phòng</p>
+                    <button class="btn btn-success" onclick="exportData('/api/export/loi')">Tải file DANH_SACH_KEM_LOI.xlsx</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD GRAPHICS PANEL -->
+        <div class="dashboard-grid">
+            <div class="chart-card">
+                <h3>Thống kê số lượng lỗi theo từng Khoa/Phòng</h3>
+                <div class="bar-chart" id="dashboardDeptChart">
+                    <div style="color:var(--text-secondary); text-align:center; padding:30px; font-style:italic;">Không có dữ liệu đối soát.</div>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h3>Phân bổ tỷ lệ trạng thái lỗi</h3>
+                <div class="donut-chart-container">
+                    <div class="donut-graphic">
+                        <svg width="120" height="120" viewBox="0 0 42 42">
+                            <circle class="donut-ring" cx="21" cy="21" r="15.91549430918954"></circle>
+                            <circle class="donut-segment" id="donut_pending" cx="21" cy="21" r="15.91549430918954" stroke="#f87171" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                            <circle class="donut-segment" id="donut_waiting" cx="21" cy="21" r="15.91549430918954" stroke="#fbbf24" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                            <circle class="donut-segment" id="donut_resolved" cx="21" cy="21" r="15.91549430918954" stroke="#34d399" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                        </svg>
+                        <div class="donut-center-text">
+                            <span class="donut-center-num" id="donutTotalText">0</span>
+                            <div class="donut-center-lbl">Ca lỗi</div>
+                        </div>
+                    </div>
+                    
+                    <div class="donut-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background:#f87171;"></div>
+                            <span>Chờ sửa (PENDING): <strong id="legendPendingText">0%</strong></span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background:#fbbf24;"></div>
+                            <span>Chờ IT duyệt (WAITING): <strong id="legendWaitingText">0%</strong></span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background:#34d399;"></div>
+                            <span>Đã xử lý (RESOLVED): <strong id="legendResolvedText">0%</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Báo cáo số lượng lỗi chi tiết theo từng Khoa/Phòng</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tên khoa</th>
+                            <th>Số ca lỗi chưa sửa (PENDING)</th>
+                            <th>Số ca đã sửa chờ IT duyệt (WAITING_REVIEW)</th>
+                            <th>Tổng lỗi phát sinh</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deptReportBody">
+                        <!-- Ajax reports -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal cập nhật ghi chú IT -->
+<div class="modal" id="adminNoteModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Cập nhật Ghi chú và Xử lý ca FAIL</h3>
+            <button class="btn-close" onclick="closeAdminModal()">&times;</button>
+        </div>
+        <div class="form-group" style="margin-bottom:20px;">
+            <label>Nội dung ghi chú xử lý của IT</label>
+            <textarea class="form-control" style="min-height:100px; resize:vertical;" id="adminNoteText" placeholder="Nhập ghi chú..."></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn" onclick="closeAdminModal()">Hủy</button>
+            <button class="btn btn-primary" id="btnAdminSaveNote">Lưu & Đánh dấu xử lý</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let activeTab = 'sync';
+    let currentConfig = {};
+    let selectedRecordId = null;
+
+    // Set today defaults for date inputs
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('sync_from').value = today;
+    document.getElementById('sync_to').value = today;
+
+    function logToConsole(msg) {
+        const consoleEl = document.getElementById('logConsole');
+        const timestamp = new Date().toLocaleTimeString();
+        consoleEl.textContent = `[${timestamp}] ${msg}\n` + consoleEl.textContent;
+    }
+
+    function clearConsole() {
+        document.getElementById('logConsole').textContent = '';
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+        const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.textContent.toLowerCase().includes(tabId));
+        if (activeBtn) activeBtn.classList.add('active');
+
+        document.getElementById(`tab_${tabId}`).classList.add('active');
+        activeTab = tabId;
+
+        // Fetch corresponding tab data
+        if (tabId === 'fail') fetchFailRecords();
+        if (tabId === 'review') fetchReviewRecords();
+        if (tabId === 'users') { fetchUsers(); }
+        if (tabId === 'reports') { fetchDeptReport(); }
+    }
+
+    function toggleAuthFields() {
+        const isSql = document.getElementById('cfg_auth').value === 'SQL Auth';
+        document.getElementById('cfg_user').disabled = !isSql;
+        document.getElementById('cfg_password').disabled = !isSql;
+    }
+
+    function toggleAutoSyncTime() {
+        const isChecked = document.getElementById('cfg_auto_sync_enabled').checked;
+        document.getElementById('autoSyncTimeGroup').style.display = isChecked ? 'flex' : 'none';
+    }
+
+    function toggleUserDept() {
+        const role = document.getElementById('usr_role').value;
+        document.getElementById('usr_dept').disabled = (role === 'admin');
+    }
+
+    // Load initial config
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/config');
+            if (res.ok) {
+                currentConfig = await res.json();
+                document.getElementById('cfg_driver').value = currentConfig.driver || "ODBC Driver 17 for SQL Server";
+                document.getElementById('cfg_server').value = currentConfig.server || "";
+                document.getElementById('cfg_database').value = currentConfig.database || "";
+                document.getElementById('cfg_auth').value = currentConfig.auth || "Windows Auth";
+                document.getElementById('cfg_user').value = currentConfig.user || "";
+                document.getElementById('cfg_password').value = currentConfig.password || "";
+                document.getElementById('cfg_sp_op').value = currentConfig.sp_op || "";
+                document.getElementById('cfg_sp_ip').value = currentConfig.sp_ip || "";
+                document.getElementById('cfg_auto_sync_enabled').checked = currentConfig.auto_sync_enabled || false;
+                document.getElementById('cfg_auto_sync_time').value = currentConfig.auto_sync_time || "00:30";
+                
+                toggleAuthFields();
+                toggleAutoSyncTime();
+                logToConsole("Đã tải cấu hình kết nối SQL Server thành công.");
+                updateGlobalKPIs();
+            }
+        } catch {
+            logToConsole("Lỗi kết nối máy chủ để tải cấu hình.");
+        }
+    }
+
+    // Save config
+    async function saveConfig() {
+        const cfg = {
+            driver: document.getElementById('cfg_driver').value,
+            server: document.getElementById('cfg_server').value.trim(),
+            database: document.getElementById('cfg_database').value.trim(),
+            auth: document.getElementById('cfg_auth').value,
+            user: document.getElementById('cfg_user').value.trim(),
+            password: document.getElementById('cfg_password').value,
+            sp_op: document.getElementById('cfg_sp_op').value.trim(),
+            sp_ip: document.getElementById('cfg_sp_ip').value.trim(),
+            auto_sync_enabled: document.getElementById('cfg_auto_sync_enabled').checked,
+            auto_sync_time: document.getElementById('cfg_auto_sync_time').value.trim()
+        };
+
+        try {
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(cfg)
+            });
+
+            if (res.ok) {
+                logToConsole("Đã lưu cấu hình CSDL HIS thành công!");
+                alert("Lưu cấu hình thành công!");
+            } else {
+                logToConsole("Lỗi lưu cấu hình.");
+            }
+        } catch {
+            logToConsole("Lỗi kết nối LAN.");
+        }
+    }
+
+    // Test connection
+    async function testConnection() {
+        logToConsole("Đang kiểm tra kết nối tới SQL Server LAN...");
+        try {
+            const res = await fetch('/api/config/test-connection', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                logToConsole("Kết nối SQL Server thành công! ✅");
+                alert("Kết nối SQL Server thành công!");
+            } else {
+                logToConsole(`Kết nối SQL Server Thất bại: ${data.detail || 'Không rõ nguyên nhân'}`);
+                alert("Kết nối Thất bại!");
+            }
+        } catch (e) {
+            logToConsole("Lỗi kết nối LAN khi test connection.");
+        }
+    }
+
+    // Upload Files
+    async function uploadFile(type) {
+        const fileInput = type === 'listbh' ? document.getElementById('fileListbh') : document.getElementById('fileLoi');
+        const statusEl = type === 'listbh' ? document.getElementById('lblListbhStatus') : document.getElementById('lblLoiStatus');
+        
+        if (fileInput.files.length === 0) return;
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        logToConsole(`Đang nạp file ${file.name}...`);
+        
+        try {
+            const res = await fetch(`/api/upload/${type}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                statusEl.innerText = `Đã tải: ${file.name} (${data.rows} dòng)`;
+                logToConsole(`Tải tệp ${file.name} thành công. Ghi nhận ${data.rows} dòng.`);
+            } else {
+                statusEl.innerText = "Lỗi khi tải tệp";
+                logToConsole(`Lỗi tải tệp: ${data.detail || 'Lỗi xử lý file Excel'}`);
+            }
+        } catch {
+            logToConsole("Lỗi mạng khi tải tệp.");
+        }
+    }
+
+    let syncInterval = null;
+
+    // Trigger Reconciliation & Stored Procedure HIS Sync
+    async function runComparison() {
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+
+        if (!fromDate || !toDate) {
+            alert("Vui lòng chọn đầy đủ khoảng ngày!");
+            return;
+        }
+
+        const btn = document.getElementById('btnStartSync');
+        const progressContainer = document.getElementById('syncProgressContainer');
+        const progressStatus = document.getElementById('syncProgressStatus');
+        const progressPercent = document.getElementById('syncProgressPercent');
+        const progressBarFill = document.getElementById('syncProgressBarFill');
+
+        btn.disabled = true;
+        progressContainer.style.display = 'block';
+        progressStatus.innerText = 'Đang bắt đầu đối soát...';
+        progressPercent.innerText = '0%';
+        progressBarFill.style.width = '0%';
+
+        logToConsole(`Đang gửi yêu cầu kích hoạt đối soát từ ${fromDate} đến ${toDate}...`);
+        
+        try {
+            const res = await fetch(`/api/sync/start?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            
+            if (!res.ok) {
+                logToConsole(`Lỗi kích hoạt đối soát: ${data.detail || 'Không thể bắt đầu'}`);
+                alert(`Lỗi kích hoạt: ${data.detail || 'Không rõ nguyên nhân'}`);
+                btn.disabled = false;
+                progressContainer.style.display = 'none';
+                return;
+            }
+
+            logToConsole("Yêu cầu đối soát ngầm được chấp nhận. Bắt đầu theo dõi tiến trình LAN...");
+            
+            if (syncInterval) clearInterval(syncInterval);
+            let lastLogIndex = 0;
+            
+            syncInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch('/api/sync/status');
+                    if (statusRes.ok) {
+                        const statusData = await statusRes.json();
+                        
+                        progressStatus.innerText = statusData.status;
+                        progressPercent.innerText = `${statusData.progress}%`;
+                        progressBarFill.style.width = `${statusData.progress}%`;
+                        
+                        if (statusData.logs && statusData.logs.length > lastLogIndex) {
+                            for (let i = lastLogIndex; i < statusData.logs.length; i++) {
+                                logToConsole(statusData.logs[i]);
+                            }
+                            lastLogIndex = statusData.logs.length;
+                        }
+                        
+                        if (!statusData.active) {
+                            clearInterval(syncInterval);
+                            btn.disabled = false;
+                            
+                            if (statusData.status === 'Lỗi') {
+                                alert("Quá trình đối soát thất bại! Vui lòng kiểm tra Log Console.");
+                            } else {
+                                alert("Quá trình đối soát & đồng bộ dữ liệu HIS đã hoàn tất!");
+                                updateGlobalKPIs();
+                                // Reload reports and data lists
+                                if (activeTab === 'fail') fetchFailRecords();
+                                if (activeTab === 'review') fetchReviewRecords();
+                                if (activeTab === 'reports') fetchDeptReport();
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Lỗi polling status:", e);
+                }
+            }, 1000);
+            
+        } catch {
+            logToConsole("Lỗi kết nối LAN khi kích hoạt đối soát.");
+            btn.disabled = false;
+        }
+    }
+
+    // Update global numbers
+    async function updateGlobalKPIs() {
+        try {
+            const res = await fetch('/api/records/kpi');
+            if (res.ok) {
+                const kpis = await res.json();
+                document.getElementById('kpiSql').innerText = kpis.tong_sql;
+                document.getElementById('kpiSent').innerText = kpis.da_gui;
+                document.getElementById('kpiLoi').innerText = kpis.loi;
+                document.getElementById('kpiFail').innerText = kpis.fail;
+                document.getElementById('kpiResolved').innerText = kpis.resolved;
+            }
+        } catch (e) {
+            console.error("Lỗi fetch KPIs:", e);
+        }
+    }
+
+    // Check discharge age alerts
+    function getWarningClass(ngayRaVienStr) {
+        if (!ngayRaVienStr) return '';
+        const ngayRaVien = new Date(ngayRaVienStr);
+        const today = new Date();
+        
+        ngayRaVien.setHours(0,0,0,0);
+        today.setHours(0,0,0,0);
+        
+        const diffTime = today - ngayRaVien;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 7) {
+            return 'warning-red';
+        } else if (diffDays === 6 || diffDays === 7) {
+            return 'warning-orange';
+        }
+        return '';
+    }
+
+    // Fetch Fail Records (Tab 2)
+    async function fetchFailRecords() {
+        try {
+            const res = await fetch('/api/records/admin/fail');
+            if (res.ok) {
+                const data = await res.json();
+                const tbody = document.getElementById('failBody');
+                tbody.innerHTML = '';
+
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào cần xử lý.</td></tr>`;
+                    return;
+                }
+
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const warnClass = getWarningClass(r.ngay_ra_vien);
+                    if (warnClass) {
+                        tr.className = warnClass;
+                    }
+                    
+                    const formattedDate = r.ngay_ra_vien ? new Date(r.ngay_ra_vien).toLocaleDateString('vi-VN') : '';
+                    tr.innerHTML = `
+                        <td><strong>${r.ma_lk}</strong></td>
+                        <td>${r.ho_ten}</td>
+                        <td><code>${r.ma_the}</code></td>
+                        <td>${r.ten_khoa}</td>
+                        <td>${formattedDate}</td>
+                        <td>${r.loai_ca}</td>
+                        <td style="font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
+                        <td><span class="badge badge-pending">PENDING</span></td>
+                        <td>
+                            <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        } catch {}
+    }
+
+    // Fetch Review Records (Tab 3)
+    async function fetchReviewRecords() {
+        try {
+            const res = await fetch('/api/records/admin/review');
+            if (res.ok) {
+                const data = await res.json();
+                const tbody = document.getElementById('reviewBody');
+                tbody.innerHTML = '';
+
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có yêu cầu chờ duyệt nào từ các Khoa lâm sàng.</td></tr>`;
+                    return;
+                }
+
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const warnClass = getWarningClass(r.ngay_ra_vien);
+                    if (warnClass) {
+                        tr.className = warnClass;
+                    }
+                    
+                    tr.innerHTML = `
+                        <td><strong>${r.ma_lk}</strong></td>
+                        <td>${r.ho_ten}</td>
+                        <td><code>${r.ma_the}</code></td>
+                        <td>${r.ten_khoa}</td>
+                        <td><span style="color:#f87171; font-weight:700;">${r.maloi || ''}</span></td>
+                        <td style="font-style:italic; max-width:250px; white-space:normal; color:#fbbf24;">${r.note || ''}</td>
+                        <td>${r.loai_ca}</td>
+                        <td><span class="badge badge-waiting">Chờ duyệt</span></td>
+                        <td style="display:flex; gap:6px;">
+                            <button class="btn btn-success" style="padding:4px 8px; font-size:12px;" onclick="approveAndReset(${r.id})">Duyệt & Reset</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        } catch {}
+    }
+
+    // Approve and execute SQL reset for department errors (Tab 3)
+    async function approveAndReset(id) {
+        if (!confirm("Bạn có chắc chắn muốn xác nhận đã xử lý và chạy cập nhật reset cờ xuất trên CSDL HIS bệnh viện?")) return;
+        
+        try {
+            const res = await fetch(`/api/records/${id}/approve`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert(`Duyệt & Reset thành công! Ghi nhận ${data.rowcount} dòng cập nhật.`);
+                fetchReviewRecords();
+                updateGlobalKPIs();
+            } else {
+                alert(`Lỗi duyệt: ${data.detail || 'Không thể cập nhật CSDL HIS'}`);
+            }
+        } catch {
+            alert("Lỗi kết nối máy chủ LAN.");
+        }
+    }
+
+    // Modal Action Admin
+    const adminModal = document.getElementById('adminNoteModal');
+    const adminTextarea = document.getElementById('adminNoteText');
+
+    function openAdminModal(id, note) {
+        selectedRecordId = id;
+        adminTextarea.value = note;
+        adminModal.style.display = 'flex';
+    }
+
+    function closeAdminModal() {
+        adminModal.style.display = 'none';
+        selectedRecordId = null;
+    }
+
+    document.getElementById('btnAdminSaveNote').onclick = async () => {
+        if (!selectedRecordId) return;
+        const note = adminTextarea.value.trim();
+
+        try {
+            const res = await fetch(`/api/records/${selectedRecordId}/admin-resolve`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({note: note})
+            });
+
+            if (res.ok) {
+                closeAdminModal();
+                fetchFailRecords();
+                updateGlobalKPIs();
+            } else {
+                alert("Lỗi lưu trạng thái ca FAIL.");
+            }
+        } catch {
+            alert("Lỗi kết nối LAN.");
+        }
+    };
+
+    // Bulk Reset from Fail List
+    async function resetSelectedFail(loai) {
+        if (!confirm(`Bạn sắp chạy cập nhật reset cờ xuất cho TOÀN BỘ các ca FAIL (${loai}) trên CSDL HIS bệnh viện. Có chắc chắn không?`)) return;
+
+        try {
+            const res = await fetch(`/api/records/admin/fail/reset?loai=${loai}`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Reset thành công! Rowcount: ${data.rowcount}`);
+                fetchFailRecords();
+            } else {
+                alert(`Thất bại: ${data.detail || 'Lỗi chạy SQL reset'}`);
+            }
+        } catch {
+            alert("Lỗi kết nối.");
+        }
+    }
+
+    // Export files
+    function exportData(url) {
+        window.open(url, '_blank');
+    }
+
+    // Load unique department names datalist for autocomplete
+    async function loadDeptDatalist() {
+        try {
+            const res = await fetch('/api/departments/unique');
+            if (res.ok) {
+                const depts = await res.json();
+                const datalist = document.getElementById('dept_list');
+                datalist.innerHTML = '';
+                depts.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d;
+                    datalist.appendChild(opt);
+                });
+            }
+        } catch (e) {
+            console.error("Lỗi tải gợi ý tên khoa:", e);
+        }
+    }
+
+    // User management (Tab 4)
+    async function fetchUsers() {
+        try {
+            loadDeptDatalist(); // Populate autocomplete datalist
+            const res = await fetch('/api/users');
+            if (res.ok) {
+                const data = await res.json();
+                const tbody = document.getElementById('userListBody');
+                tbody.innerHTML = '';
+                
+                data.forEach(u => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${u.id}</td>
+                        <td><strong>${u.username}</strong></td>
+                        <td>${u.role === 'admin' ? '<span style="color:#a855f7; font-weight:700;">IT Admin</span>' : 'Khoa lâm sàng'}</td>
+                        <td>${u.department_name || '<span style="color:var(--text-secondary);">IT (Không có)</span>'}</td>
+                        <td>
+                            <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="deleteUser(${u.id})" ${u.username === 'admin' ? 'disabled' : ''}>Xóa</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        } catch {}
+    }
+
+    async function createUserAccount() {
+        const username = document.getElementById('usr_username').value.trim();
+        const password = document.getElementById('usr_password').value;
+        const role = document.getElementById('usr_role').value;
+        const dept = document.getElementById('usr_dept').value.trim();
+
+        if (!username || !password) {
+            alert("Vui lòng nhập đầy đủ Tên đăng nhập và Mật khẩu!");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/users', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    role: role,
+                    department_name: role === 'admin' ? '' : dept
+                })
+            });
+
+            if (res.ok) {
+                alert("Tạo tài khoản thành công!");
+                document.getElementById('usr_username').value = '';
+                document.getElementById('usr_password').value = '';
+                document.getElementById('usr_dept').value = '';
+                fetchUsers();
+            } else {
+                const data = await res.json();
+                alert(`Lỗi tạo tài khoản: ${data.detail || 'Không hợp lệ'}`);
+            }
+        } catch {
+            alert("Lỗi kết nối.");
+        }
+    }
+
+    async function deleteUser(id) {
+        if (!confirm("Bạn có chắc chắn muốn xóa tài khoản này không?")) return;
+        try {
+            const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                alert("Xóa thành công!");
+                fetchUsers();
+            } else {
+                alert("Lỗi khi xóa tài khoản.");
+            }
+        } catch {
+            alert("Lỗi kết nối.");
+        }
+    }
+
+    // Visual Analytics Dashboard Generator
+    function drawVisualDashboard(data) {
+        // 1. Top departments by error count (bar chart CSS)
+        const barChartContainer = document.getElementById('dashboardDeptChart');
+        barChartContainer.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            barChartContainer.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:30px; font-style:italic;">Không có dữ liệu đối soát.</div>`;
+            return;
+        }
+        
+        const sortedData = [...data].sort((a, b) => b.total - a.total).slice(0, 5);
+        const maxVal = Math.max(...sortedData.map(d => d.total));
+        
+        sortedData.forEach(d => {
+            const pct = maxVal > 0 ? (d.total / maxVal) * 100 : 0;
+            const barRow = document.createElement('div');
+            barRow.className = 'bar-row';
+            barRow.innerHTML = `
+                <span class="bar-label" title="${d.ten_khoa}">${d.ten_khoa}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width: 0%;"></div>
+                </div>
+                <span class="bar-val">${d.total}</span>
+            `;
+            barChartContainer.appendChild(barRow);
+            
+            setTimeout(() => {
+                const barFill = barRow.querySelector('.bar-fill');
+                if (barFill) barFill.style.width = `${pct}%`;
+            }, 50);
+        });
+        
+        // 2. Status distribution (donut chart SVG)
+        let totalLoi = 0;
+        let totalPending = 0;
+        let totalWaiting = 0;
+        let totalResolved = 0;
+        
+        data.forEach(d => {
+            totalPending += d.pending;
+            totalWaiting += d.waiting;
+        });
+        
+        const resolvedText = document.getElementById('kpiResolved').innerText;
+        totalResolved = parseInt(resolvedText) || 0;
+        
+        const totalAll = totalPending + totalWaiting + totalResolved;
+        document.getElementById('donutTotalText').innerText = totalAll;
+        
+        const pctPending = totalAll > 0 ? (totalPending / totalAll) * 100 : 0;
+        const pctWaiting = totalAll > 0 ? (totalWaiting / totalAll) * 100 : 0;
+        const pctResolved = totalAll > 0 ? (totalResolved / totalAll) * 100 : 0;
+        
+        document.getElementById('legendPendingText').innerText = `${pctPending.toFixed(1)}% (${totalPending})`;
+        document.getElementById('legendWaitingText').innerText = `${pctWaiting.toFixed(1)}% (${totalWaiting})`;
+        document.getElementById('legendResolvedText').innerText = `${pctResolved.toFixed(1)}% (${totalResolved})`;
+        
+        const pendingSeg = document.getElementById('donut_pending');
+        const waitingSeg = document.getElementById('donut_waiting');
+        const resolvedSeg = document.getElementById('donut_resolved');
+        
+        if (pendingSeg && waitingSeg && resolvedSeg) {
+            pendingSeg.setAttribute('stroke-dasharray', `${pctPending} ${100 - pctPending}`);
+            pendingSeg.setAttribute('stroke-dashoffset', '0');
+            
+            waitingSeg.setAttribute('stroke-dasharray', `${pctWaiting} ${100 - pctWaiting}`);
+            waitingSeg.setAttribute('stroke-dashoffset', `-${pctPending}`);
+            
+            resolvedSeg.setAttribute('stroke-dasharray', `${pctResolved} ${100 - pctResolved}`);
+            resolvedSeg.setAttribute('stroke-dashoffset', `-${pctPending + pctWaiting}`);
+        }
+    }
+
+    // Reports (Tab 5)
+    async function fetchDeptReport() {
+        try {
+            const res = await fetch('/api/reports/departments');
+            if (res.ok) {
+                const data = await res.json();
+                const tbody = document.getElementById('deptReportBody');
+                tbody.innerHTML = '';
+                
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${r.ten_khoa || 'Chưa phân khoa'}</strong></td>
+                        <td><span style="color:#f87171; font-weight:700;">${r.pending}</span></td>
+                        <td><span style="color:#fbbf24; font-weight:700;">${r.waiting}</span></td>
+                        <td>${r.total}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                
+                // Draw dynamic charts dashboard offline
+                drawVisualDashboard(data);
+            }
+        } catch {}
+    }
+
+    // Logout
+    document.getElementById('btnLogout').onclick = async () => {
+        const res = await fetch('/auth/logout', { method: 'POST' });
+        if (res.ok) {
+            window.location.href = '/login';
+        }
+    };
+
+    // Initialize
+    loadConfig();
+    toggleUserDept();
+</script>
+</body>
+</html>

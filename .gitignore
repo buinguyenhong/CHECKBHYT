@@ -31,3 +31,8 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Database and uploaded files
+*.db
+uploaded_files/
+web_app/uploaded_files/
