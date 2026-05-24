@@ -37,8 +37,14 @@ if __name__ == "__main__":
     os.chdir(app_dir)
     sys.path.insert(0, app_dir)
     
+    # Hỗ trợ truyền tham số --port hoặc biến môi trường BHYT_PORT từ công cụ Launcher
+    import argparse
+    parser = argparse.ArgumentParser(description="Khởi chạy CheckBHYT WebApp")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("BHYT_PORT", 8000)), help="Cổng chạy dịch vụ")
+    args = parser.parse_known_args()[0]
+    
     lan_ip = get_lan_ip()
-    port = 8000
+    port = args.port
     
     print("==================================================================")
     print("   HE THONG DOI SOAT BHYT MANG NOI BO (LAN WEBAPP) - BNH          ")
@@ -54,4 +60,6 @@ if __name__ == "__main__":
     print("==================================================================")
     print("Khoi dong may chu uvicorn...")
     
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    # Tắt reload khi chạy ngầm để tối ưu hóa tài nguyên hệ thống
+    is_reload = os.environ.get("BHYT_NO_RELOAD") != "1"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=is_reload)
