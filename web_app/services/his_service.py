@@ -28,8 +28,16 @@ def parse_datetime_to_date(series: pd.Series) -> pd.Series:
 
 def build_conn_str(driver: str, server: str, db: str, auth: str, user: str, pw: str) -> str:
     if auth == "Windows Auth":
-        return f"DRIVER={{{driver}}};SERVER={server};DATABASE={db};Trusted_Connection=yes;"
-    return f"DRIVER={{{driver}}};SERVER={server};DATABASE={db};UID={user};PWD={pw};"
+        conn_str = f"DRIVER={{{driver}}};SERVER={server};DATABASE={db};Trusted_Connection=yes;"
+    else:
+        conn_str = f"DRIVER={{{driver}}};SERVER={server};DATABASE={db};UID={user};PWD={pw};"
+        
+    # Khắc phục lỗi kết nối ODBC Driver 18+ trên mạng LAN bệnh viện (không có SSL tin cậy)
+    # ODBC 18 mặc định Encrypt=yes và kiểm tra chứng chỉ nghiêm ngặt.
+    if "18" in driver or "19" in driver or "20" in driver:
+        conn_str += "TrustServerCertificate=yes;Encrypt=no;"
+        
+    return conn_str
 
 def get_conn(cfg: dict):
     if pyodbc is None:
