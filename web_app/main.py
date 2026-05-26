@@ -25,23 +25,28 @@ SECRET_KEY = "bnkBHYT_encryptionKey_2026"
 def encrypt_password(password: str) -> str:
     if not password:
         return ""
-    encrypted_chars = []
-    for i, char in enumerate(password):
-        key_char = SECRET_KEY[i % len(SECRET_KEY)]
-        encrypted_chars.append(chr(ord(char) ^ ord(key_char)))
-    encrypted_str = "".join(encrypted_chars)
-    return base64.b64encode(encrypted_str.encode('utf-8')).decode('utf-8')
+    try:
+        pw_bytes = password.encode('utf-8')
+        key_bytes = SECRET_KEY.encode('utf-8')
+        encrypted_bytes = bytearray()
+        for i, b in enumerate(pw_bytes):
+            key_byte = key_bytes[i % len(key_bytes)]
+            encrypted_bytes.append(b ^ key_byte)
+        return base64.b64encode(encrypted_bytes).decode('utf-8')
+    except Exception:
+        return ""
 
 def decrypt_password(encrypted_base64: str) -> str:
     if not encrypted_base64:
         return ""
     try:
-        raw_encrypted = base64.b64decode(encrypted_base64.encode('utf-8')).decode('utf-8')
-        decrypted_chars = []
-        for i, char in enumerate(raw_encrypted):
-            key_char = SECRET_KEY[i % len(SECRET_KEY)]
-            decrypted_chars.append(chr(ord(char) ^ ord(key_char)))
-        return "".join(decrypted_chars)
+        encrypted_bytes = base64.b64decode(encrypted_base64.encode('utf-8'))
+        key_bytes = SECRET_KEY.encode('utf-8')
+        decrypted_bytes = bytearray()
+        for i, b in enumerate(encrypted_bytes):
+            key_byte = key_bytes[i % len(key_bytes)]
+            decrypted_bytes.append(b ^ key_byte)
+        return decrypted_bytes.decode('utf-8')
     except Exception:
         return encrypted_base64
 
