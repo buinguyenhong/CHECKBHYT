@@ -4,24 +4,134 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Khoa/Phòng — Quản lý Lỗi BHYT</title>
+    <script>
+        // Set theme immediately to avoid flash of dark/light theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
     <style>
         :root {
+            /* Dark Theme (Default) */
             --bg-color: #0b1329;
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%);
+            --header-bg: rgba(15, 23, 42, 0.6);
             --card-bg: rgba(30, 41, 59, 0.45);
             --border-color: rgba(255, 255, 255, 0.08);
             --text-main: #f8fafc;
             --text-secondary: #94a3b8;
             --primary: #3b82f6;
             --primary-hover: #2563eb;
+            --focus-shadow: rgba(59, 130, 246, 0.2);
+            --title-gradient: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%);
             
             --status-pending: #f87171;
             --status-pending-bg: rgba(239, 68, 68, 0.15);
+            --status-pending-border: rgba(239, 68, 68, 0.2);
             --status-waiting: #fbbf24;
             --status-waiting-bg: rgba(251, 191, 36, 0.15);
+            --status-waiting-border: rgba(251, 191, 36, 0.2);
             --status-resolved: #34d399;
             --status-resolved-bg: rgba(52, 211, 153, 0.15);
+            --status-resolved-border: rgba(52, 211, 153, 0.2);
             
             --input-bg: #0f172a;
+            --input-border: rgba(255, 255, 255, 0.1);
+            --input-color: #ffffff;
+            
+            --th-bg: rgba(15, 23, 42, 0.8);
+            --th-color: var(--text-secondary);
+            --row-hover-bg: rgba(255, 255, 255, 0.02);
+            
+            --username-color: #60a5fa;
+            --username-bg: rgba(96, 165, 250, 0.1);
+            
+            --alert-bg: rgba(59, 130, 246, 0.1);
+            --alert-border: rgba(59, 130, 246, 0.2);
+            --alert-text: #93c5fd;
+            
+            --modal-bg: #0f172a;
+            --modal-border: rgba(255, 255, 255, 0.1);
+            
+            --btn-action-bg: #1e293b;
+            --btn-action-border: rgba(255, 255, 255, 0.1);
+            --btn-action-hover-bg: var(--primary);
+            --btn-action-hover-border: var(--primary);
+            --btn-action-hover-color: #ffffff;
+            
+            --scrollbar-thumb: #1e293b;
+            --scrollbar-track: #0b1329;
+            
+            /* Overdue alerts in dark theme */
+            --warning-red-bg: rgba(239, 68, 68, 0.25);
+            --warning-red-text: #fca5a5;
+            --warning-orange-bg: rgba(245, 158, 11, 0.25);
+            --warning-orange-text: #fde047;
+            
+            --toggle-bg: rgba(255, 255, 255, 0.05);
+            --toggle-border: rgba(255, 255, 255, 0.1);
+            --toggle-hover: rgba(255, 255, 255, 0.15);
+        }
+
+        html[data-theme="light"] {
+            /* Light Theme (Modern Premium Green Accent) */
+            --bg-color: #f4fbf7;
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+            --header-bg: rgba(255, 255, 255, 0.85);
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-secondary: #475569;
+            --primary: #10b981; /* Emerald Green */
+            --primary-hover: #059669;
+            --focus-shadow: rgba(16, 185, 129, 0.2);
+            --title-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            
+            --status-pending: #dc2626; /* High contrast red */
+            --status-pending-bg: #fef2f2;
+            --status-pending-border: #fee2e2;
+            --status-waiting: #d97706; /* High contrast amber */
+            --status-waiting-bg: #fffbeb;
+            --status-waiting-border: #fef3c7;
+            --status-resolved: #059669; /* High contrast green */
+            --status-resolved-bg: #f0fdf4;
+            --status-resolved-border: #dcfce7;
+            
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-color: #0f172a;
+            
+            --th-bg: #f8fafc;
+            --th-color: #475569;
+            --row-hover-bg: #f0fdf4; /* Pale green-tint hover */
+            
+            --username-color: #059669;
+            --username-bg: rgba(16, 185, 129, 0.1);
+            
+            --alert-bg: rgba(16, 185, 129, 0.05);
+            --alert-border: rgba(16, 185, 129, 0.15);
+            --alert-text: #047857;
+            
+            --modal-bg: #ffffff;
+            --modal-border: #e2e8f0;
+            
+            --btn-action-bg: #f1f5f9;
+            --btn-action-border: #cbd5e1;
+            --btn-action-hover-bg: var(--primary);
+            --btn-action-hover-border: var(--primary);
+            --btn-action-hover-color: #ffffff;
+            
+            --scrollbar-thumb: #cbd5e1;
+            --scrollbar-track: #f1f5f9;
+            
+            /* Overdue alerts in light theme: gorgeous pastels for readability */
+            --warning-red-bg: #fef2f2;
+            --warning-red-text: #991b1b;
+            --warning-orange-bg: #fffbeb;
+            --warning-orange-text: #9a3412;
+            
+            --toggle-bg: rgba(16, 185, 129, 0.05);
+            --toggle-border: rgba(16, 185, 129, 0.15);
+            --toggle-hover: rgba(16, 185, 129, 0.12);
         }
 
         * {
@@ -33,11 +143,12 @@
 
         body {
             background-color: var(--bg-color);
-            background-image: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%);
+            background-image: var(--bg-gradient);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            transition: background-color 0.3s ease;
         }
 
         .header-bar {
@@ -45,15 +156,16 @@
             align-items: center;
             justify-content: space-between;
             padding: 16px 40px;
-            background: rgba(15, 23, 42, 0.6);
+            background: var(--header-bg);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
         }
 
         .header-title h1 {
             font-size: 20px;
             font-weight: 800;
-            background: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%);
+            background: var(--title-gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -71,8 +183,8 @@
 
         .user-info .username {
             font-weight: 600;
-            color: #60a5fa;
-            background: rgba(96, 165, 250, 0.1);
+            color: var(--username-color);
+            background: var(--username-bg);
             padding: 6px 12px;
             border-radius: 8px;
             font-size: 14px;
@@ -81,7 +193,7 @@
         .btn-logout {
             background: transparent;
             border: 1px solid rgba(239, 68, 68, 0.4);
-            color: #f87171;
+            color: var(--status-pending);
             padding: 6px 14px;
             border-radius: 8px;
             font-size: 13px;
@@ -93,6 +205,7 @@
         .btn-logout:hover {
             background: rgba(239, 68, 68, 0.1);
             border-color: #ef4444;
+            color: #ef4444;
         }
 
         .main-content {
@@ -104,8 +217,8 @@
         }
 
         .alert-box {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: var(--alert-bg);
+            border: 1px solid var(--alert-border);
             border-radius: 12px;
             padding: 16px 20px;
             margin-bottom: 25px;
@@ -116,7 +229,7 @@
 
         .alert-box p {
             font-size: 14px;
-            color: #93c5fd;
+            color: var(--alert-text);
         }
 
         .kpi-row {
@@ -135,6 +248,11 @@
             flex-direction: column;
             gap: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+            transition: background-color 0.3s ease;
+        }
+
+        html[data-theme="light"] .kpi-card {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
         }
 
         .kpi-card .kpi-label {
@@ -156,6 +274,11 @@
             border-radius: 16px;
             padding: 25px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease;
+        }
+
+        html[data-theme="light"] .data-panel {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
         }
 
         .panel-header {
@@ -177,12 +300,18 @@
 
         .form-select {
             background: var(--input-bg);
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--input-border);
             border-radius: 8px;
             padding: 8px 12px;
             color: var(--text-main);
             font-size: 14px;
             outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--focus-shadow);
         }
 
         .table-responsive {
@@ -204,16 +333,16 @@
         }
 
         .data-table th {
-            background: rgba(15, 23, 42, 0.8);
+            background: var(--th-bg);
             font-weight: 700;
-            color: var(--text-secondary);
+            color: var(--th-color);
             text-transform: uppercase;
             font-size: 12px;
             letter-spacing: 0.5px;
         }
 
         .data-table tr:hover {
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--row-hover-bg);
         }
 
         .status-badge {
@@ -228,24 +357,24 @@
         .status-pending {
             color: var(--status-pending);
             background: var(--status-pending-bg);
-            border: 1px solid rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--status-pending-border);
         }
 
         .status-waiting {
             color: var(--status-waiting);
             background: var(--status-waiting-bg);
-            border: 1px solid rgba(251, 191, 36, 0.2);
+            border: 1px solid var(--status-waiting-border);
         }
 
         .status-resolved {
             color: var(--status-resolved);
             background: var(--status-resolved-bg);
-            border: 1px solid rgba(52, 211, 153, 0.2);
+            border: 1px solid var(--status-resolved-border);
         }
 
         .btn-action {
-            background: #1e293b;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--btn-action-bg);
+            border: 1px solid var(--btn-action-border);
             color: var(--text-main);
             padding: 6px 12px;
             border-radius: 6px;
@@ -255,9 +384,10 @@
             transition: all 0.2s;
         }
 
-        .btn-action:hover {
-            background: var(--primary);
-            border-color: var(--primary);
+        .btn-action:hover:not(:disabled) {
+            background: var(--btn-action-hover-bg);
+            border-color: var(--btn-action-hover-border);
+            color: var(--btn-action-hover-color);
         }
 
         .btn-action:disabled {
@@ -278,14 +408,15 @@
         }
 
         .modal-content {
-            background: #0f172a;
-            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--modal-bg);
+            border: 1px solid var(--modal-border);
             border-radius: 16px;
             width: 90%;
             max-width: 500px;
             padding: 25px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             animation: modalFade 0.3s;
+            transition: background-color 0.3s ease;
         }
 
         @keyframes modalFade {
@@ -315,19 +446,21 @@
 
         .form-control-textarea {
             width: 100%;
-            background: #0b1329;
-            border: 1px solid rgba(255,255,255,0.15);
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
             border-radius: 8px;
             padding: 10px;
-            color: white;
+            color: var(--input-color);
             font-size: 14px;
             min-height: 100px;
             resize: vertical;
             outline: none;
+            transition: all 0.3s ease;
         }
 
         .form-control-textarea:focus {
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--focus-shadow);
         }
 
         .modal-footer {
@@ -339,12 +472,17 @@
 
         .btn-cancel {
             background: transparent;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--border-color);
             color: var(--text-secondary);
             padding: 8px 16px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel:hover {
+            background: rgba(120, 120, 120, 0.1);
         }
 
         .btn-save {
@@ -356,6 +494,7 @@
             cursor: pointer;
             font-weight: 600;
             font-size: 13px;
+            transition: all 0.2s;
         }
 
         .btn-save:hover {
@@ -364,14 +503,73 @@
 
         /* OVERDUE AGE ALERTS */
         .warning-red {
-            background-color: rgba(239, 68, 68, 0.25) !important;
-            color: #fca5a5 !important;
+            background-color: var(--warning-red-bg) !important;
+            color: var(--warning-red-text) !important;
             font-weight: 600;
         }
         .warning-orange {
-            background-color: rgba(245, 158, 11, 0.25) !important;
-            color: #fde047 !important;
+            background-color: var(--warning-orange-bg) !important;
+            color: var(--warning-orange-text) !important;
             font-weight: 600;
+        }
+
+        /* Theme Toggle Button Style */
+        .theme-toggle-btn {
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            width: 38px;
+            height: 38px;
+            outline: none;
+        }
+
+        .theme-toggle-btn:hover {
+            background: var(--toggle-hover);
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+
+        .theme-toggle-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        html[data-theme="light"] .sun-icon {
+            display: none;
+        }
+        html[data-theme="light"] .moon-icon {
+            display: block;
+            color: #475569;
+        }
+        html:not([data-theme="light"]) .moon-icon {
+            display: none;
+        }
+        html:not([data-theme="light"]) .sun-icon {
+            display: block;
+            color: #fbbf24;
+        }
+
+        /* Scrollbar aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
         }
     </style>
 </head>
@@ -384,6 +582,10 @@
     </div>
     <div class="user-info">
         <div class="username" id="usernameLabel">Tải...</div>
+        <button id="themeToggle" class="theme-toggle-btn" title="Chuyển chế độ sáng/tối" onclick="toggleTheme()">
+            <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
         <button class="btn-logout" id="btnLogout">Đăng xuất</button>
     </div>
 </div>
@@ -468,6 +670,13 @@
 </div>
 
 <script>
+    function toggleTheme() {
+        const activeTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = activeTheme === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+    }
+
     let activeUser = null;
     let records = [];
     let selectedRecordId = null;

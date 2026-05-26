@@ -4,9 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IT Admin — Trung tâm Đối soát BHYT BNH</title>
+    <script>
+        // Set theme immediately to avoid flash of dark/light theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
     <style>
         :root {
+            /* Dark Theme (Default) */
             --bg-color: #0b1329;
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.05) 0px, transparent 50%);
+            --header-bg: rgba(15, 23, 42, 0.6);
             --card-bg: rgba(30, 41, 59, 0.45);
             --border-color: rgba(255, 255, 255, 0.08);
             --text-main: #f8fafc;
@@ -19,6 +27,133 @@
             --danger: #ef4444;
             
             --input-bg: #0f172a;
+            --input-border: rgba(255, 255, 255, 0.1);
+            --input-color: var(--text-main);
+            
+            --th-bg: rgba(15, 23, 42, 0.8);
+            --th-color: var(--text-secondary);
+            --row-hover-bg: rgba(255, 255, 255, 0.02);
+            
+            --username-color: #a855f7;
+            --username-bg: rgba(168, 85, 247, 0.1);
+            
+            --modal-bg: #0f172a;
+            --modal-border: rgba(255, 255, 255, 0.1);
+            
+            --btn-bg: #1e293b;
+            --btn-border: rgba(255, 255, 255, 0.1);
+            --btn-hover-bg: rgba(255, 255, 255, 0.05);
+            
+            --tab-shadow-color: rgba(59, 130, 246, 0.25);
+            --panel-border: rgba(255, 255, 255, 0.05);
+            
+            --upload-bg: rgba(15, 23, 42, 0.3);
+            --upload-border: rgba(255, 255, 255, 0.1);
+            
+            --log-bg: #020617;
+            --log-border: #1e293b;
+            --log-color: #38bdf8;
+            
+            --chart-track-bg: rgba(255, 255, 255, 0.05);
+            --chart-fill-gradient: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+            
+            --warning-red-bg: rgba(239, 68, 68, 0.25);
+            --warning-red-text: #fca5a5;
+            --warning-orange-bg: rgba(245, 158, 11, 0.25);
+            --warning-orange-text: #fde047;
+            
+            --title-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            --focus-shadow: rgba(59, 130, 246, 0.2);
+            
+            --toggle-bg: rgba(255, 255, 255, 0.05);
+            --toggle-border: rgba(255, 255, 255, 0.1);
+            --toggle-hover: rgba(255, 255, 255, 0.15);
+            
+            --scrollbar-thumb: #1e293b;
+            --scrollbar-track: #0b1329;
+
+            --status-pending: #f87171;
+            --status-pending-bg: rgba(239, 68, 68, 0.1);
+            --status-pending-border: rgba(239, 68, 68, 0.15);
+            --status-waiting: #fbbf24;
+            --status-waiting-bg: rgba(251, 191, 36, 0.1);
+            --status-waiting-border: rgba(251, 191, 36, 0.15);
+            --status-resolved: #34d399;
+            --status-resolved-bg: rgba(52, 211, 153, 0.1);
+            --status-resolved-border: rgba(52, 211, 153, 0.15);
+        }
+
+        html[data-theme="light"] {
+            /* Light Theme (Modern Premium Green Accent) */
+            --bg-color: #f4fbf7;
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(5, 150, 105, 0.04) 0px, transparent 50%);
+            --header-bg: rgba(255, 255, 255, 0.85);
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-secondary: #475569;
+            
+            --primary: #10b981; /* Emerald green */
+            --primary-hover: #059669;
+            --success: #059669;
+            --success-hover: #047857;
+            --danger: #dc2626;
+            
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-color: #0f172a;
+            
+            --th-bg: #f8fafc;
+            --th-color: #475569;
+            --row-hover-bg: #f0fdf4;
+            
+            --username-color: #059669;
+            --username-bg: rgba(16, 185, 129, 0.1);
+            
+            --modal-bg: #ffffff;
+            --modal-border: #e2e8f0;
+            
+            --btn-bg: #f1f5f9;
+            --btn-border: #cbd5e1;
+            --btn-hover-bg: #e2e8f0;
+            
+            --tab-shadow-color: rgba(16, 185, 129, 0.25);
+            --panel-border: #f1f5f9;
+            
+            --upload-bg: #f9fafb;
+            --upload-border: #cbd5e1;
+            
+            --log-bg: #0f172a;
+            --log-border: #cbd5e1;
+            --log-color: #38bdf8;
+            
+            --chart-track-bg: rgba(0, 0, 0, 0.05);
+            --chart-fill-gradient: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            
+            --warning-red-bg: #fef2f2;
+            --warning-red-text: #991b1b;
+            --warning-orange-bg: #fffbeb;
+            --warning-orange-text: #9a3412;
+            
+            --title-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            --focus-shadow: rgba(16, 185, 129, 0.2);
+            
+            --toggle-bg: rgba(16, 185, 129, 0.05);
+            --toggle-border: rgba(16, 185, 129, 0.15);
+            --toggle-hover: rgba(16, 185, 129, 0.12);
+            
+            --scrollbar-thumb: #cbd5e1;
+            --scrollbar-track: #f1f5f9;
+
+            --status-pending: #dc2626;
+            --status-pending-bg: #fef2f2;
+            --status-pending-border: #fee2e2;
+            --status-waiting: #d97706;
+            --status-waiting-bg: #fffbeb;
+            --status-waiting-border: #fef3c7;
+            --status-resolved: #059669;
+            --status-resolved-bg: #f0fdf4;
+            --status-resolved-border: #dcfce7;
         }
 
         * {
@@ -30,13 +165,12 @@
 
         body {
             background-color: var(--bg-color);
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.05) 0px, transparent 50%);
+            background-image: var(--bg-gradient);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            transition: background-color 0.3s ease;
         }
 
         .header-bar {
@@ -44,15 +178,16 @@
             align-items: center;
             justify-content: space-between;
             padding: 16px 40px;
-            background: rgba(15, 23, 42, 0.6);
+            background: var(--header-bg);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
         }
 
         .header-title h1 {
             font-size: 20px;
             font-weight: 800;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            background: var(--title-gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -70,8 +205,8 @@
 
         .user-info .username {
             font-weight: 600;
-            color: #a855f7;
-            background: rgba(168, 85, 247, 0.1);
+            color: var(--username-color);
+            background: var(--username-bg);
             padding: 6px 12px;
             border-radius: 8px;
             font-size: 14px;
@@ -80,7 +215,7 @@
         .btn-logout {
             background: transparent;
             border: 1px solid rgba(239, 68, 68, 0.4);
-            color: #f87171;
+            color: var(--danger);
             padding: 6px 14px;
             border-radius: 8px;
             font-size: 13px;
@@ -91,7 +226,7 @@
 
         .btn-logout:hover {
             background: rgba(239, 68, 68, 0.1);
-            border-color: #ef4444;
+            border-color: var(--danger);
         }
 
         .main-content {
@@ -119,6 +254,11 @@
             flex-direction: column;
             gap: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+            transition: background-color 0.3s ease;
+        }
+
+        html[data-theme="light"] .kpi-card {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
         }
 
         .kpi-card .kpi-label {
@@ -160,10 +300,14 @@
             background: rgba(255,255,255,0.03);
         }
 
+        html[data-theme="light"] .tab-btn:hover {
+            background: rgba(0,0,0,0.03);
+        }
+
         .tab-btn.active {
             color: white;
             background: var(--primary);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+            box-shadow: 0 4px 12px var(--tab-shadow-color);
         }
 
         .tab-pane {
@@ -188,6 +332,11 @@
             padding: 25px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             margin-bottom: 25px;
+            transition: background-color 0.3s ease;
+        }
+
+        html[data-theme="light"] .panel {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
         }
 
         .panel-header {
@@ -195,7 +344,7 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid var(--panel-border);
             padding-bottom: 15px;
         }
 
@@ -226,17 +375,18 @@
 
         .form-control {
             background: var(--input-bg);
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--input-border);
             border-radius: 8px;
             padding: 10px 14px;
-            color: var(--text-main);
+            color: var(--input-color);
             font-size: 14px;
             outline: none;
-            transition: border 0.3s;
+            transition: border 0.3s, box-shadow 0.3s;
         }
 
         .form-control:focus {
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--focus-shadow);
         }
 
         .form-control:disabled {
@@ -245,8 +395,8 @@
         }
 
         .btn {
-            background: #1e293b;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
             color: var(--text-main);
             padding: 10px 18px;
             border-radius: 8px;
@@ -257,12 +407,13 @@
         }
 
         .btn:hover {
-            background: rgba(255,255,255,0.05);
+            background: var(--btn-hover-bg);
         }
 
         .btn-primary {
             background: var(--primary);
             border: none;
+            color: white !important;
         }
 
         .btn-primary:hover {
@@ -272,6 +423,7 @@
         .btn-success {
             background: var(--success);
             border: none;
+            color: white !important;
         }
 
         .btn-success:hover {
@@ -281,6 +433,7 @@
         .btn-danger {
             background: var(--danger);
             border: none;
+            color: white !important;
         }
 
         .btn-danger:hover {
@@ -296,8 +449,8 @@
         }
 
         .upload-card {
-            background: rgba(15, 23, 42, 0.3);
-            border: 2px dashed rgba(255, 255, 255, 0.1);
+            background: var(--upload-bg);
+            border: 2px dashed var(--upload-border);
             border-radius: 12px;
             padding: 20px;
             text-align: center;
@@ -306,7 +459,7 @@
 
         .upload-card:hover {
             border-color: var(--primary);
-            background: rgba(15, 23, 42, 0.5);
+            background: var(--card-bg);
         }
 
         .upload-card p {
@@ -335,16 +488,16 @@
         }
 
         .data-table th {
-            background: rgba(15, 23, 42, 0.8);
+            background: var(--th-bg);
             font-weight: 700;
-            color: var(--text-secondary);
+            color: var(--th-color);
             text-transform: uppercase;
             font-size: 11px;
             letter-spacing: 0.5px;
         }
 
         .data-table tr:hover {
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--row-hover-bg);
         }
 
         .badge {
@@ -356,23 +509,38 @@
             text-transform: uppercase;
         }
 
-        .badge-pending { color: #f87171; background: rgba(239, 68, 68, 0.1); }
-        .badge-waiting { color: #fbbf24; background: rgba(251, 191, 36, 0.1); }
-        .badge-resolved { color: #34d399; background: rgba(52, 211, 153, 0.1); }
+        .badge-pending {
+            color: var(--status-pending);
+            background: var(--status-pending-bg);
+            border: 1px solid var(--status-pending-border);
+        }
+
+        .badge-waiting {
+            color: var(--status-waiting);
+            background: var(--status-waiting-bg);
+            border: 1px solid var(--status-waiting-border);
+        }
+
+        .badge-resolved {
+            color: var(--status-resolved);
+            background: var(--status-resolved-bg);
+            border: 1px solid var(--status-resolved-border);
+        }
 
         /* Notification / Logs */
         #logConsole {
-            background: #020617;
-            border: 1px solid #1e293b;
+            background: var(--log-bg);
+            border: 1px solid var(--log-border);
             font-family: 'Courier New', Courier, monospace;
             padding: 15px;
             border-radius: 10px;
-            color: #38bdf8;
+            color: var(--log-color);
             font-size: 13px;
             min-height: 150px;
             max-height: 250px;
             overflow-y: auto;
             white-space: pre-wrap;
+            transition: all 0.3s ease;
         }
 
         /* Modal popup sửa ghi chú & duyệt */
@@ -388,14 +556,15 @@
         }
 
         .modal-content {
-            background: #0f172a;
-            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--modal-bg);
+            border: 1px solid var(--modal-border);
             border-radius: 16px;
             width: 90%;
             max-width: 500px;
             padding: 25px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             animation: modalFade 0.3s;
+            transition: background-color 0.3s ease;
         }
 
         @keyframes modalFade {
@@ -426,13 +595,14 @@
         /* PROGRESS BAR STYLING */
         .progress-container {
             display: none;
-            background: rgba(15, 23, 42, 0.45);
+            background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 20px;
             margin-top: 20px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             animation: fadeIn 0.4s ease-out;
+            transition: background-color 0.3s ease;
         }
         .progress-header {
             display: flex;
@@ -443,14 +613,14 @@
         }
         .progress-status {
             font-weight: 700;
-            color: #60a5fa;
+            color: var(--primary);
         }
         .progress-percent {
             font-weight: 800;
             color: var(--text-main);
         }
         .progress-bar-track {
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--chart-track-bg);
             height: 12px;
             border-radius: 6px;
             overflow: hidden;
@@ -459,7 +629,7 @@
         }
         .progress-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3b82f6 0%, #a855f7 100%);
+            background: var(--chart-fill-gradient);
             border-radius: 6px;
             width: 0%;
             transition: width 0.4s ease;
@@ -467,13 +637,13 @@
 
         /* OVERDUE AGE ALERTS */
         .warning-red {
-            background-color: rgba(239, 68, 68, 0.25) !important;
-            color: #fca5a5 !important;
+            background-color: var(--warning-red-bg) !important;
+            color: var(--warning-red-text) !important;
             font-weight: 600;
         }
         .warning-orange {
-            background-color: rgba(245, 158, 11, 0.25) !important;
-            color: #fde047 !important;
+            background-color: var(--warning-orange-bg) !important;
+            color: var(--warning-orange-text) !important;
             font-weight: 600;
         }
 
@@ -498,12 +668,16 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
+            transition: background-color 0.3s ease;
+        }
+        html[data-theme="light"] .chart-card {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
         }
         .chart-card h3 {
             font-size: 14px;
             font-weight: 700;
             color: var(--text-main);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--panel-border);
             padding-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -528,7 +702,7 @@
         }
         .bar-track {
             flex: 1;
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--chart-track-bg);
             height: 12px;
             border-radius: 6px;
             overflow: hidden;
@@ -536,7 +710,7 @@
         }
         .bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+            background: var(--chart-fill-gradient);
             border-radius: 6px;
             transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
             width: 0%;
@@ -565,7 +739,7 @@
         }
         .donut-ring {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.05);
+            stroke: var(--chart-track-bg);
             stroke-width: 12;
         }
         .donut-segment {
@@ -608,6 +782,65 @@
             height: 12px;
             border-radius: 3px;
         }
+
+        /* Theme Toggle Button Style */
+        .theme-toggle-btn {
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            width: 38px;
+            height: 38px;
+            outline: none;
+        }
+
+        .theme-toggle-btn:hover {
+            background: var(--toggle-hover);
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+
+        .theme-toggle-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        html[data-theme="light"] .sun-icon {
+            display: none;
+        }
+        html[data-theme="light"] .moon-icon {
+            display: block;
+            color: #475569;
+        }
+        html:not([data-theme="light"]) .moon-icon {
+            display: none;
+        }
+        html:not([data-theme="light"]) .sun-icon {
+            display: block;
+            color: #fbbf24;
+        }
+
+        /* Scrollbars aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
     </style>
 </head>
 <body>
@@ -619,6 +852,10 @@
     </div>
     <div class="user-info">
         <div class="username" id="usernameLabel">IT Admin</div>
+        <button id="themeToggle" class="theme-toggle-btn" title="Chuyển chế độ sáng/tối" onclick="toggleTheme()">
+            <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
         <button class="btn-logout" id="btnLogout">Đăng xuất</button>
     </div>
 </div>
@@ -941,9 +1178,9 @@
                     <div class="donut-graphic">
                         <svg width="120" height="120" viewBox="0 0 42 42">
                             <circle class="donut-ring" cx="21" cy="21" r="15.91549430918954"></circle>
-                            <circle class="donut-segment" id="donut_pending" cx="21" cy="21" r="15.91549430918954" stroke="#f87171" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
-                            <circle class="donut-segment" id="donut_waiting" cx="21" cy="21" r="15.91549430918954" stroke="#fbbf24" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
-                            <circle class="donut-segment" id="donut_resolved" cx="21" cy="21" r="15.91549430918954" stroke="#34d399" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                            <circle class="donut-segment" id="donut_pending" cx="21" cy="21" r="15.91549430918954" stroke="var(--status-pending)" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                            <circle class="donut-segment" id="donut_waiting" cx="21" cy="21" r="15.91549430918954" stroke="var(--status-waiting)" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                            <circle class="donut-segment" id="donut_resolved" cx="21" cy="21" r="15.91549430918954" stroke="var(--status-resolved)" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
                         </svg>
                         <div class="donut-center-text">
                             <span class="donut-center-num" id="donutTotalText">0</span>
@@ -953,15 +1190,15 @@
                     
                     <div class="donut-legend">
                         <div class="legend-item">
-                            <div class="legend-color" style="background:#f87171;"></div>
+                            <div class="legend-color" style="background: var(--status-pending); border: 1px solid var(--status-pending-border);"></div>
                             <span>Chờ sửa (PENDING): <strong id="legendPendingText">0%</strong></span>
                         </div>
                         <div class="legend-item">
-                            <div class="legend-color" style="background:#fbbf24;"></div>
+                            <div class="legend-color" style="background: var(--status-waiting); border: 1px solid var(--status-waiting-border);"></div>
                             <span>Chờ IT duyệt (WAITING): <strong id="legendWaitingText">0%</strong></span>
                         </div>
                         <div class="legend-item">
-                            <div class="legend-color" style="background:#34d399;"></div>
+                            <div class="legend-color" style="background: var(--status-resolved); border: 1px solid var(--status-resolved-border);"></div>
                             <span>Đã xử lý (RESOLVED): <strong id="legendResolvedText">0%</strong></span>
                         </div>
                     </div>
@@ -1011,6 +1248,13 @@
 </div>
 
 <script>
+    function toggleTheme() {
+        const activeTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = activeTheme === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+    }
+
     let activeTab = 'sync';
     let currentConfig = {};
     let selectedRecordId = null;
