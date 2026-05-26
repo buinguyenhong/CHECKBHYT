@@ -6,7 +6,7 @@
     <title>Khoa/Phòng — Quản lý Lỗi BHYT</title>
     <script>
         // Set theme immediately to avoid flash of dark/light theme
-        const savedTheme = localStorage.getItem('theme') || 'dark';
+        const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
     </script>
     <style>
@@ -172,7 +172,8 @@
 
         .header-title span {
             color: var(--text-secondary);
-            font-size: 13px;
+            font-size: 15px;
+            font-weight: 500;
         }
 
         .user-info {
@@ -182,22 +183,22 @@
         }
 
         .user-info .username {
-            font-weight: 600;
+            font-weight: 700;
             color: var(--username-color);
             background: var(--username-bg);
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 16px;
         }
 
         .btn-logout {
             background: transparent;
             border: 1px solid rgba(239, 68, 68, 0.4);
             color: var(--status-pending);
-            padding: 6px 14px;
+            padding: 8px 16px;
             border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 15px;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
         }
@@ -228,7 +229,8 @@
         }
 
         .alert-box p {
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 500;
             color: var(--alert-text);
         }
 
@@ -256,16 +258,16 @@
         }
 
         .kpi-card .kpi-label {
-            font-size: 12px;
-            font-weight: 700;
+            font-size: 14px;
+            font-weight: 750;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .kpi-card .kpi-val {
-            font-size: 28px;
-            font-weight: 800;
+            font-size: 34px;
+            font-weight: 900;
         }
 
         .data-panel {
@@ -302,9 +304,10 @@
             background: var(--input-bg);
             border: 1px solid var(--input-border);
             border-radius: 8px;
-            padding: 8px 12px;
+            padding: 10px 16px;
             color: var(--text-main);
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 600;
             outline: none;
             transition: all 0.3s ease;
         }
@@ -323,21 +326,22 @@
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 500;
             text-align: left;
         }
 
         .data-table th, .data-table td {
-            padding: 14px 16px;
+            padding: 16px 18px;
             border-bottom: 1px solid var(--border-color);
         }
 
         .data-table th {
             background: var(--th-bg);
-            font-weight: 700;
+            font-weight: 800;
             color: var(--th-color);
             text-transform: uppercase;
-            font-size: 12px;
+            font-size: 14px;
             letter-spacing: 0.5px;
         }
 
@@ -376,11 +380,11 @@
             background: var(--btn-action-bg);
             border: 1px solid var(--btn-action-border);
             color: var(--text-main);
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 14px;
+            font-weight: 700;
             transition: all 0.2s;
         }
 

@@ -6,7 +6,7 @@
     <title>IT Admin — Trung tâm Đối soát BHYT BNH</title>
     <script>
         // Set theme immediately to avoid flash of dark/light theme
-        const savedTheme = localStorage.getItem('theme') || 'dark';
+        const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
     </script>
     <style>
@@ -218,8 +218,8 @@
             color: var(--danger);
             padding: 6px 14px;
             border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 15px;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
         }
@@ -262,16 +262,16 @@
         }
 
         .kpi-card .kpi-label {
-            font-size: 12px;
-            font-weight: 700;
+            font-size: 14px;
+            font-weight: 750;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .kpi-card .kpi-val {
-            font-size: 28px;
-            font-weight: 800;
+            font-size: 34px;
+            font-weight: 900;
         }
 
         /* Tabs setup */
@@ -287,10 +287,10 @@
             background: transparent;
             border: none;
             color: var(--text-secondary);
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 8px;
-            font-weight: 700;
-            font-size: 14px;
+            font-weight: 800;
+            font-size: 16px;
             cursor: pointer;
             transition: all 0.3s;
         }
@@ -368,8 +368,8 @@
         }
 
         .form-group label {
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 15px;
+            font-weight: 650;
             color: var(--text-secondary);
         }
 
@@ -377,9 +377,9 @@
             background: var(--input-bg);
             border: 1px solid var(--input-border);
             border-radius: 8px;
-            padding: 10px 14px;
+            padding: 12px 16px;
             color: var(--input-color);
-            font-size: 14px;
+            font-size: 16px;
             outline: none;
             transition: border 0.3s, box-shadow 0.3s;
         }
@@ -398,11 +398,11 @@
             background: var(--btn-bg);
             border: 1px solid var(--btn-border);
             color: var(--text-main);
-            padding: 10px 18px;
+            padding: 12px 20px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 800;
             transition: all 0.3s;
         }
 
@@ -478,21 +478,22 @@
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 500;
             text-align: left;
         }
 
         .data-table th, .data-table td {
-            padding: 12px 14px;
+            padding: 14px 16px;
             border-bottom: 1px solid var(--border-color);
         }
 
         .data-table th {
             background: var(--th-bg);
-            font-weight: 700;
+            font-weight: 800;
             color: var(--th-color);
             text-transform: uppercase;
-            font-size: 11px;
+            font-size: 13px;
             letter-spacing: 0.5px;
         }
 
