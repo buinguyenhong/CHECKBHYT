@@ -892,6 +892,7 @@
         <button class="tab-btn" onclick="switchTab('review')">3. Chờ Duyệt (Khoa Gửi)</button>
         <button class="tab-btn" onclick="switchTab('users')">4. Quản lý Khoa Phòng</button>
         <button class="tab-btn" onclick="switchTab('reports')">5. Xuất báo cáo</button>
+        <button class="tab-btn" onclick="switchTab('error-defs')">6. Hướng dẫn Lỗi</button>
     </div>
 
     <!-- TAB 1: SYNC & COMPARE -->
@@ -1231,6 +1232,33 @@
             </div>
         </div>
     </div>
+
+    <!-- TAB 6: ERROR DEFINITIONS -->
+    <div id="tab_error-defs" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Danh mục Hướng dẫn Lỗi & Quy tắc Reset HIS</h2>
+                <button class="btn btn-primary" onclick="openErrorDefModal()">Thêm Hướng dẫn Mới</button>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Mã lỗi</th>
+                            <th>Từ khóa tìm kiếm</th>
+                            <th>Nguyên nhân phát sinh</th>
+                            <th>Hướng dẫn khắc phục cho Khoa</th>
+                            <th>Cờ Reset HIS?</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="errorDefBody">
+                        <!-- Ajax data -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal cập nhật ghi chú IT -->
@@ -1247,6 +1275,65 @@
         <div style="display:flex; justify-content:flex-end; gap:10px;">
             <button class="btn" onclick="closeAdminModal()">Hủy</button>
             <button class="btn btn-primary" id="btnAdminSaveNote">Lưu & Đánh dấu xử lý</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Hướng dẫn Lỗi -->
+<div class="modal" id="errorDefModal">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 id="errorDefModalTitle">Thêm/Sửa Hướng dẫn Lỗi</h3>
+            <button class="btn-close" onclick="closeErrorDefModal()">&times;</button>
+        </div>
+        <input type="hidden" id="err_id">
+        <div class="grid-form" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+                <label>Mã lỗi (Ví dụ: XML1_80)</label>
+                <input type="text" class="form-control" id="err_code" placeholder="Mã lỗi">
+            </div>
+            <div class="form-group">
+                <label>Từ khóa (Ví dụ: DIEN_BIEN_LS)</label>
+                <input type="text" class="form-control" id="err_keyword" placeholder="Từ khóa tìm kiếm">
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>Nguyên nhân phát sinh</label>
+            <textarea class="form-control" style="min-height: 80px; resize: vertical;" id="err_root_cause" placeholder="Nguyên nhân thực tế..."></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>Hướng dẫn khắc phục cho Khoa phòng</label>
+            <textarea class="form-control" style="min-height: 80px; resize: vertical;" id="err_resolution" placeholder="Các bước hướng dẫn khoa sửa lỗi trên HIS..."></textarea>
+        </div>
+        <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px; margin-bottom: 20px;">
+            <input type="checkbox" id="err_requires_his_reset" style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="err_requires_his_reset" style="font-weight: 700; color: #fbbf24; cursor: pointer;">Lỗi này bắt buộc IT phải mở khóa bệnh án để khoa sửa</label>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn" onclick="closeErrorDefModal()">Hủy</button>
+            <button class="btn btn-primary" onclick="saveErrorDefinition()">Lưu Hướng dẫn</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal copy câu lệnh SQL mở khóa HIS / Reset -->
+<div class="modal" id="hisUnlockModal">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3 id="hisUnlockModalTitle">Mở khóa bệnh án / Reset HIS</h3>
+            <button class="btn-close" onclick="closeHisUnlockModal()">&times;</button>
+        </div>
+        <p style="font-size:14px; margin-bottom:15px; color:var(--text-secondary);">
+            Hệ thống không can thiệp ghi trực tiếp vào CSDL HIS để đảm bảo an toàn. 
+            Vui lòng bấm nút <strong>"Copy câu lệnh SQL"</strong> bên dưới và thực thi trên phần mềm <strong>SSMS (SQL Server Management Studio)</strong> của bệnh viện.
+        </p>
+        <div class="form-group" style="margin-bottom:20px;">
+            <label style="font-weight:bold; color:var(--primary);">Câu lệnh SQL thực thi:</label>
+            <textarea class="form-control" id="hisUnlockSqlText" readonly style="font-family: 'Courier New', Courier, monospace; font-size: 14px; min-height: 150px; background: var(--log-bg); color: var(--log-color); border-color: var(--log-border); resize: none;"></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn" onclick="closeHisUnlockModal()">Đóng</button>
+            <button class="btn btn-success" style="font-weight:bold;" onclick="copyHisUnlockSql()">Copy câu lệnh SQL</button>
         </div>
     </div>
 </div>
@@ -1283,7 +1370,10 @@
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
 
-        const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.textContent.toLowerCase().includes(tabId));
+        const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => {
+            const attr = b.getAttribute('onclick');
+            return attr && attr.includes(tabId);
+        });
         if (activeBtn) activeBtn.classList.add('active');
 
         document.getElementById(`tab_${tabId}`).classList.add('active');
@@ -1294,6 +1384,7 @@
         if (tabId === 'review') fetchReviewRecords();
         if (tabId === 'users') { fetchUsers(); }
         if (tabId === 'reports') { fetchDeptReport(); }
+        if (tabId === 'error-defs') { fetchErrorDefinitions(); }
     }
 
     function toggleAuthFields() {
@@ -1681,6 +1772,19 @@
                         tr.className = warnClass;
                     }
                     
+                    let unlockBadge = '';
+                    let unlockBtn = '';
+                    
+                    if (r.requires_his_reset) {
+                        if (r.his_unlock_status === 'UNLOCKED') {
+                            unlockBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.2); color: #fbbf24;">Trả khoa - Đang sửa</span></div>`;
+                            unlockBtn = `<button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; font-weight:bold;" onclick="toggleHisUnlock(${r.id}, 'CLOSE')">Đóng mở khóa</button>`;
+                        } else {
+                            unlockBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.15); color: #f87171;">Yêu cầu mở khóa</span></div>`;
+                            unlockBtn = `<button class="btn" style="padding:4px 8px; font-size:12px; font-weight:bold; background:#f59e0b; color:white; border:none;" onclick="toggleHisUnlock(${r.id}, 'UNLOCK')">Trả khoa (Mở khóa)</button>`;
+                        }
+                    }
+                    
                     tr.innerHTML = `
                         <td><strong>${r.ma_lk}</strong></td>
                         <td>${r.ho_ten}</td>
@@ -1689,9 +1793,15 @@
                         <td><span style="color:#f87171; font-weight:700;">${r.maloi || ''}</span></td>
                         <td style="font-style:italic; max-width:250px; white-space:normal; color:#fbbf24;">${r.note || ''}</td>
                         <td>${r.loai_ca}</td>
-                        <td><span class="badge badge-waiting">Chờ duyệt</span></td>
-                        <td style="display:flex; gap:6px;">
-                            <button class="btn btn-success" style="padding:4px 8px; font-size:12px;" onclick="approveAndReset(${r.id})">Duyệt & Reset</button>
+                        <td>
+                            <span class="badge badge-waiting">Chờ duyệt</span>
+                            ${unlockBadge}
+                        </td>
+                        <td>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <button class="btn btn-success" style="padding:4px 8px; font-size:12px; font-weight:bold;" onclick="approveAndReset(${r.id})">Duyệt & Reset</button>
+                                ${unlockBtn}
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -1702,17 +1812,44 @@
 
     // Approve and execute SQL reset for department errors (Tab 3)
     async function approveAndReset(id) {
-        if (!confirm("Bạn có chắc chắn muốn xác nhận đã xử lý và chạy cập nhật reset cờ xuất trên CSDL HIS bệnh viện?")) return;
+        if (!confirm("Bạn có chắc chắn muốn xác nhận đã xử lý và duyệt Reset cờ xuất cho ca này? Hệ thống sẽ sinh câu lệnh SQL reset để bạn copy chạy SSMS.")) return;
         
         try {
             const res = await fetch(`/api/records/${id}/approve`, { method: 'POST' });
             const data = await res.json();
             if (res.ok && data.success) {
-                alert(`Duyệt & Reset thành công! Ghi nhận ${data.rowcount} dòng cập nhật.`);
+                openHisUnlockModal(data.sql_command, "Duyệt & Reset cờ xuất HIS");
                 fetchReviewRecords();
                 updateGlobalKPIs();
             } else {
                 alert(`Lỗi duyệt: ${data.detail || 'Không thể cập nhật CSDL HIS'}`);
+            }
+        } catch {
+            alert("Lỗi kết nối máy chủ LAN.");
+        }
+    }
+
+    // Toggle HIS unlock status
+    async function toggleHisUnlock(id, actionType) {
+        const formData = new FormData();
+        formData.append("action_type", actionType);
+        
+        try {
+            const res = await fetch(`/api/records/${id}/toggle-his-unlock`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                if (actionType === 'UNLOCK') {
+                    openHisUnlockModal(data.sql_command, "Mở khóa bệnh án (Trả hồ sơ về khoa)");
+                } else {
+                    alert("Đã đóng trạng thái mở khóa thành công!");
+                }
+                fetchReviewRecords();
+                updateGlobalKPIs();
+            } else {
+                alert(`Lỗi: ${data.detail || 'Không thể cập nhật trạng thái mở khóa'}`);
             }
         } catch {
             alert("Lỗi kết nối máy chủ LAN.");
@@ -1759,16 +1896,178 @@
 
     // Bulk Reset from Fail List
     async function resetSelectedFail(loai) {
-        if (!confirm(`Bạn sắp chạy cập nhật reset cờ xuất cho TOÀN BỘ các ca FAIL (${loai}) trên CSDL HIS bệnh viện. Có chắc chắn không?`)) return;
+        if (!confirm(`Bạn sắp chạy cập nhật reset cờ xuất cho TOÀN BỘ các ca FAIL (${loai}). Hệ thống sẽ sinh câu lệnh SQL reset hàng loạt để bạn copy chạy SSMS. Có chắc chắn không?`)) return;
 
         try {
             const res = await fetch(`/api/records/admin/fail/reset?loai=${loai}`, { method: 'POST' });
             const data = await res.json();
-            if (res.ok) {
-                alert(`Reset thành công! Rowcount: ${data.rowcount}`);
+            if (res.ok && data.success) {
+                if (data.rowcount > 0) {
+                    openHisUnlockModal(data.sql_command, `Reset cờ xuất hàng loạt ca FAIL (${loai})`);
+                } else {
+                    alert("Không có ca FAIL nào đang chờ reset.");
+                }
                 fetchFailRecords();
+                updateGlobalKPIs();
             } else {
                 alert(`Thất bại: ${data.detail || 'Lỗi chạy SQL reset'}`);
+            }
+        } catch {
+            alert("Lỗi kết nối.");
+        }
+    }
+
+    // Helper functions for hisUnlockModal
+    function openHisUnlockModal(sql, title) {
+        document.getElementById('hisUnlockModalTitle').innerText = title || "Mở khóa bệnh án / Reset HIS";
+        document.getElementById('hisUnlockSqlText').value = sql;
+        document.getElementById('hisUnlockModal').style.display = 'flex';
+        
+        // Auto copy to clipboard
+        navigator.clipboard.writeText(sql).then(() => {
+            logToConsole(`Đã tự động copy câu lệnh SQL vào Clipboard! ✅`);
+        }).catch(err => {
+            console.error('Không thể auto-copy: ', err);
+        });
+    }
+
+    function closeHisUnlockModal() {
+        document.getElementById('hisUnlockModal').style.display = 'none';
+    }
+
+    function copyHisUnlockSql() {
+        const sql = document.getElementById('hisUnlockSqlText').value;
+        navigator.clipboard.writeText(sql).then(() => {
+            alert("Đã copy câu lệnh SQL thành công!");
+        }).catch(err => {
+            alert("Lỗi copy: " + err);
+        });
+    }
+
+    // Tab 6: Error Definitions CRUD JS
+    let errorDefinitions = [];
+
+    async function fetchErrorDefinitions() {
+        try {
+            const res = await fetch('/api/error-definitions');
+            if (res.ok) {
+                const data = await res.json();
+                renderErrorDefinitions(data);
+            }
+        } catch (e) {
+            console.error("Lỗi fetch error definitions:", e);
+        }
+    }
+
+    function renderErrorDefinitions(data) {
+        errorDefinitions = data;
+        const tbody = document.getElementById('errorDefBody');
+        tbody.innerHTML = '';
+        
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 30px;">Danh mục hướng dẫn trống. Hãy thêm hướng dẫn mới.</td></tr>`;
+            return;
+        }
+
+        data.forEach((d, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${d.error_code}</strong></td>
+                <td><code>${d.keyword || ''}</code></td>
+                <td style="max-width:200px; white-space:normal; font-size:14px;">${d.root_cause || ''}</td>
+                <td style="max-width:250px; white-space:normal; color:var(--success); font-weight:600; font-size:14px;">${d.resolution || ''}</td>
+                <td>
+                    <span class="badge" style="background: ${d.requires_his_reset ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color: ${d.requires_his_reset ? '#f87171' : '#34d399'}; border: 1px solid ${d.requires_his_reset ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}; font-weight:700;">
+                        ${d.requires_his_reset ? 'Bắt buộc Reset' : 'Không cần'}
+                    </span>
+                </td>
+                <td>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="editErrorDefByIndex(${idx})">Sửa</button>
+                        <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="deleteErrorDef(${d.id})">Xóa</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function openErrorDefModal(data = null) {
+        if (data) {
+            document.getElementById('errorDefModalTitle').innerText = "Cập nhật Hướng dẫn Lỗi";
+            document.getElementById('err_id').value = data.id;
+            document.getElementById('err_code').value = data.error_code;
+            document.getElementById('err_keyword').value = data.keyword || '';
+            document.getElementById('err_root_cause').value = data.root_cause || '';
+            document.getElementById('err_resolution').value = data.resolution || '';
+            document.getElementById('err_requires_his_reset').checked = data.requires_his_reset || false;
+        } else {
+            document.getElementById('errorDefModalTitle').innerText = "Thêm Hướng dẫn Lỗi Mới";
+            document.getElementById('err_id').value = '';
+            document.getElementById('err_code').value = '';
+            document.getElementById('err_keyword').value = '';
+            document.getElementById('err_root_cause').value = '';
+            document.getElementById('err_resolution').value = '';
+            document.getElementById('err_requires_his_reset').checked = false;
+        }
+        document.getElementById('errorDefModal').style.display = 'flex';
+    }
+
+    function closeErrorDefModal() {
+        document.getElementById('errorDefModal').style.display = 'none';
+    }
+
+    function editErrorDefByIndex(idx) {
+        openErrorDefModal(errorDefinitions[idx]);
+    }
+
+    async function saveErrorDefinition() {
+        const id = document.getElementById('err_id').value;
+        const error_code = document.getElementById('err_code').value.trim();
+        const keyword = document.getElementById('err_keyword').value.trim();
+        const root_cause = document.getElementById('err_root_cause').value.trim();
+        const resolution = document.getElementById('err_resolution').value.trim();
+        const requires_his_reset = document.getElementById('err_requires_his_reset').checked;
+
+        if (!error_code) {
+            alert("Mã lỗi không được để trống!");
+            return;
+        }
+
+        const body = {
+            error_code,
+            keyword,
+            root_cause,
+            resolution,
+            requires_his_reset
+        };
+        if (id) body.id = parseInt(id);
+
+        try {
+            const res = await fetch('/api/error-definitions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (res.ok) {
+                closeErrorDefModal();
+                fetchErrorDefinitions();
+            } else {
+                alert("Lỗi khi lưu định nghĩa lỗi.");
+            }
+        } catch {
+            alert("Lỗi kết nối.");
+        }
+    }
+
+    async function deleteErrorDef(id) {
+        if (!confirm("Bạn có chắc muốn xóa định nghĩa lỗi này khỏi danh mục hướng dẫn?")) return;
+        try {
+            const res = await fetch(`/api/error-definitions/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                fetchErrorDefinitions();
+            } else {
+                alert("Lỗi khi xóa hướng dẫn.");
             }
         } catch {
             alert("Lỗi kết nối.");

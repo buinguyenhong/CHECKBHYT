@@ -162,6 +162,11 @@ try:
             conn.execute(text("ALTER TABLE app_config ADD COLUMN auto_sync_enabled BOOLEAN DEFAULT 0"))
         if "auto_sync_time" not in columns:
             conn.execute(text("ALTER TABLE app_config ADD COLUMN auto_sync_time VARCHAR DEFAULT '00:30'"))
+            
+        res_rec = conn.execute(text("PRAGMA table_info(records)")).fetchall()
+        columns_rec = [r[1] for r in res_rec]
+        if "his_unlock_status" not in columns_rec:
+            conn.execute(text("ALTER TABLE records ADD COLUMN his_unlock_status VARCHAR DEFAULT 'NORMAL'"))
 except Exception as e:
     print(f"[*] Thong tin di tru tu dong: {e}")
 
@@ -190,6 +195,21 @@ try:
         db.add(new_cfg)
         db.commit()
         print("[*] Da khoi tao cau hinh CSDL HIS mac dinh.")
+
+    # Seed danh mục lỗi mẫu
+    from models import ErrorDefinition
+    err_count = db.query(ErrorDefinition).count()
+    if err_count == 0:
+        sample_errors = [
+            ErrorDefinition(error_code="XML3", keyword="DIEN_BIEN_LS", root_cause="Khoa lâm sàng quên nhập diễn biến bệnh án lúc cho ra viện", resolution="Mở bệnh án HIS -> Tab Khám bệnh -> Điền đầy đủ Diễn biến lâm sàng rồi bấm Lưu", requires_his_reset=True),
+            ErrorDefinition(error_code="XML3", keyword="TOMTAT_KQ", root_cause="Thiếu tóm tắt kết quả cận lâm sàng quan trọng", resolution="Nhập đầy đủ thông tin tóm tắt kết quả cận lâm sàng trên phần mềm HIS rồi cho ra viện lại", requires_his_reset=True),
+            ErrorDefinition(error_code="XML8", keyword="MA_TTDV", root_cause="Thiếu mã tương đương dịch vụ kỹ thuật hoặc thuốc", resolution="Liên hệ phòng IT để cập nhật danh mục tương đương hoặc ánh xạ mã dịch vụ kỹ thuật", requires_his_reset=False),
+            ErrorDefinition(error_code="XML5", keyword="NGAY_TH_YL", root_cause="Ngày thực hiện y lệnh bị trống hoặc sai định dạng", resolution="Sửa lại ngày thực hiện y lệnh trên HIS cho khớp với ngày ra viện", requires_his_reset=True),
+            ErrorDefinition(error_code="XML1", keyword="XML1", root_cause="Thông tin XML1 (Tổng hợp) chưa chuẩn xác, sai lệch số tiền hoặc thẻ BHYT", resolution="Kiểm tra lại thẻ BHYT của bệnh nhân hoặc tính toán lại chi phí trên HIS trước khi phê duyệt gửi cổng", requires_his_reset=False)
+        ]
+        db.add_all(sample_errors)
+        db.commit()
+        print("[*] Da khoi tao danh muc huong dan loi mau.")
 finally:
     db.close()
 
@@ -359,6 +379,112 @@ def clear_his_cache(user: User = Depends(require_admin)):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/error-definitions")
+def get_error_definitions(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Lấy danh sách danh mục hướng dẫn lỗi"""
+    from models import ErrorDefinition
+    defs = db.query(ErrorDefinition).all()
+    return defs
+
+
+@app.post("/api/error-definitions")
+def save_error_definition(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Thêm mới hoặc cập nhật một định nghĩa lỗi"""
+    from models import ErrorDefinition
+    def_id = data.get("id")
+    if def_id:
+        err_def = db.query(ErrorDefinition).filter(ErrorDefinition.id == def_id).first()
+    else:
+        err_def = None
+        
+    if not err_def:
+        err_def = ErrorDefinition()
+        db.add(err_def)
+        
+    err_def.error_code = data.get("error_code", "").strip()
+    err_def.keyword = data.get("keyword", "").strip()
+    err_def.root_cause = data.get("root_cause", "").strip()
+    err_def.resolution = data.get("resolution", "").strip()
+    err_def.requires_his_reset = data.get("requires_his_reset", False)
+    
+    db.commit()
+    return {"status": "success", "id": err_def.id}
+
+
+@app.delete("/api/error-definitions/{id}")
+def delete_error_definition(
+    id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Xóa một định nghĩa lỗi khỏi danh mục"""
+    from models import ErrorDefinition
+    err_def = db.query(ErrorDefinition).filter(ErrorDefinition.id == id).first()
+    if not err_def:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lỗi cần xóa")
+    db.delete(err_def)
+    db.commit()
+    return {"status": "success"}
+
+
+@app.post("/api/records/{id}/toggle-his-unlock")
+def toggle_record_his_unlock(
+    id: int,
+    action_type: str = Form(...), # 'UNLOCK' | 'CLOSE'
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Bật/Tắt trạng thái 'Đang được trả về khoa' và sinh câu lệnh SQL cho IT tự chạy trên SSMS"""
+    record = db.query(Record).filter(Record.id == id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ bệnh nhân này")
+        
+    sql_command = ""
+    ma_lk = record.ma_lk
+    ho_ten = record.ho_ten
+    
+    if record.loai_ca == "Ngoại trú":
+        sql_command = f"""-- SQL Mở khóa Ngoại trú cho BN: {ho_ten}
+UPDATE xn
+SET Export=0, Export1=0, Export_CV130=0
+FROM TiepNhan tn
+JOIN XacNhanChiPhi xn ON xn.TiepNhan_Id = tn.TiepNhan_Id
+WHERE tn.SoTiepNhan = '{ma_lk}';"""
+    else:
+        sql_command = f"""-- SQL Mở khóa Nội trú cho BN: {ho_ten}
+UPDATE xn
+SET Export=0, Export1=0, Export_CV130=0
+FROM BenhAn ba
+JOIN XacNhanChiPhi xn ON xn.BenhAn_Id = ba.BenhAn_Id
+WHERE ba.SoBenhAn = '{ma_lk}';"""
+
+    if action_type == "UNLOCK":
+        record.his_unlock_status = "UNLOCKED"
+        log_action = f"IT Admin đã đổi trạng thái thành 'Đang được trả về khoa' và copy SQL mở khóa."
+    else:
+        record.his_unlock_status = "NORMAL"
+        log_action = f"IT Admin đã đóng trạng thái mở khóa (Khoa phòng báo đã sửa xong)."
+        
+    new_log = RecordLog(
+        record_id=record.id,
+        username=user.username,
+        action="CHANGE_STATUS",
+        note=log_action
+    )
+    db.add(new_log)
+    db.commit()
+    
+    return {
+        "status": "success", 
+        "his_unlock_status": record.his_unlock_status,
+        "sql_command": sql_command
+    }
 
 
 @app.post("/api/config/test-connection")
@@ -625,8 +751,25 @@ def get_department_records(
     if status != "ALL":
         query = query.filter(Record.status == status)
         
-    # Sắp xếp ngày ra viện từ xa nhất đến mới nhất (tăng dần)
-    return query.order_by(Record.status.asc(), Record.ngay_ra_vien.asc()).all()
+    records = query.order_by(Record.status.asc(), Record.ngay_ra_vien.asc()).all()
+    
+    # Làm giàu dữ liệu hướng dẫn sửa lỗi từ danh mục
+    from models import ErrorDefinition
+    defs = db.query(ErrorDefinition).all()
+    
+    for r in records:
+        r.root_cause = "Chưa rõ nguyên nhân (Hệ thống tự động quét)"
+        r.resolution = "Chờ phòng IT bổ sung hướng dẫn chi tiết"
+        r.requires_his_reset = False
+        
+        for d in defs:
+            if d.error_code == r.maloi:
+                if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
+                    r.root_cause = d.root_cause
+                    r.resolution = d.resolution
+                    r.requires_his_reset = d.requires_his_reset
+                    break
+    return records
 
 
 @app.post("/api/records/{record_id}/flag")
@@ -678,10 +821,16 @@ def get_admin_fail_records(
     db: Session = Depends(get_db)
 ):
     """Lấy danh sách các ca FAIL (sắp xếp ngày ra viện xa nhất đến mới nhất) để IT sửa tay"""
-    return db.query(Record).filter(
+    records = db.query(Record).filter(
         Record.type_group == "FAIL",
         Record.status != "RESOLVED"
     ).order_by(Record.ngay_ra_vien.asc()).all()
+    
+    for r in records:
+        r.root_cause = ""
+        r.resolution = ""
+        r.requires_his_reset = False
+    return records
 
 
 @app.get("/api/records/admin/review")
@@ -690,9 +839,27 @@ def get_admin_review_records(
     db: Session = Depends(get_db)
 ):
     """Lấy danh sách hồ sơ lỗi do các Khoa lâm sàng gửi yêu cầu duyệt kiểm tra"""
-    return db.query(Record).filter(
+    records = db.query(Record).filter(
         Record.status == "WAITING_REVIEW"
     ).order_by(Record.updated_at.desc()).all()
+    
+    # Làm giàu dữ liệu hướng dẫn sửa lỗi từ danh mục
+    from models import ErrorDefinition
+    defs = db.query(ErrorDefinition).all()
+    
+    for r in records:
+        r.root_cause = "Chưa rõ nguyên nhân (Hệ thống tự động quét)"
+        r.resolution = "Chờ phòng IT bổ sung hướng dẫn chi tiết"
+        r.requires_his_reset = False
+        
+        for d in defs:
+            if d.error_code == r.maloi:
+                if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
+                    r.root_cause = d.root_cause
+                    r.resolution = d.resolution
+                    r.requires_his_reset = d.requires_his_reset
+                    break
+    return records
 
 
 @app.post("/api/records/{record_id}/admin-resolve")
@@ -729,45 +896,29 @@ def approve_and_reset_sql(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """
-    IT duyệt hồ sơ lỗi khoa gửi lên: Đánh dấu RESOLVED và tự động
-    chạy lệnh UPDATE reset cờ xuất (Export=0) trực tiếp trên database HIS.
-    """
+    """IT duyệt hồ sơ lỗi khoa gửi lên: Đánh dấu RESOLVED trên WebApp và sinh câu lệnh SQL reset cờ xuất để IT copy chạy SSMS"""
     record = db.query(Record).filter(Record.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Hồ sơ không tồn tại.")
 
-    cfg = db.query(AppConfig).first()
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Thiếu cấu hình kết nối SQL Server HIS.")
-
     try:
-        # 1. Chạy Reset SQL
-        password_plain = decrypt_password(cfg.password) if cfg.password else ""
-        cfg_dict = {
-            "driver": cfg.driver,
-            "server": cfg.server,
-            "database": cfg.database,
-            "auth": cfg.auth,
-            "user": cfg.user,
-            "password": password_plain
-        }
-        rc = his_service.execute_reset(cfg_dict, [record.ma_lk], record.loai_ca)
+        # Sinh câu lệnh SQL Reset hành chính (Export=0)
+        sql_command = his_service.build_reset_sql([record.ma_lk], record.loai_ca)
 
-        # 2. Cập nhật trạng thái WebApp
+        # Cập nhật trạng thái WebApp thành RESOLVED
         record.status = "RESOLVED"
         log = RecordLog(
             record_id=record.id,
             username=user.username,
             action="CHANGE_STATUS",
-            note=f"IT duyệt giải trình & chạy Reset SQL. Rowcount cập nhật: {rc}"
+            note=f"IT duyệt giải trình và copy SQL Reset hành chính chạy trên SSMS."
         )
         db.add(log)
         db.commit()
 
-        return {"success": True, "rowcount": rc}
+        return {"success": True, "sql_command": sql_command, "rowcount": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi truy vấn SQL reset: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi sinh câu lệnh SQL reset: {str(e)}")
 
 
 @app.post("/api/records/admin/fail/reset")
@@ -776,7 +927,7 @@ def run_bulk_fail_reset(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """IT chạy Reset cờ xuất hàng loạt cho tất cả ca FAIL (Ngoại trú hoặc Nội trú) đang PENDING"""
+    """IT chạy Reset cờ xuất hàng loạt cho tất cả ca FAIL: Sinh câu lệnh SQL hàng loạt và đổi trạng thái WebApp thành RESOLVED"""
     records = db.query(Record).filter(
         Record.type_group == "FAIL",
         Record.status == "PENDING",
@@ -786,23 +937,10 @@ def run_bulk_fail_reset(
     if not records:
         return {"success": True, "rowcount": 0, "message": "Không có ca FAIL nào đang chờ reset."}
 
-    cfg = db.query(AppConfig).first()
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Thiếu cấu hình kết nối SQL Server HIS.")
-
     try:
-        password_plain = decrypt_password(cfg.password) if cfg.password else ""
-        cfg_dict = {
-            "driver": cfg.driver,
-            "server": cfg.server,
-            "database": cfg.database,
-            "auth": cfg.auth,
-            "user": cfg.user,
-            "password": password_plain
-        }
-        
         keys = [r.ma_lk for r in records]
-        rc = his_service.execute_reset(cfg_dict, keys, loai)
+        # Sinh câu lệnh SQL Reset hàng loạt
+        sql_command = his_service.build_reset_sql(keys, loai)
 
         # Đánh dấu đã xử lý xong cho các ca trên WebApp
         for r in records:
@@ -811,14 +949,14 @@ def run_bulk_fail_reset(
                 record_id=r.id,
                 username=user.username,
                 action="CHANGE_STATUS",
-                note=f"IT chạy Reset hàng loạt ({loai})."
+                note=f"IT xác nhận xử lý hàng loạt ({loai}) và lấy câu lệnh SQL chạy SSMS."
             )
             db.add(log)
             
         db.commit()
-        return {"success": True, "rowcount": rc}
+        return {"success": True, "rowcount": len(records), "sql_command": sql_command}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý hàng loạt: {str(e)}")
 
 
 @app.get("/api/records/kpi")

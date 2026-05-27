@@ -44,6 +44,7 @@ class Record(Base):
     ngay_doi_soat = Column(Date, index=True, nullable=False)  # Ngày thực hiện đối soát
     status = Column(String, default="PENDING")  # 'PENDING' | 'WAITING_REVIEW' | 'RESOLVED'
     type_group = Column(String, default="FAIL")  # 'LOI' (Danh sách lỗi) | 'FAIL' (Danh sách fail)
+    his_unlock_status = Column(String, default="NORMAL") # 'NORMAL' (Bình thường) | 'UNLOCKED' (Đang được trả về khoa)
     
     maloi = Column(String, default="")
     motaloi = Column(String, default="")
@@ -64,3 +65,15 @@ class RecordLog(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     record = relationship("Record", back_populates="logs")
+
+
+class ErrorDefinition(Base):
+    __tablename__ = "error_definitions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    error_code = Column(String, index=True, nullable=False)       # MALOI (ví dụ: XML3, XML5)
+    keyword = Column(String, index=True, nullable=True)           # Từ khóa trong MOTALOI (ví dụ: DIEN_BIEN_LS)
+    root_cause = Column(String, nullable=True)                    # Nguyên nhân
+    resolution = Column(String, nullable=True)                    # Cách xử lý
+    requires_his_reset = Column(Boolean, default=False)           # Cờ đánh dấu có cần Reset HIS hay không
+

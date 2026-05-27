@@ -23,21 +23,28 @@ def process_comparison(
     if not df_listbh.empty:
         sent_keys = set(df_listbh["MA_LK"].dropna().astype(str).map(chuan_hoa_ma_lk))
 
-    # 2. Xây dựng bản đồ lỗi (ma_lk -> error_detail)
+    # 2. Xây dựng bản đồ lỗi (ma_lk -> DANH SÁCH các dòng lỗi chi tiết)
     error_map = {}
     if not df_hsloi.empty:
         for _, row in df_hsloi.iterrows():
             lk = chuan_hoa_ma_lk(row["MA_LK"])
             if lk:
-                error_map[lk] = {
+                if lk not in error_map:
+                    error_map[lk] = []
+                error_map[lk].append({
                     "maloi": str(row.get("MALOI", "")).strip(),
                     "motaloi": str(row.get("MOTALOI", "")).strip(),
                     "ngay_ra": row.get("Ngày ra", None) if not pd.isna(row.get("Ngày ra")) else None
-                }
+                })
 
     stats = {"total": len(df_sql), "loi": 0, "fail": 0, "sent": 0}
 
-    # 3. Quét từng hồ sơ trong SQL HIS
+    # Danh mục lỗi đã biết (cho việc tự động thu thập lỗi mới)
+    from models import ErrorDefinition
+    known_defs = {(ed.error_code, ed.keyword) for ed in db.query(ErrorDefinition).all()}
+    KEYWORDS = ["DIEN_BIEN_LS", "TOMTAT_KQ", "NGAY_TH_YL", "MA_TTDV", "PP_DIEUTRI", "MA_BENH_CHINh", "CHAN_DOAN_RV", "NAM_QT", "THANG_QT", "NGAY_RA", "NGUOI_THUC_HIEN", "MA_LOAI_KCB", "XML1", "XML2", "XML3", "XML4", "XML5", "XML7", "XML8"]
+
+    # 3. Quét từng hồ sơ trong CSDL HIS
     for _, row in df_sql.iterrows():
         ma_lk = chuan_hoa_ma_lk(row["MA_LK"])
         if not ma_lk:
@@ -45,14 +52,7 @@ def process_comparison(
 
         # Kiểm tra xem ca này đã được gửi BHYT thành công hay chưa
         is_sent = (ma_lk in sent_keys)
-        
-        # Xác định nhóm lỗi
         has_error = (ma_lk in error_map)
-        
-        # Kiểm tra xem bản ghi đối soát (ma_lk) đã tồn tại trong CSDL chưa
-        existing_record = db.query(Record).filter(
-            Record.ma_lk == ma_lk
-        ).first()
 
         # Dữ liệu đối soát hành chính
         loai_ca = str(row.get("Loại ca", "Ngoại trú"))
@@ -62,93 +62,159 @@ def process_comparison(
         ma_y_te = str(row.get("Mã y tế", ""))
         ngay_ra_vien = row.get("Ngày ra viện", None) if not pd.isna(row.get("Ngày ra viện")) else None
 
-        # Phân loại trạng thái mặc định
         if is_sent:
-            status = "RESOLVED"
-            type_group = "FAIL"
-            stats["sent"] += 1
-            maloi = ""
-            motaloi = ""
-            ngay_ra = None
-        else:
-            status = "PENDING"
-            if has_error:
-                type_group = "LOI"
-                stats["loi"] += 1
-                err_detail = error_map[ma_lk]
-                maloi = err_detail["maloi"]
-                motaloi = err_detail["motaloi"]
-                ngay_ra = err_detail["ngay_ra"]
-            else:
-                type_group = "FAIL"
-                stats["fail"] += 1
-                maloi = ""
-                motaloi = ""
-                ngay_ra = None
-
-        if existing_record:
-            # 1. Cập nhật thông tin thô
-            existing_record.ho_ten = ho_ten
-            existing_record.ma_the = ma_the
-            existing_record.ten_khoa = ten_khoa
-            existing_record.ma_y_te = ma_y_te
-            existing_record.ngay_ra_vien = ngay_ra_vien
-            existing_record.loai_ca = loai_ca
-            existing_record.ngay_doi_soat = ngay_doi_soat  # Cập nhật ngày đối soát hiện tại
-
-            # Áp dụng Quy tắc 3: Note (ghi chú) được tự động bảo toàn và kế thừa (không thay đổi)
-
-            # Áp dụng Quy tắc 4: Tự động chuyển thành RESOLVED nếu ca này đang chờ và nay đã gửi thành công
-            if is_sent:
-                if existing_record.status != "RESOLVED":
-                    existing_record.status = "RESOLVED"
+            # Quy tắc 4: Tự động chuyển thành RESOLVED cho toàn bộ bản ghi lỗi/fail cũ của ma_lk này
+            existing_records = db.query(Record).filter(Record.ma_lk == ma_lk).all()
+            for rec in existing_records:
+                if rec.status != "RESOLVED":
+                    rec.status = "RESOLVED"
+                    rec.his_unlock_status = "NORMAL" # Reset trạng thái mở khóa khi đã gửi thành công
                     log = RecordLog(
-                        record_id=existing_record.id,
+                        record_id=rec.id,
                         username="system",
                         action="CHANGE_STATUS",
                         note="He thong tu dong duyet: Ca benh da gui thanh cong len cong BHYT"
                     )
                     db.add(log)
-            else:
-                # Nếu chưa gửi thành công và có mã lỗi mới, cập nhật lỗi
-                if has_error:
-                    existing_record.type_group = "LOI"
-                    existing_record.maloi = maloi
-                    existing_record.motaloi = motaloi
-                    if ngay_ra:
-                        existing_record.ngay_ra = ngay_ra
-                else:
-                    # Nếu là ca Fail và trạng thái cũ đã được đánh dấu RESOLVED trước đó, giữ nguyên
-                    pass
+            stats["sent"] += 1
         else:
-            # Tạo bản ghi đối soát mới hoàn toàn
-            new_rec = Record(
-                ma_lk=ma_lk,
-                ho_ten=ho_ten,
-                ma_the=ma_the,
-                ten_khoa=ten_khoa,
-                ma_y_te=ma_y_te,
-                ngay_ra_vien=ngay_ra_vien,
-                loai_ca=loai_ca,
-                ngay_doi_soat=ngay_doi_soat,
-                status=status,
-                type_group=type_group,
-                maloi=maloi,
-                motaloi=motaloi,
-                ngay_ra=ngay_ra,
-                note=""
-            )
-            db.add(new_rec)
-            db.flush()
+            # Chưa gửi thành công:
+            if not has_error:
+                # Không có lỗi chi tiết -> Bản ghi hành chính thuộc nhóm FAIL (IT xử lý)
+                type_group = "FAIL"
+                stats["fail"] += 1
+                
+                existing_record = db.query(Record).filter(
+                    Record.ma_lk == ma_lk,
+                    Record.type_group == "FAIL"
+                ).first()
+                
+                if existing_record:
+                    existing_record.ho_ten = ho_ten
+                    existing_record.ma_the = ma_the
+                    existing_record.ten_khoa = ten_khoa
+                    existing_record.ma_y_te = ma_y_te
+                    existing_record.ngay_ra_vien = ngay_ra_vien
+                    existing_record.loai_ca = loai_ca
+                    existing_record.ngay_doi_soat = ngay_doi_soat
+                    
+                    # Nếu ca FAIL này trước đó đã gửi thành công nay bị mở lại
+                    if existing_record.status == "RESOLVED":
+                        existing_record.status = "PENDING"
+                        log = RecordLog(
+                            record_id=existing_record.id,
+                            username="system",
+                            action="CHANGE_STATUS",
+                            note="He thong tu dong mo lai: Ca benh chua gui duoc cong BHYT"
+                        )
+                        db.add(log)
+                else:
+                    new_rec = Record(
+                        ma_lk=ma_lk,
+                        ho_ten=ho_ten,
+                        ma_the=ma_the,
+                        ten_khoa=ten_khoa,
+                        ma_y_te=ma_y_te,
+                        ngay_ra_vien=ngay_ra_vien,
+                        loai_ca=loai_ca,
+                        ngay_doi_soat=ngay_doi_soat,
+                        status="PENDING",
+                        type_group="FAIL",
+                        maloi="",
+                        motaloi="",
+                        ngay_ra=None,
+                        note=""
+                    )
+                    db.add(new_rec)
+                    db.flush()
+                    
+                    log_entry = RecordLog(
+                        record_id=new_rec.id,
+                        username="system",
+                        action="CREATE",
+                        note=f"Khoi tao doi soat ngay {ngay_doi_soat.strftime('%d/%m/%Y')}. Nhom: FAIL"
+                    )
+                    db.add(log_entry)
+            else:
+                # Có lỗi chi tiết -> TẠO 1 BẢN GHI RIÊNG BIỆT CHO MỖI DÒNG LỖI!
+                for err_detail in error_map[ma_lk]:
+                    maloi = err_detail["maloi"]
+                    motaloi = err_detail["motaloi"]
+                    ngay_ra = err_detail["ngay_ra"]
+                    
+                    stats["loi"] += 1
+                    
+                    # A. Tự động thu thập mẫu lỗi mới chưa có trong danh mục hướng dẫn
+                    kw = None
+                    for k in KEYWORDS:
+                        if k in motaloi:
+                            kw = k
+                            break
+                    if (maloi, kw) not in known_defs and (maloi or kw):
+                        new_def = ErrorDefinition(
+                            error_code=maloi,
+                            keyword=kw,
+                            root_cause="Chưa rõ nguyên nhân (Hệ thống tự động quét)",
+                            resolution="Chờ phòng IT bổ sung hướng dẫn chi tiết",
+                            requires_his_reset=False
+                        )
+                        db.add(new_def)
+                        db.flush()
+                        known_defs.add((maloi, kw))
 
-            # Lưu log hệ thống khởi tạo
-            log_entry = RecordLog(
-                record_id=new_rec.id,
-                username="system",
-                action="CREATE",
-                note=f"Khoi tao doi soat ngay {ngay_doi_soat.strftime('%d/%m/%Y')}. Nhom: {type_group}"
-            )
-            db.add(log_entry)
+                    # B. Tìm hoặc tạo Record cho dòng lỗi cụ thể này
+                    existing_record = db.query(Record).filter(
+                        Record.ma_lk == ma_lk,
+                        Record.maloi == maloi,
+                        Record.motaloi == motaloi
+                    ).first()
+                    
+                    if existing_record:
+                        existing_record.ho_ten = ho_ten
+                        existing_record.ma_the = ma_the
+                        existing_record.ten_khoa = ten_khoa
+                        existing_record.ma_y_te = ma_y_te
+                        existing_record.ngay_ra_vien = ngay_ra_vien
+                        existing_record.loai_ca = loai_ca
+                        existing_record.ngay_doi_soat = ngay_doi_soat
+                        existing_record.type_group = "LOI"
+                        
+                        if existing_record.status == "RESOLVED":
+                            existing_record.status = "PENDING"
+                            log = RecordLog(
+                                record_id=existing_record.id,
+                                username="system",
+                                action="CHANGE_STATUS",
+                                note="He thong tu dong mo lai: Loi chua duoc khac phuc va chua gui thanh cong"
+                            )
+                            db.add(log)
+                    else:
+                        new_rec = Record(
+                            ma_lk=ma_lk,
+                            ho_ten=ho_ten,
+                            ma_the=ma_the,
+                            ten_khoa=ten_khoa,
+                            ma_y_te=ma_y_te,
+                            ngay_ra_vien=ngay_ra_vien,
+                            loai_ca=loai_ca,
+                            ngay_doi_soat=ngay_doi_soat,
+                            status="PENDING",
+                            type_group="LOI",
+                            maloi=maloi,
+                            motaloi=motaloi,
+                            ngay_ra=ngay_ra,
+                            note=""
+                        )
+                        db.add(new_rec)
+                        db.flush()
+                        
+                        log_entry = RecordLog(
+                            record_id=new_rec.id,
+                            username="system",
+                            action="CREATE",
+                            note=f"Khoi tao doi soat ngay {ngay_doi_soat.strftime('%d/%m/%Y')}. Nhom: LOI (Ma loi: {maloi})"
+                        )
+                        db.add(log_entry)
 
     db.commit()
     return stats
