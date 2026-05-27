@@ -353,21 +353,42 @@ def get_available_drivers(user: User = Depends(require_admin)):
 
 @app.post("/api/config/test-connection")
 def test_his_connection(
+    test_data: dict = None,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Kiểm tra kết nối CSDL HIS trên mạng LAN (giải mã mật khẩu)"""
+    """Kiểm tra kết nối CSDL HIS trên mạng LAN. Hỗ trợ cả test cấu hình lưu sẵn hoặc test cấu hình truyền trực tiếp từ UI"""
     cfg = db.query(AppConfig).first()
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Chưa cấu hình thông tin kết nối")
-    try:
+    
+    if test_data:
+        driver = test_data.get("driver")
+        server = test_data.get("server")
+        database = test_data.get("database")
+        auth = test_data.get("auth")
+        user_db = test_data.get("user")
+        password_raw = test_data.get("password", "")
+        
+        if password_raw == "••••••••":
+            password_plain = decrypt_password(cfg.password) if (cfg and cfg.password) else ""
+        else:
+            password_plain = password_raw
+    else:
+        if not cfg:
+            raise HTTPException(status_code=400, detail="Chưa cấu hình thông tin kết nối")
+        driver = cfg.driver
+        server = cfg.server
+        database = cfg.database
+        auth = cfg.auth
+        user_db = cfg.user
         password_plain = decrypt_password(cfg.password) if cfg.password else ""
+
+    try:
         cfg_dict = {
-            "driver": cfg.driver,
-            "server": cfg.server,
-            "database": cfg.database,
-            "auth": cfg.auth,
-            "user": cfg.user,
+            "driver": driver,
+            "server": server,
+            "database": database,
+            "auth": auth,
+            "user": user_db,
             "password": password_plain
         }
         success = his_service.test_connection(cfg_dict)

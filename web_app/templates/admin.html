@@ -1411,8 +1411,20 @@
     // Test connection
     async function testConnection() {
         logToConsole("Đang kiểm tra kết nối tới SQL Server LAN...");
+        const testData = {
+            driver: document.getElementById('cfg_driver').value,
+            server: document.getElementById('cfg_server').value.trim(),
+            database: document.getElementById('cfg_database').value.trim(),
+            auth: document.getElementById('cfg_auth').value,
+            user: document.getElementById('cfg_user').value.trim(),
+            password: document.getElementById('cfg_password').value
+        };
         try {
-            const res = await fetch('/api/config/test-connection', { method: 'POST' });
+            const res = await fetch('/api/config/test-connection', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(testData)
+            });
             const data = await res.json();
             if (res.ok && data.success) {
                 logToConsole("Kết nối SQL Server thành công! ✅");
