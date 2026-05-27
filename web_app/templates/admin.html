@@ -1312,6 +1312,45 @@
     // Load initial config
     async function loadConfig() {
         try {
+            // Load available drivers first
+            try {
+                const driversRes = await fetch('/api/config/drivers');
+                if (driversRes.ok) {
+                    const data = await driversRes.json();
+                    if (data.drivers && data.drivers.length > 0) {
+                        const selectEl = document.getElementById('cfg_driver');
+                        
+                        // Clear existing options
+                        selectEl.innerHTML = '';
+                        
+                        // Add installed drivers
+                        data.drivers.forEach(driver => {
+                            const opt = document.createElement('option');
+                            opt.value = driver;
+                            opt.textContent = driver + " (Đã cài đặt)";
+                            selectEl.appendChild(opt);
+                        });
+                        
+                        // Add standard ones as fallback if they aren't in the list
+                        const standardDrivers = [
+                            "ODBC Driver 17 for SQL Server",
+                            "ODBC Driver 18 for SQL Server",
+                            "SQL Server"
+                        ];
+                        standardDrivers.forEach(std => {
+                            if (!data.drivers.includes(std)) {
+                                const opt = document.createElement('option');
+                                opt.value = std;
+                                opt.textContent = std + " (Chưa phát hiện)";
+                                selectEl.appendChild(opt);
+                            }
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Lỗi khi tải danh sách driver:", err);
+            }
+
             const res = await fetch('/api/config');
             if (res.ok) {
                 currentConfig = await res.json();

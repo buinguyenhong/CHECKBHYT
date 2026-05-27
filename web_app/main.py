@@ -340,6 +340,17 @@ def save_config(
     return {"status": "success"}
 
 
+@app.get("/api/config/drivers")
+def get_available_drivers(user: User = Depends(require_admin)):
+    """Lấy danh sách các ODBC drivers đã cài đặt trên hệ thống máy chủ"""
+    try:
+        import pyodbc
+        drivers = pyodbc.drivers()
+    except Exception:
+        drivers = []
+    return {"drivers": drivers}
+
+
 @app.post("/api/config/test-connection")
 def test_his_connection(
     user: User = Depends(require_admin),
