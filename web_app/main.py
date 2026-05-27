@@ -145,6 +145,7 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         
         ngay_doi_soat = datetime.date.today()
         stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat)
+        save_last_kpis(db, stats, df_listbh, ngay_doi_soat)
         
         SYNC_PROGRESS["progress"] = 100
         SYNC_PROGRESS["status"] = "Hoàn tất"
@@ -171,6 +172,20 @@ try:
             conn.execute(text("ALTER TABLE app_config ADD COLUMN auto_sync_enabled BOOLEAN DEFAULT 0"))
         if "auto_sync_time" not in columns:
             conn.execute(text("ALTER TABLE app_config ADD COLUMN auto_sync_time VARCHAR DEFAULT '00:30'"))
+        if "last_sync_date" not in columns:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN last_sync_date DATE"))
+        if "last_tong_sql" not in columns:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN last_tong_sql INTEGER DEFAULT 0"))
+        if "last_tong_bh" not in columns:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN last_tong_bh INTEGER DEFAULT 0"))
+        if "last_da_gui" not in columns:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN last_da_gui INTEGER DEFAULT 0"))
+        if "last_loi" not in columns:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN last_loi INTEGER DEFAULT 0"))
+        if "last_fail" not in columns:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN last_fail INTEGER DEFAULT 0"))
+        if "last_resolved" not in columns:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN last_resolved INTEGER DEFAULT 0"))
             
         res_rec = conn.execute(text("PRAGMA table_info(records)")).fetchall()
         columns_rec = [r[1] for r in res_rec]
@@ -184,6 +199,22 @@ app = FastAPI(
     description="Hệ thống đối soát BHYT chạy mạng LAN nội bộ bệnh viện",
     version="2.0.0"
 )
+
+def save_last_kpis(db: Session, stats: dict, df_listbh: pd.DataFrame, ngay_doi_soat: datetime.date):
+    """Lưu KPI lần đối soát gần nhất. Không dùng count(records) vì records chỉ lưu ca cần xử lý."""
+    cfg = db.query(AppConfig).first()
+    if not cfg:
+        cfg = AppConfig()
+        db.add(cfg)
+
+    cfg.last_sync_date = ngay_doi_soat
+    cfg.last_tong_sql = int(stats.get("total", 0))
+    cfg.last_tong_bh = int(len(df_listbh)) if df_listbh is not None else 0
+    cfg.last_da_gui = int(stats.get("sent", 0))
+    cfg.last_loi = int(stats.get("loi", 0))
+    cfg.last_fail = int(stats.get("fail", 0))
+    cfg.last_resolved = db.query(Record).filter(Record.status == "RESOLVED").count()
+    db.commit()
 
 # 2. Tạo tài khoản admin mặc định & config mặc định khi khởi chạy
 db = next(get_db())
@@ -687,6 +718,7 @@ def compare_records(
         # 4. Thực hiện đối soát thông minh
         ngay_doi_soat = datetime.date.today()
         stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat)
+        save_last_kpis(db, stats, df_listbh, ngay_doi_soat)
         
         return stats
     except Exception as e:
@@ -974,12 +1006,21 @@ def get_global_kpis(
     db: Session = Depends(get_db)
 ):
     """Lấy số liệu KPI tổng quan cho Dashboard"""
-    today_date = datetime.date.today()
+    cfg = db.query(AppConfig).first()
+    if cfg and getattr(cfg, "last_sync_date", None):
+        return {
+            "tong_sql": getattr(cfg, "last_tong_sql", 0) or 0,
+            "tong_bh": getattr(cfg, "last_tong_bh", 0) or 0,
+            "da_gui": getattr(cfg, "last_da_gui", 0) or 0,
+            "loi": getattr(cfg, "last_loi", 0) or 0,
+            "fail": getattr(cfg, "last_fail", 0) or 0,
+            "resolved": getattr(cfg, "last_resolved", 0) or 0
+        }
     
     # Lấy đối soát của ngày gần nhất có dữ liệu
     last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
     if not last_record:
-        return {"tong_sql": 0, "da_gui": 0, "loi": 0, "fail": 0, "resolved": 0}
+        return {"tong_sql": 0, "tong_bh": 0, "da_gui": 0, "loi": 0, "fail": 0, "resolved": 0}
         
     target_date = last_record.ngay_doi_soat
 
@@ -996,6 +1037,7 @@ def get_global_kpis(
 
     return {
         "tong_sql": tong_sql,
+        "tong_bh": 0,
         "da_gui": da_gui,
         "loi": loi,
         "fail": fail,
@@ -1260,7 +1302,8 @@ async def auto_sync_scheduler():
                                 # File lỗi chi tiết chỉ được dùng khi IT chủ động import/chạy lại.
                                 df_hsloi = pd.DataFrame()
                                     
-                                compare_service.process_comparison(temp_db, df_sql, df_listbh, df_hsloi, now.date())
+                                stats = compare_service.process_comparison(temp_db, df_sql, df_listbh, df_hsloi, now.date())
+                                save_last_kpis(temp_db, stats, df_listbh, now.date())
                                 print("[*] [Scheduler] Dong bo tu dong HIS thanh cong.")
                             except Exception as ex:
                                 print(f"[!] [Scheduler] Loi khi thuc hien: {ex}")

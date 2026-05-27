@@ -28,6 +28,13 @@ class AppConfig(Base):
     listbh_date_col = Column(String, default="Ngày ra")
     auto_sync_enabled = Column(Boolean, default=False)
     auto_sync_time = Column(String, default="00:30")
+    last_sync_date = Column(Date, nullable=True)
+    last_tong_sql = Column(Integer, default=0)
+    last_tong_bh = Column(Integer, default=0)
+    last_da_gui = Column(Integer, default=0)
+    last_loi = Column(Integer, default=0)
+    last_fail = Column(Integer, default=0)
+    last_resolved = Column(Integer, default=0)
 
 class Record(Base):
     __tablename__ = "records"

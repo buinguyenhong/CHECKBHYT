@@ -58,6 +58,28 @@ Nguyên tắc:
 ## 2026-05-27 - Codex
 
 ### Mục tiêu
+- Sửa lỗi KPI "Tổng ca SQL" hiển thị bằng số ca `FAIL`.
+
+### Thay đổi
+- `web_app/models.py`: thêm các cột KPI lần đối soát gần nhất vào `AppConfig`.
+- `web_app/main.py`:
+  - Thêm migration SQLite cho các cột KPI mới.
+  - Thêm `save_last_kpis()` để lưu `total/sent/fail/loi` sau mỗi lần đối soát thủ công, đối soát nền, và scheduler.
+  - `GET /api/records/kpi` ưu tiên đọc KPI đã lưu thay vì `count(records)`.
+
+### Nghiệp vụ ảnh hưởng
+- `Tổng ca SQL` giờ là tổng số dòng SQL HIS trả về sau chuẩn hóa trong lần đối soát gần nhất.
+- Không còn phụ thuộc vào số record `FAIL`/`LOI` đang lưu trong SQLite.
+
+### Kiểm tra
+- Cần chạy `py_compile` và smoke test KPI.
+
+### Lưu ý cho phiên sau
+- `records` hiện vẫn không lưu toàn bộ ca SQL đã gửi thành công; nếu cần export `sql_list.xlsx` đầy đủ thì nên lưu snapshot riêng hoặc bảng `sync_runs/sync_records`.
+
+## 2026-05-27 - Codex
+
+### Mục tiêu
 - Tránh timeout khi truy vấn dữ liệu SQL HIS range dài như 1 tháng.
 - Làm rõ Bước 3 trên giao diện admin dù chưa có ca `FAIL`.
 
