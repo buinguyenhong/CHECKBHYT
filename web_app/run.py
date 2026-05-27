@@ -10,9 +10,9 @@ try:
     import jinja2
     import pandas
 except ImportError as e:
-    print("❌ THIẾU THƯ VIỆN HOẶC PHỤ THUỘC!")
-    print(f"Chi tiết lỗi: {e}")
-    print("\nVui lòng thực hiện cài đặt các thư viện bằng lệnh dưới đây:")
+    print("[ERROR] THIEU THU VIEN HOAC PHU THUOC!")
+    print(f"Chi tiet loi: {e}")
+    print("\nVui long cai dat thu vien bang lenh:")
     print("  pip install -r requirements.txt")
     sys.exit(1)
 

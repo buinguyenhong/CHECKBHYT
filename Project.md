@@ -1,87 +1,139 @@
-# Project: CheckBHYT
+# Project: CheckBHYT LAN WebApp
 
-## 1. Mục đích phần mềm
+## 1. Định hướng dự án
 
-CheckBHYT là phần mềm desktop nội bộ dùng để hỗ trợ quy trình kiểm tra và xử lý dữ liệu gửi XML lên cổng Bảo hiểm y tế (BHYT).
+CheckBHYT hiện được định hướng là **LAN WebApp nội bộ bệnh viện** phục vụ đối soát dữ liệu BHYT sau khi hệ thống HIS/EMR/BHYT đã xuất và gửi XML lên cổng BHYT.
 
-Phần mềm này **không trực tiếp tạo XML và không trực tiếp gửi XML**. Vai trò chính của phần mềm là xử lý sau khi người dùng hoặc một hệ thống khác đã gửi XML:
+Ứng dụng không trực tiếp tạo XML và không trực tiếp gửi XML. Vai trò chính của hệ thống là:
 
-- Đọc danh sách hồ sơ đã gửi thành công/đã ghi nhận từ cổng hoặc phần mềm BHYT.
-- Lấy danh sách hồ sơ cần gửi từ cơ sở dữ liệu SQL Server.
-- So sánh hai nguồn dữ liệu để tìm các ca còn thiếu, tức có trong database nhưng chưa xuất hiện trong danh sách đã gửi BHYT.
-- Sinh hoặc chạy script SQL reset cờ xuất dữ liệu để các ca thiếu được hệ thống gửi XML bên ngoài gửi lại.
-- Đọc file lỗi trả về từ cổng BHYT và ghép với thông tin bệnh nhân từ database để nhân viên dễ xử lý.
+- Lấy danh sách hồ sơ đáng lẽ phải gửi từ SQL Server HIS.
+- Đọc danh sách hồ sơ đã gửi/đã được cổng hoặc phần mềm BHYT ghi nhận từ file `listbh.xlsx`.
+- Đọc file lỗi chi tiết từ cổng BHYT, thường là `HoSoLoiChiTiet.xlsx`, sau khi các ca cần gửi lại đã được reset và hệ thống gửi XML bên ngoài gửi lại.
+- Đối soát theo khóa nghiệp vụ `MA_LK`.
+- Phân loại hồ sơ thành đã gửi, lỗi chi tiết, hoặc chưa gửi thành công.
+- Lưu trạng thái xử lý vào SQLite nội bộ của webapp.
+- Cho phòng IT và các khoa lâm sàng phối hợp xử lý lỗi theo trạng thái.
+- Sinh câu lệnh SQL reset cờ xuất dữ liệu để hệ thống gửi XML bên ngoài gửi lại.
+- Xuất báo cáo Excel phục vụ kiểm tra và lưu trữ.
 
-Tên app khi chạy GUI: `Kiểm tra gửi BHYT (SQL + File) — BNH`.
+Bản desktop PySide6 cũ vẫn còn trong repo để tham chiếu nghiệp vụ:
 
-Entry point hiện tại: `main.py`.
+- `main.py`
+- `main02022026.py`
+- `KiemTraGuiBHYT.spec`
 
-File đóng gói PyInstaller: `KiemTraGuiBHYT.spec`.
+Tuy nhiên hướng phát triển chính từ hiện tại là:
 
-## 2. Bối cảnh nghiệp vụ thực tế
+- `web_app/main.py`
+- `web_app/run.py`
+- `web_app/services/*`
+- `web_app/templates/*`
+- `LaunchWebBHYT.py`
 
-Luồng nghiệp vụ ngoài đời được hiểu như sau:
+## 2. Mô hình triển khai thực tế
 
-1. Người dùng hoặc phần mềm HIS/EMR/BHYT xuất và gửi các file XML lên cổng BHYT.
-2. Sau khi gửi, người dùng lấy danh sách các hồ sơ đã gửi được từ cổng/phần mềm BHYT.
-3. Người dùng đưa danh sách đã gửi được vào CheckBHYT.
-4. CheckBHYT kết nối SQL Server, chạy stored procedure để lấy danh sách hồ sơ đáng lẽ phải gửi trong khoảng ngày.
-5. CheckBHYT so sánh danh sách trong database với danh sách đã gửi được.
-6. Những hồ sơ có trong database nhưng không có trong danh sách đã gửi được được xem là `FAIL` hoặc chưa gửi thành công.
-7. CheckBHYT tạo script SQL reset các cờ xuất dữ liệu cho những ca `FAIL`.
-8. Người dùng có thể copy script để chạy thủ công, hoặc để phần mềm chạy trực tiếp script reset trên database.
-9. Sau khi reset, hệ thống gửi XML bên ngoài sẽ gửi lại các ca đó.
-10. Người dùng lấy file lỗi từ cổng BHYT, thường là `HoSoLoiChiTiet.xlsx`.
-11. Người dùng đưa file lỗi vào CheckBHYT để ghép mã lỗi, mô tả lỗi với thông tin bệnh nhân/khoa/mã thẻ lấy từ database.
-12. Kết quả ghép lỗi được xuất Excel để phục vụ sửa dữ liệu hoặc xử lý nghiệp vụ tiếp theo.
+Webapp được thiết kế để chạy trong **mạng LAN local, không phụ thuộc internet khi vận hành hằng ngày**.
 
-Tóm lại, phần mềm nằm ở khâu **đối soát sau gửi**, **reset để gửi lại**, và **tổng hợp lỗi sau khi cổng BHYT trả về**.
+Mô hình máy chủ dự kiến:
+
+- Một máy Windows đặt trong bệnh viện.
+- Máy có 2 card mạng:
+  - Card mạng local/LAN bệnh viện: dùng cho các khoa truy cập webapp và kết nối SQL Server HIS.
+  - Card mạng internet: dùng khi cần cài đặt thư viện, cập nhật mã nguồn, hoặc hỗ trợ từ xa nếu được phép.
+- Khi vận hành chính thức, các máy khoa truy cập qua địa chỉ LAN, ví dụ `http://<IP_LAN_MAY_CHU>:8000`.
+- Dữ liệu nghiệp vụ và file upload nằm nội bộ trên máy chủ.
+- Không cần client cài phần mềm, chỉ cần trình duyệt trong mạng LAN.
+
+Điểm cần cấu hình ở tầng hạ tầng:
+
+- Máy chủ phải ping/kết nối được SQL Server HIS qua LAN.
+- Firewall Windows phải mở port webapp, mặc định `8000`, cho mạng nội bộ.
+- Các máy khoa chỉ cần truy cập IP LAN của máy chủ, không dùng IP internet.
+- Nếu máy có nhiều card mạng, cần xác định đúng IP LAN để thông báo cho các khoa.
+- Không public webapp ra internet nếu chưa bổ sung bảo mật tương ứng.
 
 ## 3. Công nghệ sử dụng
 
-Ngôn ngữ và framework:
+Backend webapp:
 
-- Python 3.13.x.
-- PySide6 cho giao diện desktop.
-- pandas cho xử lý bảng dữ liệu và Excel.
-- pyodbc cho kết nối SQL Server.
-- pyperclip để copy script SQL vào clipboard, có fallback sang Qt clipboard nếu thiếu.
-- openpyxl gián tiếp qua pandas để đọc/ghi `.xlsx`.
-- PyInstaller để đóng gói thành `.exe`.
+- Python 3.10+; khuyến nghị Python 3.13.x.
+- FastAPI.
+- Uvicorn.
+- SQLAlchemy.
+- SQLite để lưu trạng thái nội bộ webapp.
+- pandas, openpyxl để xử lý Excel.
+- pyodbc để kết nối SQL Server HIS.
+- Jinja2 templates cho giao diện HTML.
 
-Thư mục và file chính:
+Desktop/launcher:
 
-- `main.py`: toàn bộ source chính của phần mềm.
-- `main02022026.py`: bản cũ/backup, không phải entry point hiện tại.
-- `KiemTraGuiBHYT.spec`: cấu hình PyInstaller, đang trỏ tới `main.py`.
-- `checkbh.ico`: icon app khi build.
-- `dist/`: output đã build.
-- `build/`: output trung gian của PyInstaller.
-- `.venv/`: môi trường Python local.
+- `LaunchWebBHYT.py`: launcher Tkinter để cài dependency, chọn thư mục, chọn port, khởi động/dừng server nền.
+- PySide6 vẫn tồn tại cho bản desktop cũ, không phải hướng phát triển chính.
+- PyInstaller có thể dùng khi cần đóng gói công cụ phụ trợ.
 
-Hiện repo không có `.git`, `README.md`, `requirements.txt`, hoặc test tự động.
+File quan trọng:
 
-## 4. Các nguồn dữ liệu
+- `requirements.txt`: danh sách thư viện.
+- `INSTALL_WEB.md`: hướng dẫn triển khai webapp.
+- `web_app/run.py`: entry point chạy server LAN.
+- `web_app/main.py`: FastAPI app, routes, API, scheduler, seed dữ liệu mặc định.
+- `web_app/database.py`: SQLite engine/session.
+- `web_app/models.py`: models dữ liệu nội bộ.
+- `web_app/auth.py`: đăng nhập và phân quyền.
+- `web_app/services/his_service.py`: kết nối SQL HIS, cache, chuẩn hóa SQL, sinh reset SQL.
+- `web_app/services/excel_service.py`: đọc `listbh.xlsx`, `HoSoLoiChiTiet.xlsx`.
+- `web_app/services/compare_service.py`: logic đối soát và lưu trạng thái.
+- `web_app/templates/admin.html`: giao diện phòng IT.
+- `web_app/templates/department.html`: giao diện khoa lâm sàng.
+- `web_app/templates/login.html`: đăng nhập.
 
-### 4.1. Dữ liệu từ SQL Server
+File sinh trong runtime:
 
-Phần mềm lấy dữ liệu database bằng cách chạy 2 stored procedure:
+- `web_app/app_state.db` hoặc `app_state.db` tùy thư mục chạy: SQLite lưu trạng thái.
+- `web_app/uploaded_files/` hoặc `uploaded_files/`: file Excel upload và file export.
+- `web_app/cache_sql/` hoặc `cache_sql/`: cache dữ liệu SQL HIS.
+- `launcher_config.json`: cấu hình launcher.
+
+Lưu ý: do một số đường dẫn hiện dùng relative path, nên nên chạy bằng `python web_app/run.py` hoặc launcher để `run.py` tự chuyển working directory vào `web_app`.
+
+## 4. Tài khoản và phân quyền
+
+Webapp hiện có 2 vai trò:
+
+- `admin`: phòng IT/quản trị hệ thống.
+- `user`: tài khoản khoa/phòng lâm sàng.
+
+Tài khoản admin mặc định được tạo khi app chạy lần đầu:
+
+- Username: `admin`
+- Password: `adminBHYT2026`
+
+Việc cần làm khi triển khai thật:
+
+- Đăng nhập admin lần đầu.
+- Tạo tài khoản riêng cho từng khoa.
+- Map chính xác `department_name` với tên khoa trả về từ stored procedure HIS, vì khoa chỉ thấy hồ sơ có `Record.ten_khoa == User.department_name`.
+- Nên bổ sung chức năng đổi mật khẩu admin mặc định hoặc đổi trực tiếp trong DB trước khi dùng chính thức.
+
+## 5. Nguồn dữ liệu đầu vào
+
+### 5.1. SQL Server HIS
+
+Webapp lấy danh sách hồ sơ đáng lẽ phải gửi bằng 2 stored procedure:
 
 - Ngoại trú:
   - `dbo.sp_BCVP_095_DsDeNghiThanhToanBHYT_NgoaiTru_25a_CV5937`
 - Nội trú:
   - `dbo.sp_BCVP_096_DsDeNghiThanhToanBHYT_NoiTru_26A_CV5937`
 
-Hai stored procedure được nhập trong tab `SQL (LAN) — Kết nối & xuất sql_list`; người dùng có thể sửa tên SP trên giao diện.
-
-Tham số truyền vào SP:
+Tham số truyền vào:
 
 - `@TuNgay`
 - `@DenNgay`
 
-Định dạng ngày truyền vào SQL là `yyyyMMdd`, ví dụ `20260427`.
+Định dạng ngày truyền vào SQL: `yyyyMMdd`, ví dụ `20260527`.
 
-Các cột bắt buộc từ SP ngoại trú:
+Cột bắt buộc từ SP ngoại trú:
 
 - `TenBenhNhan`
 - `SoBHYT`
@@ -89,7 +141,7 @@ Các cột bắt buộc từ SP ngoại trú:
 - `SoPhieuThanhToanNgoaiTru`
 - `NgayRa`
 
-Các cột bắt buộc từ SP nội trú:
+Cột bắt buộc từ SP nội trú:
 
 - `TenBenhNhan`
 - `SoBHYT`
@@ -97,31 +149,25 @@ Các cột bắt buộc từ SP nội trú:
 - `khoadieutri`
 - `NgayRa`
 
-Nếu thiếu một trong các cột trên, phần mềm sẽ báo lỗi rõ tên cột thiếu và danh sách cột hiện có.
+### 5.2. File danh sách đã gửi BHYT
 
-### 4.2. Dữ liệu danh sách đã gửi BHYT
+File upload trên tab admin: `listbh.xlsx`.
 
-Người dùng chọn file Excel, trên giao diện gọi là `listbh.xlsx` hoặc "file danh sách đã gửi BHYT".
+Cột mặc định:
 
-Cấu hình mặc định:
+- `Mã liên kết`: mã liên kết hồ sơ.
+- `Ngày ra`: ngày ra để lọc theo khoảng đối soát.
 
-- Cột mã liên kết: `Mã liên kết`
-- Cột ngày ra: `Ngày ra`
-
-File này được hiểu là danh sách hồ sơ đã gửi được hoặc đã được cổng/phần mềm BHYT ghi nhận. Phần mềm chỉ cần mã liên kết và ngày ra để đối soát.
-
-Nếu cột ngày trong cấu hình không tồn tại nhưng file có cột `Ngày ra`, phần mềm tự fallback sang `Ngày ra`.
-
-Kết quả đọc file `listbh` được chuẩn hóa thành:
+Khi đọc file, hệ thống chuẩn hóa thành:
 
 - `MA_LK`
 - `_ngay`
 
-Sau đó người dùng lọc theo khoảng ngày trên giao diện.
+Ý nghĩa nghiệp vụ: file này đại diện cho danh sách hồ sơ đã gửi hoặc đã được cổng/phần mềm BHYT ghi nhận.
 
-### 4.3. Dữ liệu file lỗi từ cổng BHYT
+### 5.3. File lỗi chi tiết BHYT
 
-Người dùng chọn file Excel lỗi, thường là `HoSoLoiChiTiet.xlsx`.
+File upload trên tab admin: `HoSoLoiChiTiet.xlsx`.
 
 Cột bắt buộc:
 
@@ -133,115 +179,22 @@ Cột tùy chọn:
 - `MOTALOI`
 - `Ngày ra`
 
-Nếu `MALOI` hoặc `MOTALOI` không tồn tại, phần mềm tự tạo cột rỗng.
+Nếu thiếu `MALOI` hoặc `MOTALOI`, hệ thống tự tạo cột rỗng.
 
-File lỗi được ghép với `sql_list` hiện có trong phiên làm việc theo `MA_LK`.
+Ý nghĩa nghiệp vụ: đây là danh sách hồ sơ cổng BHYT trả lỗi sau khi hệ thống bên ngoài đã gửi hồ sơ lên cổng. Trong quy trình chuẩn, file này thường xuất hiện sau bước đối soát `listbh`, reset các ca chưa đẩy, và gửi lại.
 
-## 5. Dữ liệu đầu ra
+## 6. Chuẩn hóa dữ liệu nghiệp vụ
 
-Phần mềm có thể xuất các file Excel:
+Khóa chính xuyên suốt hệ thống là `MA_LK`.
 
-- `sql_list.xlsx`: danh sách hồ sơ lấy từ database sau khi chuẩn hóa.
-- `DANH_SACH_FAIL.xlsx`: danh sách hồ sơ có trong database nhưng chưa thấy trong danh sách đã gửi BHYT.
-- `DANH_SACH_KEM_LOI.xlsx`: danh sách lỗi từ cổng BHYT đã ghép thêm thông tin bệnh nhân từ database.
+Quy tắc chuẩn hóa `MA_LK`:
 
-Ngoài ra phần mềm có thể:
+- Nếu null/NaN thì đưa về chuỗi rỗng.
+- Ép sang chuỗi.
+- `strip()` khoảng trắng đầu cuối.
+- Thay `_CC` bằng `/CC`.
 
-- Copy SQL reset ngoại trú vào clipboard.
-- Copy SQL reset nội trú vào clipboard.
-- Chạy trực tiếp SQL reset ngoại trú.
-- Chạy trực tiếp SQL reset nội trú.
-
-## 6. Luồng hoạt động trong giao diện
-
-Giao diện chính có nhóm `Quy trình thao tác` với các bước:
-
-1. `Thêm file danh sách đã gửi BHYT`
-   - Người dùng chọn file Excel danh sách đã gửi.
-   - Code xử lý: `on_add_listbh()`, `load_listbh()`.
-
-2. `Lọc list bh theo ngày`
-   - Người dùng chọn `Từ ngày`, `Đến ngày`.
-   - Phần mềm lọc danh sách đã gửi theo cột ngày.
-   - Code xử lý: `on_filter_bh()`, `filter_listbh_by_date()`.
-
-3. `So sánh dữ liệu database và BHYT`
-   - Điều kiện: đã có `sql_list` từ SQL và đã lọc list BHYT.
-   - Phần mềm so sánh `MA_LK`.
-   - Nếu `MA_LK` có trong danh sách BHYT: trạng thái `Đã gửi BH`.
-   - Nếu `MA_LK` không có trong danh sách BHYT: trạng thái `FAIL`.
-   - Code xử lý: `on_compare()`, `refresh_compare_table()`.
-
-4. `Copy SQL reset Ngoại trú` / `Copy SQL reset Nội trú`
-   - Lấy các ca `FAIL`, tách ngoại trú/nội trú.
-   - Sinh script reset cờ xuất dữ liệu.
-   - Copy vào clipboard.
-   - Code xử lý: `get_reset_keys()`, `build_reset_sql()`, `copy_reset()`.
-
-5. `CHẠY reset Ngoại trú` / `CHẠY reset Nội trú`
-   - Lấy các ca `FAIL`, sinh script reset.
-   - Hỏi xác nhận trước khi chạy.
-   - Chạy script trên database hiện cấu hình.
-   - Code xử lý: `run_reset()`, `run_update_sql()`.
-
-6. `Thêm HoSoLoiChiTiet.xlsx`
-   - Người dùng chọn file lỗi trả về từ cổng BHYT.
-   - Code xử lý: `on_add_loi()`, `load_hosoloichitiet()`.
-
-7. `Ghép lỗi + bỏ trùng hoàn toàn`
-   - Ghép file lỗi với thông tin bệnh nhân trong `sql_list`.
-   - Bỏ trùng hoàn toàn bằng `drop_duplicates(keep="first")`.
-   - Code xử lý: `on_merge_loi()`, `merge_error_with_sql()`.
-
-8. Xuất Excel
-   - `Xuất Excel dữ liệu database`: gọi `export_sql_list()`.
-   - `Xuất Excel: DANH_SACH_FAIL.xlsx`: gọi `export_fail()`.
-   - `Xuất Excel: DANH_SACH_KEM_LOI.xlsx`: gọi `export_loi()`.
-
-## 7. Luồng SQL
-
-Tab SQL có các trường:
-
-- Driver ODBC.
-- Server.
-- Database.
-- Kiểu xác thực:
-  - `Windows Auth`
-  - `SQL Auth`
-- User.
-- Password.
-- Từ ngày.
-- Đến ngày.
-- SP Ngoại trú.
-- SP Nội trú.
-
-Các action chính:
-
-- `Lưu cấu hình`
-  - Ghi vào `config.json`.
-  - Code: `on_save_config()`, `save_config()`.
-
-- `Test kết nối`
-  - Chạy `SELECT 1`.
-  - Code: `on_test_connection()`, `get_conn()`.
-
-- `Chạy SP → Tạo sql_list (có cache)`
-  - Chạy 2 stored procedure trong khoảng ngày.
-  - Chuẩn hóa thành một dataframe thống nhất.
-  - Hiển thị ở tab `sql_list`.
-  - Code: `on_run_sp()`, `_run_sp_range()`, `sql_exec_sp()`, `normalize_sql_list()`.
-
-- `Clear cache SQL`
-  - Xóa thư mục `cache_sql`.
-  - Code: `on_clear_cache()`, `cache_clear_all()`.
-
-## 8. Chuẩn hóa dữ liệu SQL thành sql_list
-
-Hàm chính: `normalize_sql_list(df_op, df_ip)`.
-
-### 8.1. Ngoại trú
-
-Mapping từ SP ngoại trú:
+Ngoại trú:
 
 - `Loại ca` = `Ngoại trú`
 - `MA_LK` = `Column4`
@@ -251,114 +204,379 @@ Mapping từ SP ngoại trú:
 - `Mã y tế` = `SoPhieuThanhToanNgoaiTru`
 - `Ngày ra viện` = `NgayRa`
 
-### 8.2. Nội trú
-
-Mapping từ SP nội trú:
+Nội trú:
 
 - `Loại ca` = `Nội trú`
-- `MA_LK` = `SoPhieu_BA`, sau đó bỏ ký tự `A` ở đầu nếu có.
+- `MA_LK` = `SoPhieu_BA`
+- Nếu `SoPhieu_BA` bắt đầu bằng `A`, bỏ chữ `A` đầu trước khi so sánh/reset.
 - `Họ tên` = `TenBenhNhan`
 - `Mã thẻ` = `SoBHYT`
 - `Tên khoa` = `khoadieutri`
 - `Mã y tế` = rỗng
 - `Ngày ra viện` = `NgayRa`
 
-### 8.3. Chuẩn hóa chung
-
 Sau khi ghép ngoại trú và nội trú:
 
-- Loại bỏ dòng có `MA_LK` rỗng.
-- Chuẩn hóa `MA_LK`.
+- Bỏ dòng không có `MA_LK`.
+- Chuẩn hóa lại `MA_LK`.
 - Bỏ trùng theo `MA_LK`, giữ dòng đầu tiên.
-- Trả về các cột:
-  - `Loại ca`
-  - `MA_LK`
-  - `Họ tên`
-  - `Mã thẻ`
-  - `Tên khoa`
-  - `Mã y tế`
-  - `Ngày ra viện`
 
-## 9. Quy tắc chuẩn hóa nghiệp vụ
+## 7. Mô hình dữ liệu SQLite nội bộ
 
-### 9.1. Chuẩn hóa MA_LK
+SQLite lưu trạng thái vận hành của webapp, không thay thế SQL Server HIS.
 
-Hàm: `chuan_hoa_ma_lk(value)`.
+Các bảng chính:
 
-Quy tắc:
+- `users`: tài khoản admin/khoa.
+- `app_config`: cấu hình kết nối SQL Server HIS, SP, tự đồng bộ.
+- `records`: hồ sơ đối soát và trạng thái xử lý.
+- `record_logs`: lịch sử thay đổi trạng thái/ghi chú.
+- `error_definitions`: danh mục hướng dẫn lỗi theo `MALOI` và từ khóa trong `MOTALOI`.
 
-- Nếu giá trị null/NaN thì trả về chuỗi rỗng.
-- Ép sang chuỗi.
-- `strip()` khoảng trắng đầu cuối.
-- Thay `_CC` bằng `/CC`.
+Trạng thái `Record.status`:
 
-Ví dụ:
+- `PENDING`: đang chờ xử lý.
+- `WAITING_REVIEW`: khoa đã nhập ghi chú/sửa lỗi và gửi IT duyệt.
+- `WAITING_RESEND`: IT đã sinh/copy SQL reset, đang chờ hệ thống bên ngoài gửi XML lại.
+- `RESOLVED`: lần đối soát sau đã thấy hồ sơ xuất hiện trong `listbh`, hoặc IT chủ động xác nhận hoàn tất thủ công.
 
-- `TN.123_CC` thành `TN.123/CC`.
+Nhóm `Record.type_group`:
 
-### 9.2. Bỏ chữ A đầu mã bệnh án nội trú
+- `FAIL`: có trong SQL HIS nhưng chưa có trong danh sách bảo hiểm đã gửi (`listbh`) và cũng chưa có trong danh sách lỗi chi tiết (`HoSoLoiChiTiet.xlsx`).
+- `LOI`: có lỗi chi tiết từ `HoSoLoiChiTiet.xlsx`.
 
-Hàm: `remove_leading_A(value)`.
+Trạng thái mở khóa HIS:
 
-Quy tắc:
+- `NORMAL`: bình thường.
+- `UNLOCKED`: IT đã trả về khoa/mở khóa để khoa sửa.
 
-- Chuẩn hóa `MA_LK`.
-- Nếu chuỗi bắt đầu bằng `A`, bỏ ký tự `A` đầu.
-- Dùng cho `SoPhieu_BA` của nội trú.
+## 8. Quy trình đang thực thi hiện tại trong code
 
-### 9.3. Phân loại ngoại trú/nội trú khi reset
+Đây là quy trình thực tế hiện đang chạy theo code trong `web_app/main.py` và `web_app/services/*`.
 
-Trong `get_reset_keys(loai)`:
+### 8.1. Khởi động hệ thống
 
-- Ngoại trú: `MA_LK` bắt đầu bằng `TN.`
-- Nội trú: `MA_LK` không bắt đầu bằng `TN.`
+1. IT chạy:
 
-Đây là giả định nghiệp vụ quan trọng. Nếu format mã liên kết thay đổi, logic reset có thể sai.
+```powershell
+python web_app/run.py
+```
 
-## 10. Logic so sánh
+2. `run.py`:
 
-Hàm chính: `on_compare()`.
+- Chuyển working directory vào `web_app`.
+- Đọc port từ `--port` hoặc biến môi trường `BHYT_PORT`, mặc định `8000`.
+- In IP LAN dò được.
+- Chạy Uvicorn với `host="0.0.0.0"`.
 
-Điều kiện trước khi so sánh:
+3. `web_app/main.py` khi import:
 
-- `df_sql_list` không rỗng.
-- `df_listbh_filtered` không rỗng.
+- Tạo bảng SQLite nếu chưa có.
+- Tự migrate nhẹ một số cột mới trong `app_config` và `records`.
+- Seed admin mặc định nếu chưa có.
+- Seed cấu hình mặc định nếu chưa có.
+- Seed danh mục lỗi mẫu nếu chưa có.
+- Khởi động scheduler tự đồng bộ khi FastAPI startup.
 
-Các bước:
+### 8.2. Đăng nhập và điều hướng
 
-1. Lấy tập `MA_LK` từ danh sách BHYT đã lọc.
-2. Chuẩn hóa `MA_LK` của `sql_list`.
-3. Với từng dòng trong `sql_list`:
-   - Nếu `MA_LK` có trong tập BHYT: `Trạng thái = Đã gửi BH`.
-   - Nếu không có: `Trạng thái = FAIL`.
-4. Lưu toàn bộ kết quả vào `df_compare`.
-5. Lưu riêng danh sách lệch vào `df_fail`.
-6. Cập nhật KPI:
+1. Người dùng truy cập `/`.
+2. Nếu chưa có cookie session, chuyển về `/login`.
+3. Sau khi login:
+
+- Nếu role `admin`, chuyển `/admin`.
+- Nếu role `user`, chuyển `/department`.
+
+Hiện session cookie lưu username trong cookie `checkbh_session`.
+
+### 8.3. Cấu hình HIS
+
+Phòng IT vào tab admin `Đồng bộ & Đối soát`:
+
+1. Chọn ODBC driver.
+2. Nhập server SQL HIS.
+3. Nhập database.
+4. Chọn `Windows Auth` hoặc `SQL Auth`.
+5. Nhập user/password nếu dùng SQL Auth.
+6. Nhập SP ngoại trú/nội trú nếu khác mặc định.
+7. Bấm `Lưu cấu hình`.
+8. Bấm `Test kết nối SQL Server`.
+
+API liên quan:
+
+- `GET /api/config`
+- `POST /api/config`
+- `GET /api/config/drivers`
+- `POST /api/config/test-connection`
+
+Password HIS hiện được lưu dạng XOR/base64 trong SQLite. Đây chỉ là che giấu cơ bản, chưa phải mã hóa mạnh.
+
+### 8.4. Upload file đối soát
+
+Admin upload:
+
+- `listbh.xlsx` qua `POST /api/upload/listbh`.
+- `HoSoLoiChiTiet.xlsx` qua `POST /api/upload/loi`.
+
+Hiện file được lưu cố định:
+
+- `uploaded_files/listbh.xlsx`
+- `uploaded_files/HoSoLoiChiTiet.xlsx`
+
+Nếu upload lại, file cũ bị ghi đè.
+
+Khi upload file lỗi, hệ thống còn cố gắng ghép ngay vào ngày đối soát gần nhất đang có trong SQLite và chuyển các record tương ứng sang nhóm `LOI`.
+
+### 8.5. Chạy đồng bộ và đối soát thủ công
+
+Admin chọn `Từ ngày`, `Đến ngày`, bấm kích hoạt đồng bộ.
+
+API hiện dùng:
+
+- `POST /api/sync/start`
+- Frontend poll `GET /api/sync/status`.
+
+Luồng nền `run_sync_in_background()`:
+
+1. Đọc cấu hình HIS từ SQLite.
+2. Giải mã password HIS.
+3. Gọi `his_service.fetch_his_data(cfg, from_date, to_date)`.
+4. `fetch_his_data()` dùng cache SQL nếu có.
+5. Nếu không có cache hoặc cache thiếu range, gọi 2 stored procedure HIS.
+6. Chuẩn hóa thành dataframe `df_sql`.
+7. Đọc `uploaded_files/listbh.xlsx` nếu có.
+8. Lọc `listbh` theo khoảng ngày.
+9. Chỉ đọc `uploaded_files/HoSoLoiChiTiet.xlsx` nếu IT bật tùy chọn dùng file lỗi trong lần đối soát đó.
+10. Nếu không bật tùy chọn file lỗi, hệ thống bỏ qua file lỗi dù file đang tồn tại trên máy chủ để tránh dùng nhầm file cũ.
+11. Gọi `compare_service.process_comparison()`.
+12. Lưu hoặc cập nhật records vào SQLite.
+13. Cập nhật progress/log cho UI.
+
+Ngày đối soát lưu vào record hiện là `datetime.date.today()`, tức ngày chạy đối soát, không phải `from_date` hoặc `to_date`.
+
+### 8.6. Logic phân loại trong đối soát
+
+Với từng hồ sơ trong `df_sql`:
+
+1. Chuẩn hóa `MA_LK`.
+2. Kiểm tra `MA_LK` có trong danh sách `listbh` đã lọc không.
+3. Kiểm tra `MA_LK` có trong file lỗi chi tiết không.
+
+Nếu `MA_LK` có trong `listbh`:
+
+- Đếm vào `sent`.
+- Tự động chuyển tất cả record cũ cùng `MA_LK` sang `RESOLVED`.
+- Reset `his_unlock_status` về `NORMAL`.
+- Ghi log hệ thống.
+
+Nếu `MA_LK` không có trong `listbh` và không có trong file lỗi:
+
+- Tạo/cập nhật record nhóm `FAIL`.
+- Trạng thái mặc định `PENDING`.
+- Nhóm này dành cho IT xử lý/reset.
+
+Nếu `MA_LK` không có trong `listbh` nhưng có trong file lỗi:
+
+- Tạo/cập nhật record nhóm `LOI`.
+- Mỗi dòng lỗi chi tiết có thể tạo một record riêng theo `MA_LK + MALOI + MOTALOI`.
+- Trạng thái mặc định `PENDING`.
+- Hệ thống tự học danh mục lỗi mới nếu gặp `MALOI`/keyword chưa có.
+
+### 8.7. Quy trình xử lý của khoa
+
+Khoa đăng nhập `/department`.
+
+API lấy dữ liệu:
+
+- `GET /api/records/dept?status=...`
+
+Khoa chỉ thấy:
+
+- `Record.ten_khoa == user.department_name`
+- `Record.type_group == "LOI"`
+
+Khoa xử lý:
+
+1. Xem lỗi, nguyên nhân gợi ý, hướng dẫn xử lý.
+2. Sửa dữ liệu trên HIS theo quy trình nội bộ.
+3. Nhập ghi chú.
+4. Bấm lưu/gắn cờ gửi IT.
+5. API `POST /api/records/{record_id}/flag` đổi trạng thái sang `WAITING_REVIEW`.
+
+Khoa không trực tiếp chạy SQL reset trên webapp.
+
+### 8.8. Quy trình xử lý của IT
+
+IT có các luồng chính:
+
+Danh sách FAIL:
+
+- `GET /api/records/admin/fail`
+- IT xem các ca `FAIL` chưa `RESOLVED`.
+- Có thể sinh SQL reset hàng loạt theo loại ca qua `POST /api/records/admin/fail/reset?loai=...`.
+- Code chuyển các record FAIL đó sang `WAITING_RESEND` sau khi sinh SQL.
+- Câu SQL trả về để IT copy chạy ngoài SSMS.
+- Chỉ khi lần đối soát sau thấy `MA_LK` xuất hiện trong `listbh`, hệ thống mới tự chuyển sang `RESOLVED`.
+
+Danh sách chờ duyệt từ khoa:
+
+- `GET /api/records/admin/review`
+- IT xem các ca `WAITING_REVIEW`.
+- Có thể `Duyệt & Reset` qua `POST /api/records/{record_id}/approve`.
+- Code hiện chuyển record sang `WAITING_RESEND` và trả về SQL reset để IT copy chạy SSMS.
+- Khi lần đối soát sau thấy `MA_LK` xuất hiện trong `listbh`, hệ thống tự chuyển record sang `RESOLVED`.
+
+Mở khóa/trả khoa:
+
+- `POST /api/records/{id}/toggle-his-unlock`
+- Nếu action `UNLOCK`, record chuyển `his_unlock_status = "UNLOCKED"` và sinh SQL đưa `BenhAn.TrangThai` về `DaXuatVien` để khoa sửa.
+- Nếu action `CLOSE`, record chuyển về `NORMAL` và sinh SQL đưa `BenhAn.TrangThai` về `DaThanhToan` để khóa lại sau khi khoa sửa.
+- Script này hiện áp dụng cho ca `Nội trú` theo `BenhAn.SoBenhAn`. Đây là script mở/khóa bệnh án, không phải script reset cờ xuất XML.
+
+Đánh dấu xử lý thủ công:
+
+- `POST /api/records/{record_id}/admin-resolve`
+- IT nhập ghi chú và đổi record sang `RESOLVED`.
+
+### 8.9. Scheduler tự đồng bộ
+
+Khi app startup, scheduler chạy nền:
+
+- Kiểm tra mỗi 30 giây.
+- Nếu `auto_sync_enabled = true` và giờ/phút hiện tại trùng `auto_sync_time`, tự chạy đồng bộ.
+- Range tự động hiện là 3 ngày gần nhất: từ hôm nay trừ 3 ngày đến hôm nay.
+- Sau khi chạy, sleep 65 giây để tránh chạy lặp trong cùng phút.
+
+### 8.10. Xuất báo cáo
+
+Admin có thể export:
+
+- `GET /api/export/sql_list`
+- `GET /api/export/fail`
+- `GET /api/export/loi`
+
+Các export hiện lấy ngày đối soát gần nhất có dữ liệu trong SQLite.
+
+## 9. Quy trình nghiệp vụ chuẩn đề xuất khi vận hành hằng ngày
+
+Đây là quy trình đề xuất để vận hành đúng và giảm lệch dữ liệu.
+
+### 9.1. Chuẩn bị đầu ngày hoặc đầu ca
+
+1. Kiểm tra máy chủ webapp đang chạy.
+2. Xác nhận các khoa truy cập được địa chỉ LAN.
+3. IT đăng nhập admin.
+4. Kiểm tra cấu hình SQL HIS nếu có thay đổi server/database/SP.
+5. Nếu có thay đổi cấu hình HIS, bấm `Xóa Cache SQL` trước khi đối soát.
+
+### 9.2. Đối soát danh sách đã gửi và tìm ca chưa đẩy
+
+1. Lấy file danh sách đã gửi BHYT từ cổng/phần mềm BHYT.
+2. Đảm bảo file có cột `Mã liên kết` và `Ngày ra`.
+3. Upload vào webapp dưới dạng `listbh.xlsx`.
+4. Chọn đúng khoảng ngày cần đối soát.
+5. Chạy `Đồng bộ & Đối soát CSDL HIS`.
+6. Webapp lấy dữ liệu từ SQL Server HIS theo đúng khoảng ngày đã chọn.
+7. Webapp so sánh danh sách SQL HIS với `listbh.xlsx` theo `MA_LK`.
+8. Các ca có trong SQL HIS nhưng chưa có trong `listbh.xlsx` và chưa có trong danh sách lỗi được đưa vào nhóm `FAIL`.
+9. IT kiểm tra nhóm `FAIL` và sinh SQL reset HIS để hệ thống gửi XML bên ngoài đẩy lại dữ liệu.
+10. Sau khi reset và hệ thống bên ngoài gửi lại, IT lấy lại kết quả từ cổng/phần mềm BHYT:
+   - Nếu ca đã được ghi nhận gửi thành công, cập nhật/upload lại `listbh.xlsx` rồi chạy đối soát lại.
+   - Nếu cổng trả lỗi chi tiết, lúc này mới upload/import `HoSoLoiChiTiet.xlsx` để phân loại nhóm `LOI`.
+11. Chờ progress hoàn tất 100%.
+12. Kiểm tra KPI:
    - Tổng ca SQL.
-   - Tổng ca BH đã lọc.
-   - Đã gửi BH.
-   - FAIL.
+   - Đã gửi BHYT.
+   - Danh sách lỗi.
+   - Danh sách FAIL.
+   - IT đã duyệt.
 
-Lưu ý: phần mềm đang tìm các ca **có trong SQL nhưng không có trong danh sách đã gửi BHYT**. Chiều ngược lại, tức có trong danh sách BHYT nhưng không có trong SQL, hiện chưa được báo riêng.
+### 9.3. Xử lý nhóm FAIL
 
-## 11. Logic reset để gửi lại
+Nhóm `FAIL` là hồ sơ có trong SQL HIS nhưng chưa có trong danh sách bảo hiểm đã gửi (`listbh`) và cũng chưa có trong danh sách lỗi chi tiết (`HoSoLoiChiTiet.xlsx`).
 
-Hàm sinh SQL: `build_reset_sql(keys, loai)`.
+Quy trình:
 
-Mục tiêu reset:
+1. IT mở tab `Danh sách FAIL`.
+2. Kiểm tra các ca theo ngày ra viện xa nhất trước.
+3. Chọn reset ngoại trú/nội trú phù hợp.
+4. Copy SQL reset do webapp sinh.
+5. Chạy SQL trong SSMS hoặc công cụ được bệnh viện cho phép.
+6. Đợi hệ thống gửi XML bên ngoài gửi lại.
+7. Lấy lại `listbh.xlsx` mới từ cổng/phần mềm BHYT.
+8. Upload lại `listbh.xlsx`.
+9. Chạy đối soát lại để hệ thống tự chuyển ca đã gửi thành `RESOLVED`.
+
+Sau khi IT sinh SQL reset, webapp chuyển ca sang `WAITING_RESEND`. Ca chỉ hoàn tất khi lần đối soát sau thấy `MA_LK` đã có trong `listbh`, hoặc khi IT chủ động xác nhận hoàn tất thủ công.
+
+### 9.4. Xử lý nhóm LỖI chi tiết
+
+Nhóm `LOI` là hồ sơ có trong file lỗi chi tiết BHYT.
+
+Quy trình:
+
+1. Khoa đăng nhập tài khoản của khoa.
+2. Xem danh sách lỗi thuộc khoa.
+3. Đọc nguyên nhân/hướng dẫn từ danh mục lỗi nếu có.
+4. Sửa dữ liệu trên HIS.
+5. Nếu lỗi cần mở khóa bệnh án trước khi sửa, IT bấm mở khóa để sinh script đưa `BenhAn.TrangThai` về `DaXuatVien`, copy chạy trên SSMS, sau đó khoa sửa dữ liệu trên HIS.
+6. Khoa nhập ghi chú đã xử lý.
+7. Khoa gửi IT duyệt, record chuyển `WAITING_REVIEW`.
+8. IT kiểm tra lại.
+9. Nếu trước đó đã mở khóa, IT bấm khóa lại để sinh script đưa `BenhAn.TrangThai` về `DaThanhToan`, copy chạy trên SSMS.
+10. IT duyệt và lấy SQL reset cờ xuất nếu cần gửi XML lại.
+11. Hệ thống gửi XML bên ngoài gửi lại.
+12. IT upload lại file danh sách đã gửi/file lỗi mới và chạy đối soát lại.
+13. Nếu ca đã xuất hiện trong `listbh`, hệ thống tự chuyển các record cùng `MA_LK` sang `RESOLVED`.
+
+Script mở khóa bệnh án nội trú có dạng:
+
+```sql
+-- MO KHOA BENH AN CHO KHOA SUA
+SELECT ba.SoBenhAn, ba.TrangThai, ba.NgayRaVien
+FROM BenhAn ba
+WHERE ba.SoBenhAn IN (
+    '26.002711/CC'
+);
+
+UPDATE ba
+SET TrangThai = 'DaXuatVien'
+FROM BenhAn ba
+WHERE ba.SoBenhAn IN (
+    '26.002711/CC'
+);
+```
+
+Script khóa lại sau khi khoa sửa có dạng:
+
+```sql
+-- KHOA LAI BENH AN SAU KHI KHOA SUA XONG
+UPDATE ba
+SET TrangThai = 'DaThanhToan'
+FROM BenhAn ba
+WHERE ba.SoBenhAn IN (
+    '26.002711/CC'
+);
+```
+
+### 9.5. Cuối ngày
+
+1. Export `sql_list.xlsx`, `DANH_SACH_FAIL.xlsx`, `DANH_SACH_KEM_LOI.xlsx` nếu cần lưu hồ sơ.
+2. Kiểm tra số lượng `PENDING` và `WAITING_REVIEW`.
+3. Gửi danh sách còn tồn cho các khoa/IT.
+4. Backup `app_state.db` nếu cần lưu lịch sử xử lý.
+
+## 10. Logic reset SQL
+
+Reset không gửi XML. Reset chỉ đặt lại cờ xuất dữ liệu để hệ thống khác gửi XML lại.
+
+Các cờ reset:
 
 - `Export=0`
 - `Export1=0`
 - `Export_CV130=0`
 
-### 11.1. Reset ngoại trú
-
-Điều kiện:
-
-- Hồ sơ `FAIL`.
-- `MA_LK` bắt đầu bằng `TN.`
-
-SQL sinh ra:
+Ngoại trú:
 
 ```sql
 UPDATE xn
@@ -370,14 +588,7 @@ WHERE tn.SoTiepNhan IN (
 );
 ```
 
-### 11.2. Reset nội trú
-
-Điều kiện:
-
-- Hồ sơ `FAIL`.
-- `MA_LK` không bắt đầu bằng `TN.`
-
-SQL sinh ra:
+Nội trú:
 
 ```sql
 UPDATE xn
@@ -389,338 +600,454 @@ WHERE ba.SoBenhAn IN (
 );
 ```
 
-### 11.3. Copy và chạy reset
+Trong webapp, loại ca lấy từ `Record.loai_ca`, không còn tách bằng `MA_LK.startswith("TN.")` ở UI như bản desktop. Tuy vậy quy tắc dữ liệu ban đầu vẫn cần nhất quán: ngoại trú thường có mã `TN.*`, nội trú là số bệnh án đã bỏ `A` đầu nếu có.
 
-Người dùng có hai lựa chọn:
+## 11. Cache SQL
 
-- Copy script rồi chạy ngoài SQL Server Management Studio hoặc công cụ khác.
-- Chạy trực tiếp từ phần mềm.
-
-Khi chạy trực tiếp, phần mềm luôn hiển thị hộp thoại xác nhận với:
-
-- Loại ca.
-- Số ca.
-- Cảnh báo đang chạy update trên database.
-
-## 12. Logic xử lý file lỗi BHYT
-
-File lỗi được đọc bởi `load_hosoloichitiet(path)`.
-
-Quy tắc:
-
-- File phải có `MA_LK`.
-- Nếu thiếu `MALOI`, tạo cột rỗng.
-- Nếu thiếu `MOTALOI`, tạo cột rỗng.
-- Chuẩn hóa `MA_LK`.
-- Nếu có `Ngày ra`, parse về dạng date.
-
-Ghép lỗi bằng `merge_error_with_sql(hsloi, sql_list)`:
-
-- Lấy thông tin bệnh nhân từ `sql_list`:
-  - `MA_LK`
-  - `Họ tên`
-  - `Mã thẻ`
-  - `Tên khoa`
-  - `Mã y tế`
-  - `Ngày ra viện`
-- Merge với file lỗi theo `MA_LK`.
-- Bỏ trùng hoàn toàn.
-- Trả về các cột ưu tiên:
-  - `MA_LK`
-  - `Họ tên`
-  - `Mã thẻ`
-  - `Tên khoa`
-  - `Mã y tế`
-  - `Ngày ra viện`
-  - `Ngày ra` nếu file lỗi có
-  - `MALOI`
-  - `MOTALOI`
-
-Lưu ý: file lỗi chỉ ghép được thông tin bệnh nhân nếu `sql_list` hiện tại có chứa `MA_LK` tương ứng. Nếu người dùng chạy SQL sai khoảng ngày hoặc chưa chạy SQL cho các hồ sơ lỗi, kết quả ghép sẽ thiếu thông tin bệnh nhân.
-
-## 13. Cache SQL
-
-Cache được lưu trong thư mục:
-
-- `cache_sql/`
-
-File index:
+Cache hiện nằm trong:
 
 - `cache_sql/index.json`
-
-File dữ liệu:
-
 - `cache_sql/sql_list_<TuNgay>.pkl`
 
-Logic cache:
+Logic hiện tại:
 
 - Cache theo `TuNgay`.
-- Nếu chạy lại cùng `TuNgay` và cùng `DenNgay`, dùng cache.
-- Nếu chạy lại cùng `TuNgay` nhưng `DenNgay` lớn hơn ngày đã cache, phần mềm chỉ chạy phần thiếu từ ngày kế tiếp sau `cached_end` đến `DenNgay`, sau đó ghép vào cache cũ.
-- Nếu `DenNgay` nhỏ hơn `cached_end`, phần mềm chạy full lại để đảm bảo đúng range.
+- Nếu `TuNgay` và `DenNgay` khớp cache, dùng lại.
+- Nếu `DenNgay` lớn hơn cache cũ, chỉ gọi SQL phần ngày còn thiếu rồi ghép.
+- Nếu cache không dùng được, gọi full range.
 
-Điểm cần cẩn trọng:
+Rủi ro:
 
-- Cache hiện chỉ key theo `TuNgay`, chưa phân biệt server, database, stored procedure, user, hoặc cấu hình SQL.
-- Nếu đổi server/database/SP mà không clear cache, có thể dùng nhầm dữ liệu cũ.
-- Khi nghi ngờ dữ liệu không khớp, nên bấm `Clear cache SQL` trước khi chạy lại.
+- Cache chưa phân biệt server/database/SP/user.
+- Đổi cấu hình HIS mà không clear cache có thể dùng nhầm dữ liệu.
 
-## 14. Config
+Hướng xử lý nên làm:
 
-File config:
+- Tạo cache key bằng hash gồm:
+  - server
+  - database
+  - auth/user
+  - SP ngoại trú
+  - SP nội trú
+  - `TuNgay`
+  - `DenNgay`
+  - version schema
+- Hiển thị rõ cache đang dùng cho cấu hình nào.
+- Tự clear hoặc bỏ qua cache khi cấu hình HIS thay đổi.
 
-- `config.json`
+## 12. Rà soát lỗi và rủi ro hiện tại
 
-Cấu hình mặc định:
+### 12.1. Bảo mật đăng nhập
 
-```json
-{
-  "sql": {
-    "driver": "ODBC Driver 17 for SQL Server",
-    "server": "",
-    "database": "",
-    "auth": "Windows Auth",
-    "user": "",
-    "password": ""
-  },
-  "bh": {
-    "listbh_key_col": "Mã liên kết",
-    "listbh_date_col": "Ngày ra"
-  }
-}
-```
+Hiện session cookie lưu trực tiếp username, chưa ký/chưa mã hóa.
 
-Lưu ý bảo mật:
+Nên cải thiện:
 
-- Nếu dùng `SQL Auth`, password hiện được lưu plain text trong `config.json`.
-- Không nên commit hoặc chia sẻ `config.json` nếu chứa thông tin thật.
+- Dùng signed session hoặc JWT nội bộ có secret.
+- Set `SameSite=Lax`.
+- Nếu dùng HTTPS nội bộ thì set thêm `Secure`.
+- Thêm chức năng đổi mật khẩu.
+- Bắt đổi mật khẩu admin mặc định khi chạy lần đầu.
 
-## 15. Trạng thái dữ liệu trong MainWindow
+### 12.2. Mật khẩu SQL HIS
 
-Các dataframe chính:
+Hiện password HIS được XOR/base64 bằng key hard-code.
 
-- `df_listbh_all`: toàn bộ dữ liệu đọc từ file danh sách đã gửi BHYT.
-- `df_listbh_filtered`: danh sách BHYT đã lọc theo ngày.
-- `df_sql_list`: danh sách hồ sơ từ SQL đã chuẩn hóa.
-- `df_compare`: kết quả so sánh toàn bộ `sql_list`.
-- `df_fail`: các hồ sơ trong SQL nhưng chưa có trong danh sách BHYT.
-- `df_hsloi`: file lỗi BHYT đã đọc.
-- `df_loi_merged`: file lỗi đã ghép thông tin từ SQL.
+Nên cải thiện:
 
-Các bảng hiển thị:
+- Dùng Windows Credential Manager, DPAPI, hoặc tối thiểu mã hóa bằng khóa ngoài source code.
+- Cho phép không lưu password, nhập khi chạy nếu bệnh viện yêu cầu.
 
-- `tbl_sql`: tab `sql_list`.
-- `tbl_bh`: tab `listbh (lọc)`.
-- `tbl_compare`: tab `So sánh`.
-- `tbl_loi`: tab `Ghép lỗi`.
+### 12.3. Sinh SQL bằng ghép chuỗi
 
-## 16. KPI trên giao diện
+`build_reset_sql()` đưa `MA_LK` trực tiếp vào SQL.
 
-KPI được lưu bằng dataclass `KPI`:
+Nên cải thiện:
 
-- `tong_sql`: tổng số ca trong `sql_list`.
-- `tong_bh`: tổng số ca trong danh sách BHYT đã lọc.
-- `da_gui`: số ca SQL đã tìm thấy trong danh sách BHYT.
-- `fail`: số ca SQL chưa tìm thấy trong danh sách BHYT.
+- Escape dấu `'` trong mã.
+- Khi chạy trực tiếp, dùng parameterized query hoặc bảng tạm.
+- Validate `loai_ca` chỉ nhận `Ngoại trú`/`Nội trú`.
+- Validate stored procedure name theo whitelist hoặc pattern an toàn.
 
-## 17. Build và chạy
+### 12.4. Đánh dấu RESOLVED quá sớm
 
-Chạy app từ source:
+Một số API reset/approve hiện chuyển record sang `RESOLVED` ngay khi IT lấy SQL reset.
 
-```powershell
-.\.venv\Scripts\python.exe main.py
-```
+Nên kiểm tra lại nghiệp vụ:
 
-Kiểm tra cú pháp:
+- Nếu `RESOLVED` nghĩa là "đã xử lý trên webapp", code hiện phù hợp.
+- Nếu `RESOLVED` nghĩa là "đã được cổng BHYT ghi nhận gửi thành công", nên thêm trạng thái trung gian.
 
-```powershell
-.\.venv\Scripts\python.exe -m py_compile main.py
-```
+Đề xuất trạng thái mới:
 
-Build bằng PyInstaller:
+- `PENDING`
+- `WAITING_DEPARTMENT`
+- `WAITING_REVIEW`
+- `RESET_READY`
+- `RESET_SQL_COPIED`
+- `WAITING_RESEND`
+- `RESOLVED`
 
-```powershell
-.\.venv\Scripts\pyinstaller.exe KiemTraGuiBHYT.spec
-```
+### 12.5. File upload ghi đè
 
-File `.exe` sau build:
+Hiện upload `listbh.xlsx` và `HoSoLoiChiTiet.xlsx` ghi đè file cũ.
 
-```text
-dist\KiemTraGuiBHYT\KiemTraGuiBHYT.exe
-```
+Nên cải thiện:
 
-File zip hiện có:
+- Lưu file theo timestamp.
+- Lưu metadata: người upload, thời điểm upload, số dòng, range ngày.
+- Cho phép chọn bộ file dùng cho một lần đối soát.
 
-```text
-dist\KiemTraGuiBHYT0402.zip
-```
+### 12.6. Ngày đối soát
 
-## 18. Các hàm quan trọng trong `main.py`
+Record hiện lưu `ngay_doi_soat = today()`.
 
-Config:
+Điều này phù hợp để biết ngày chạy hệ thống, nhưng chưa đủ nếu cần truy vết theo range nghiệp vụ.
 
-- `load_config()`
-- `save_config(cfg)`
+Nên thêm:
 
-Cache:
+- `tu_ngay`
+- `den_ngay`
+- `sync_run_id`
+- `source_file_id`
 
-- `cache_get(tu)`
-- `cache_put(tu, den, df)`
-- `cache_clear_all()`
+### 12.7. Lọc dữ liệu theo khoa
 
-Chuẩn hóa:
+Khoa chỉ thấy lỗi nếu `Record.ten_khoa` khớp tuyệt đối `User.department_name`.
 
-- `chuan_hoa_ma_lk(value)`
-- `remove_leading_A(value)`
-- `unique_keep_order(items)`
-- `parse_datetime_to_date(series)`
+Rủi ro:
 
-File BHYT đã gửi:
+- HIS trả `Khoa Sản`, admin tạo `Sản` thì khoa không thấy dữ liệu.
+- Có khoảng trắng/ký tự khác biệt.
 
-- `load_listbh(path, key_col, date_col)`
-- `filter_listbh_by_date(df, tu_ngay, den_ngay)`
+Nên cải thiện:
 
-SQL:
+- Thêm bảng mapping khoa HIS -> tài khoản khoa.
+- Chuẩn hóa tên khoa.
+- UI cho admin chọn từ danh sách khoa thực tế đã phát hiện.
 
-- `build_conn_str(driver, server, db, auth, user, pw)`
-- `get_conn(cfg)`
-- `sql_exec_sp(conn, sp_name, tu, den)`
-- `run_update_sql(conn, sql_text)`
-- `normalize_sql_list(df_op, df_ip)`
+### 12.8. Scheduler tự đồng bộ
 
-Reset:
+Scheduler hiện chạy theo giờ cấu hình và lấy 3 ngày gần nhất.
 
-- `build_reset_sql(keys, loai)`
-- `get_reset_keys(loai)`
-- `copy_reset(loai)`
-- `run_reset(loai)`
+Rủi ro:
 
-File lỗi:
+- Nếu thời điểm đó file `listbh.xlsx` chưa được cập nhật, kết quả đối soát sẽ sai.
+- Nếu job chạy lâu, trạng thái progress global có thể gây nhầm với job thủ công.
 
-- `load_hosoloichitiet(path)`
-- `merge_error_with_sql(hsloi, sql_list)`
+Nên cải thiện:
 
-GUI:
+- Tạo bảng `sync_runs`.
+- Mỗi lần đồng bộ có ID, logs riêng, trạng thái riêng.
+- Scheduler chỉ chạy khi file nguồn mới hơn lần chạy trước.
+- Có cấu hình range tự động.
 
-- `MainWindow`
-- `build_tab_sql()`
-- `update_buttons()`
-- `df_to_table(table, df)`
+### 12.9. Đường dẫn runtime
 
-## 19. Những giả định nghiệp vụ quan trọng
+Một số path hiện là relative.
 
-Các agent khác cần đặc biệt chú ý các giả định sau khi sửa code:
+Nên cải thiện:
 
-1. `listbh.xlsx` đại diện cho danh sách hồ sơ đã gửi được, không phải XML gốc.
-2. `MA_LK` là khóa chính để so sánh giữa database, danh sách BHYT và file lỗi.
-3. Ngoại trú được xác định bằng `MA_LK.startswith("TN.")`.
-4. Nội trú là các mã còn lại.
-5. Mã nội trú từ `SoPhieu_BA` có thể bắt đầu bằng `A`; phần mềm bỏ `A` đầu chuỗi trước khi so sánh/reset.
-6. `_CC` trong mã liên kết được đổi thành `/CC`.
-7. Reset không gửi XML; reset chỉ đưa cờ xuất về `0` để hệ thống gửi XML khác gửi lại.
-8. File lỗi BHYT chỉ được ghép với `sql_list` hiện đang có trong bộ nhớ.
-9. Cache SQL có thể làm dữ liệu cũ xuất hiện nếu người dùng đổi DB/SP nhưng không clear cache.
-10. Password SQL Auth hiện lưu plain text nếu người dùng bấm lưu cấu hình.
+- Tính đường dẫn theo `BASE_DIR = Path(__file__).resolve().parent`.
+- Đặt SQLite, upload, cache cố định dưới `web_app/data/`, `web_app/uploaded_files/`, `web_app/cache_sql/`.
 
-## 20. Các rủi ro kỹ thuật hiện tại
+### 12.10. Frontend khó bảo trì
 
-### 20.1. UI có thể bị đứng khi chạy dữ liệu lớn
+HTML/CSS/JS đang inline trong template lớn.
 
-Các thao tác đọc Excel, chạy SP, xử lý pandas, ghi Excel đang chạy trực tiếp trên UI thread. Nếu dữ liệu lớn hoặc SQL chậm, giao diện có thể tạm đứng.
+Nên cải thiện:
 
-Hướng cải thiện:
+- Tách JS ra `static/js/admin.js`, `static/js/department.js`.
+- Tách CSS ra `static/css/*.css`.
+- Chuẩn hóa component table, modal, toast.
 
-- Dùng `QThread` hoặc worker background cho tác vụ SQL/Excel.
-- Disable nút khi đang chạy.
-- Có progress/status rõ hơn.
+## 13. Hướng tối ưu hóa nghiệp vụ
 
-### 20.2. Cache chưa đủ khóa định danh
+### 13.1. Thêm vòng đời xử lý rõ ràng
 
-Cache chỉ theo `TuNgay`, nên dễ nhầm nếu đổi:
+Mục tiêu: không nhầm giữa "đã copy SQL reset" và "đã gửi BHYT thành công".
 
-- Server.
-- Database.
-- Stored procedure.
-- Cột mapping.
-- Phiên bản nghiệp vụ.
+Đề xuất:
 
-Hướng cải thiện:
+- `PENDING`: mới phát hiện lỗi/fail.
+- `IN_PROGRESS`: đang được khoa/IT xử lý.
+- `WAITING_REVIEW`: khoa gửi IT duyệt.
+- `RESET_DONE`: IT đã reset cờ xuất.
+- `WAITING_RESEND`: chờ hệ thống gửi XML bên ngoài gửi lại.
+- `RESOLVED`: đã thấy lại trong `listbh`.
 
-- Cache key nên gồm hash của server, database, SP ngoại trú, SP nội trú, `TuNgay`, `DenNgay`, và có thể version schema.
+### 13.2. Tạo lần đồng bộ độc lập
 
-### 20.3. SQL reset đang ghép chuỗi
+Thêm bảng `sync_runs`:
 
-`build_reset_sql()` đưa trực tiếp giá trị `MA_LK` vào chuỗi SQL.
+- id
+- from_date
+- to_date
+- started_at
+- finished_at
+- triggered_by
+- listbh_file
+- loi_file
+- total_sql
+- total_sent
+- total_loi
+- total_fail
+- status
+- log
 
-Trong nghiệp vụ nội bộ có thể chấp nhận nếu dữ liệu tin cậy, nhưng về kỹ thuật nên escape dấu `'` hoặc dùng bảng tạm/parameterized query khi chạy trực tiếp.
+Lợi ích:
 
-### 20.4. Chưa báo chiều lệch ngược
+- Truy vết được mỗi lần đối soát.
+- Export đúng theo lần chạy.
+- Không phụ thuộc "ngày gần nhất có dữ liệu".
 
-Hiện phần mềm chỉ báo:
+### 13.3. Quản lý file nguồn
+
+Thêm bảng `uploaded_files`:
+
+- file_type
+- original_name
+- stored_name
+- uploaded_by
+- uploaded_at
+- row_count
+- hash
+
+Lợi ích:
+
+- Biết lần đối soát dùng file nào.
+- Tránh ghi đè mất dấu vết.
+- Phát hiện upload nhầm file cũ.
+
+### 13.4. Mapping khoa phòng
+
+Thêm bảng `department_mappings`:
+
+- his_department_name
+- app_department_name
+- user_id hoặc department_id
+- active
+
+Lợi ích:
+
+- Khoa thấy đúng dữ liệu.
+- Không phụ thuộc khớp chuỗi tuyệt đối.
+- Dễ xử lý trường hợp một khoa có nhiều tên trong HIS.
+
+### 13.5. Báo cáo lệch hai chiều
+
+Hiện trọng tâm là:
 
 - Có trong SQL nhưng không có trong BHYT.
 
-Chưa báo:
+Nên thêm:
 
 - Có trong BHYT nhưng không có trong SQL.
+- Có trong file lỗi nhưng không có trong SQL range đang chạy.
+- Có trong file lỗi nhưng đã xuất hiện trong list đã gửi.
 
-Nếu cần đối soát đầy đủ, nên thêm một tab hoặc báo cáo "BHYT không có trong SQL".
+### 13.6. Tự cảnh báo dữ liệu đầu vào bất thường
 
-### 20.5. File lỗi phụ thuộc vào `sql_list` đang có
+Nên kiểm tra sau upload:
 
-Nếu người dùng mở file lỗi nhưng chưa chạy SQL đúng range, dữ liệu ghép có thể thiếu `Họ tên`, `Mã thẻ`, `Tên khoa`, `Mã y tế`.
+- Thiếu cột bắt buộc.
+- Số dòng bằng 0.
+- Tỷ lệ `MA_LK` rỗng.
+- Khoảng ngày trong file không giao với range đối soát.
+- File lỗi có nhiều `MA_LK` không nằm trong SQL.
+- Dữ liệu ngày parse lỗi.
 
-Hướng cải thiện:
+### 13.7. Dashboard theo trách nhiệm
 
-- Khi ghép lỗi, cảnh báo số dòng không ghép được.
-- Cho phép chạy SQL bổ sung theo ngày trong file lỗi.
-- Cho phép import `sql_list.xlsx` đã xuất trước đó.
+Admin:
 
-### 20.6. Chưa có test tự động
+- Tổng lỗi theo khoa.
+- Top mã lỗi nhiều nhất.
+- Lỗi quá hạn theo ngày ra viện.
+- Số ca đã reset nhưng chưa gửi lại.
 
-Các hàm nghiệp vụ có thể test độc lập:
+Khoa:
 
-- `chuan_hoa_ma_lk`
-- `remove_leading_A`
-- `normalize_sql_list`
-- `filter_listbh_by_date`
-- `build_reset_sql`
-- `load_hosoloichitiet`
-- `merge_error_with_sql`
+- Việc cần xử lý hôm nay.
+- Việc đã gửi IT duyệt.
+- Việc bị IT trả lại.
+- Hướng dẫn lỗi theo từng dòng.
 
-Nên tách business logic ra module riêng để test không cần mở GUI.
+## 14. Quy trình triển khai LAN đề xuất
 
-## 21. Gợi ý hướng phát triển tiếp theo
+### 14.1. Cài đặt lần đầu trên máy chủ
 
-Các hướng cải thiện có giá trị cao:
+1. Cài Python.
+2. Cài ODBC Driver 17/18 for SQL Server.
+3. Clone/copy source vào máy chủ.
+4. Tạo `.venv`.
+5. Cài thư viện:
 
-1. Thêm `requirements.txt`.
-2. Tách business logic khỏi GUI:
-   - `services/sql_service.py`
-   - `services/bhyt_compare.py`
-   - `services/error_merge.py`
-   - `services/cache.py`
-3. Thêm test cho các hàm nghiệp vụ.
-4. Thêm import nhiều file `listbh` hoặc import cả thư mục nếu thực tế người dùng lấy nhiều file đã gửi.
-5. Thêm báo cáo lệch hai chiều.
-6. Thêm cảnh báo số dòng lỗi không ghép được thông tin bệnh nhân.
-7. Thêm lựa chọn import/export `sql_list` để xử lý offline.
-8. Cải thiện cache key.
-9. Không lưu password plain text, hoặc tối thiểu không lưu password nếu người dùng không chọn.
-10. Chạy SQL/Excel bằng background worker để tránh đứng UI.
+```powershell
+pip install -r requirements.txt
+```
 
-## 22. Cách hiểu nhanh cho Agent mới
+6. Chạy thử:
 
-Nếu cần sửa hoặc mở rộng dự án, hãy hiểu theo thứ tự:
+```powershell
+python web_app/run.py --port 8000
+```
 
-1. `main.py` là source chính.
-2. App là PySide6 desktop app, không phải web app.
-3. Business key là `MA_LK`.
-4. `sql_list` là danh sách hồ sơ đáng lẽ phải gửi, lấy từ SQL Server.
-5. `listbh` là danh sách đã gửi được, lấy từ cổng/phần mềm BHYT.
-6. `FAIL` là ca có trong SQL nhưng chưa có trong danh sách BHYT.
-7. Reset SQL chỉ đặt lại cờ để hệ thống khác gửi lại XML.
-8. `HoSoLoiChiTiet.xlsx` là danh sách lỗi sau khi gửi lại, được ghép với `sql_list`.
-9. Không sửa `dist/` hoặc `build/` trừ khi đang xử lý đóng gói.
-10. Nếu thay đổi nghiệp vụ, ưu tiên sửa hàm nghiệp vụ trước, sau đó cập nhật GUI.
+7. Truy cập từ chính máy chủ:
 
+```text
+http://localhost:8000
+```
+
+8. Truy cập từ máy khoa:
+
+```text
+http://<IP_LAN_MAY_CHU>:8000
+```
+
+### 14.2. Cấu hình mạng
+
+1. Xác định IP LAN của card mạng bệnh viện.
+2. Mở inbound firewall port `8000` cho private/domain network.
+3. Không mở port này ra internet.
+4. Nếu máy có internet và LAN đồng thời, ưu tiên thông báo địa chỉ IP thuộc LAN bệnh viện cho các khoa.
+5. Kiểm tra từ máy khoa bằng trình duyệt.
+
+### 14.3. Chạy nền
+
+Khuyến nghị dùng một trong hai cách:
+
+- Task Scheduler chạy `python web_app/run.py`.
+- NSSM tạo Windows Service.
+
+Nếu dùng launcher:
+
+- Chạy `LaunchWebBHYT.py`.
+- Chọn thư mục dự án.
+- Chọn port.
+- Start server background.
+
+## 15. Các endpoint chính
+
+Trang:
+
+- `GET /`
+- `GET /login`
+- `GET /admin`
+- `GET /department`
+
+Auth:
+
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
+
+Config:
+
+- `GET /api/config`
+- `POST /api/config`
+- `GET /api/config/drivers`
+- `POST /api/config/test-connection`
+- `POST /api/config/clear-cache`
+
+Upload/đối soát:
+
+- `POST /api/upload/listbh`
+- `POST /api/upload/loi`
+- `GET /api/records/compare`
+- `POST /api/sync/start`
+- `GET /api/sync/status`
+
+Khoa:
+
+- `GET /api/records/dept`
+- `POST /api/records/{record_id}/flag`
+
+Admin xử lý:
+
+- `GET /api/records/admin/fail`
+- `GET /api/records/admin/review`
+- `POST /api/records/{record_id}/admin-resolve`
+- `POST /api/records/{record_id}/approve`
+- `POST /api/records/admin/fail/reset`
+- `POST /api/records/{id}/toggle-his-unlock`
+
+Báo cáo:
+
+- `GET /api/records/kpi`
+- `GET /api/reports/departments`
+- `GET /api/export/sql_list`
+- `GET /api/export/fail`
+- `GET /api/export/loi`
+
+Quản trị:
+
+- `GET /api/users`
+- `POST /api/users`
+- `DELETE /api/users/{user_id}`
+- `GET /api/error-definitions`
+- `POST /api/error-definitions`
+- `DELETE /api/error-definitions/{id}`
+
+## 16. Checklist kiểm tra quy trình với người dùng nghiệp vụ
+
+Cần xác nhận lại các điểm sau trước khi tinh chỉnh code sâu:
+
+1. `RESOLVED` có nên chỉ dựa vào việc đã thấy hồ sơ gửi thành công trong `listbh`, hay IT vẫn được phép xác nhận thủ công trong một số trường hợp?
+2. Trạng thái `WAITING_RESEND` đã đủ cho giai đoạn sau reset/chờ gửi lại chưa, hay cần tách thêm `RESET_SQL_COPIED` và `RESET_DONE`?
+3. Khoa có cần quyền yêu cầu IT mở khóa HIS trực tiếp từ màn hình khoa không?
+4. File lỗi `HoSoLoiChiTiet.xlsx` có thể có nhiều dòng cùng `MA_LK` không, và mỗi dòng có cần thành một việc riêng không?
+5. Một khoa trong HIS có thể có nhiều tên khác nhau không?
+6. Ngoại trú luôn map về `Khám bệnh` có đúng thực tế không?
+7. Scheduler tự động nên chạy theo 3 ngày gần nhất hay theo range cố định khác?
+8. Có cần lưu lịch sử nhiều lần upload file hay chỉ cần file mới nhất?
+9. Có cần báo cáo lệch ngược "có trong BHYT nhưng không có trong SQL" không?
+10. Có cần chạy reset trực tiếp từ webapp hay chỉ sinh SQL để IT copy chạy SSMS?
+
+## 17. Ưu tiên phát triển tiếp theo
+
+Ưu tiên cao:
+
+1. Sửa tài liệu và quy trình vận hành theo webapp.
+2. Thêm trạng thái trung gian để không `RESOLVED` quá sớm.
+3. Tăng bảo mật session và bắt đổi mật khẩu admin mặc định.
+4. Cải thiện cache key theo cấu hình HIS.
+5. Chuẩn hóa path runtime theo `BASE_DIR`.
+6. Escape/validate SQL reset.
+7. Thêm mapping khoa phòng.
+
+Ưu tiên trung bình:
+
+1. Tạo bảng `sync_runs`.
+2. Lưu lịch sử upload file.
+3. Báo cáo lệch hai chiều.
+4. Dashboard theo mã lỗi/khoa/quá hạn.
+5. Tách JS/CSS khỏi template.
+
+Ưu tiên sau:
+
+1. Test tự động cho services nghiệp vụ.
+2. Đóng gói launcher/webapp thành bộ cài nội bộ.
+3. Thêm backup/restore SQLite.
+4. Thêm audit log đầy đủ hơn cho thao tác admin.
+
+## 18. Ghi chú cho agent hoặc lập trình viên mới
+
+Nếu sửa webapp, đọc theo thứ tự:
+
+1. `AGENT_CHANGELOG.md` để nắm thay đổi qua các phiên làm việc và ghi log sau khi sửa.
+2. `web_app/models.py` để hiểu dữ liệu.
+3. `web_app/services/his_service.py` để hiểu SQL HIS và reset.
+4. `web_app/services/excel_service.py` để hiểu file Excel.
+5. `web_app/services/compare_service.py` để hiểu phân loại nghiệp vụ.
+6. `web_app/main.py` để hiểu API và scheduler.
+7. `web_app/templates/admin.html` và `department.html` để hiểu thao tác người dùng.
+
+Nguyên tắc quan trọng:
+
+- Không sửa `dist/` hoặc `build/` trừ khi đang đóng gói.
+- Không commit `app_state.db`, cache, file upload, file Excel thật.
+- Không thay đổi logic `MA_LK` nếu chưa xác nhận nghiệp vụ.
+- Khi thay đổi trạng thái xử lý, phải xem cả màn hình admin, khoa, export, KPI và scheduler.
+- Khi đổi logic đối soát, nên có test mẫu cho `compare_service.process_comparison()`.
+- Sau mỗi thay đổi có ý nghĩa, phải cập nhật `AGENT_CHANGELOG.md` để phiên làm việc sau hiểu bối cảnh.

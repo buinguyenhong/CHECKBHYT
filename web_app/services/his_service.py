@@ -287,6 +287,56 @@ WHERE ba.SoBenhAn IN (
 );
 """
 
+def build_benhan_unlock_sql(keys: list[str], action_type: str) -> str:
+    """
+    Sinh script mở/khóa lại bệnh án nội trú để IT copy chạy trên SSMS.
+
+    - UNLOCK: đưa BenhAn.TrangThai về DaXuatVien để khoa sửa.
+    - CLOSE: đưa BenhAn.TrangThai về DaThanhToan sau khi khoa sửa xong.
+    """
+    keys = [chuan_hoa_ma_lk(k) for k in keys if chuan_hoa_ma_lk(k)]
+    seen = set()
+    unique_keys = []
+    for k in keys:
+        if k not in seen:
+            seen.add(k)
+            unique_keys.append(k)
+
+    if not unique_keys:
+        return "-- Không có số bệnh án nào để cập nhật trạng thái."
+
+    if action_type == "UNLOCK":
+        target_status = "DaXuatVien"
+        title = "MO KHOA BENH AN CHO KHOA SUA"
+    elif action_type == "CLOSE":
+        target_status = "DaThanhToan"
+        title = "KHOA LAI BENH AN SAU KHI KHOA SUA XONG"
+    else:
+        return "-- action_type không hợp lệ. Chỉ hỗ trợ UNLOCK hoặc CLOSE."
+
+    quoted_values = []
+    for k in unique_keys:
+        quoted_values.append("'" + k.replace("'", "''") + "'")
+    quoted = ",\n    ".join(quoted_values)
+
+    return f"""-- {title}
+-- So ca: {len(unique_keys)}
+-- Kiem tra truoc khi cap nhat:
+SELECT ba.SoBenhAn, ba.TrangThai, ba.NgayRaVien
+FROM BenhAn ba
+WHERE ba.SoBenhAn IN (
+    {quoted}
+);
+
+-- Chay lenh UPDATE ben duoi khi da kiem tra dung danh sach:
+UPDATE ba
+SET TrangThai = '{target_status}'
+FROM BenhAn ba
+WHERE ba.SoBenhAn IN (
+    {quoted}
+);
+"""
+
 def execute_reset(cfg: dict, keys: list[str], loai: str) -> int:
     """
     Chạy cập nhật reset cờ xuất trên database HIS của bệnh viện

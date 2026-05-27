@@ -622,6 +622,7 @@
                     <option value="ALL">Tất cả trạng thái</option>
                     <option value="PENDING">Chờ sửa (PENDING)</option>
                     <option value="WAITING_REVIEW">Đang chờ IT duyệt (WAITING_REVIEW)</option>
+                    <option value="WAITING_RESEND">Chờ gửi lại (WAITING_RESEND)</option>
                     <option value="RESOLVED">Đã duyệt (RESOLVED)</option>
                 </select>
             </div>
@@ -719,7 +720,7 @@
 
     function updateKPIs() {
         const pending = records.filter(r => r.status === 'PENDING').length;
-        const waiting = records.filter(r => r.status === 'WAITING_REVIEW').length;
+        const waiting = records.filter(r => r.status === 'WAITING_REVIEW' || r.status === 'WAITING_RESEND').length;
         const resolved = records.filter(r => r.status === 'RESOLVED').length;
 
         document.getElementById('kpiPending').innerText = pending;
@@ -774,6 +775,9 @@
             } else if (r.status === 'WAITING_REVIEW') {
                 statusClass = 'status-waiting';
                 statusText = 'Chờ IT duyệt';
+            } else if (r.status === 'WAITING_RESEND') {
+                statusClass = 'status-waiting';
+                statusText = 'Chờ gửi lại';
             } else if (r.status === 'RESOLVED') {
                 statusClass = 'status-resolved';
                 statusText = 'Đã duyệt';
@@ -817,7 +821,7 @@
                 <td style="max-width:200px; white-space:normal; font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa có ghi chú</span>'}</td>
                 <td><span class="status-badge ${statusClass}" style="${statusStyle}">${statusText}</span></td>
                 <td>
-                    <button class="btn-action" onclick="openNoteModal(${r.id}, '${r.note || ''}')" ${r.status === 'RESOLVED' ? 'disabled' : ''}>
+                    <button class="btn-action" onclick="openNoteModal(${r.id}, '${r.note || ''}')" ${(r.status === 'RESOLVED' || r.status === 'WAITING_RESEND') ? 'disabled' : ''}>
                         Sửa & Báo cáo
                     </button>
                 </td>

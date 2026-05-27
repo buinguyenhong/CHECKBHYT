@@ -972,16 +972,16 @@
             
             <div class="upload-row">
                 <div class="upload-card">
-                    <h3>1) Tải danh sách BHYT đã gửi (listbh.xlsx)</h3>
-                    <p>Nhận diện các ca đã được ghi nhận trên cổng BHYT</p>
+                    <h3>Bước 1: Tải danh sách BHYT đã gửi (listbh.xlsx)</h3>
+                    <p>Dùng để so sánh với dữ liệu SQL HIS trong khoảng ngày đã chọn và tìm ca chưa đẩy lên cổng.</p>
                     <input type="file" id="fileListbh" accept=".xlsx" style="display:none" onchange="uploadFile('listbh')">
                     <button class="btn btn-primary" onclick="document.getElementById('fileListbh').click()">Chọn File listbh.xlsx</button>
                     <div style="margin-top:10px; font-size:12px; color:var(--success);" id="lblListbhStatus">Chưa tải tệp</div>
                 </div>
 
                 <div class="upload-card">
-                    <h3>2) Tải chi tiết file lỗi (HoSoLoiChiTiet.xlsx)</h3>
-                    <p>Nhận diện chi tiết mã lỗi trả về từ cổng BHYT</p>
+                    <h3>Bước 4: Tải file lỗi sau khi gửi lại</h3>
+                    <p>Chỉ nạp HoSoLoiChiTiet.xlsx sau khi đã reset HIS, hệ thống gửi lại và cổng BHYT trả lỗi chi tiết.</p>
                     <input type="file" id="fileLoi" accept=".xlsx" style="display:none" onchange="uploadFile('loi')">
                     <button class="btn btn-primary" onclick="document.getElementById('fileLoi').click()">Chọn File HoSoLoiChiTiet.xlsx</button>
                     <div style="margin-top:10px; font-size:12px; color:var(--success);" id="lblLoiStatus">Chưa tải tệp</div>
@@ -999,12 +999,24 @@
                 </div>
             </div>
 
+            <div style="margin-bottom:18px; padding:12px 14px; border:1px solid var(--border-color); background:rgba(59, 130, 246, 0.06); border-radius:8px;">
+                <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; color:var(--text-main); font-size:14px; line-height:1.45;">
+                    <input type="checkbox" id="includeErrorsInSync" style="width:18px; height:18px; margin-top:2px;">
+                    <span>
+                        Dùng kèm file lỗi HoSoLoiChiTiet.xlsx trong lần đối soát này.
+                        <span style="display:block; color:var(--text-secondary); font-size:12px; margin-top:2px;">
+                            Chỉ bật sau khi đã reset các ca FAIL, hệ thống gửi lại, và đã nạp file lỗi từ cổng BHYT.
+                        </span>
+                    </span>
+                </label>
+            </div>
+
             <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
                 <div style="display:flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                    <button class="btn btn-success" style="padding:12px 24px;" id="btnStartSync" onclick="runComparison()">Kích hoạt Đồng bộ & Đối soát CSDL HIS</button>
+                    <button class="btn btn-success" style="padding:12px 24px;" id="btnStartSync" onclick="runComparison()">Bước 2: Đối soát SQL HIS với listbh</button>
                     
                     <div id="syncResetActions" style="display:none; gap:10px; align-items:center; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.15); padding:8px 16px; border-radius:8px;">
-                        <span style="font-weight:700; color:var(--primary); font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">👉 BƯỚC 3: RESET HÀNH CHÍNH HIS:</span>
+                        <span style="font-weight:700; color:var(--primary); font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">Bước 3: Có ca FAIL, tạo SQL reset HIS</span>
                         <button class="btn btn-primary" style="padding:6px 14px; font-size:13px; font-weight:bold; background:var(--primary);" onclick="resetSelectedFail('Ngoại trú')">Copy SQL Reset Ngoại trú</button>
                         <button class="btn btn-primary" style="padding:6px 14px; font-size:13px; font-weight:bold; background:var(--primary);" onclick="resetSelectedFail('Nội trú')">Copy SQL Reset Nội trú</button>
                     </div>
@@ -1322,11 +1334,11 @@
     </div>
 </div>
 
-<!-- Modal copy câu lệnh SQL mở khóa HIS / Reset -->
+<!-- Modal copy câu lệnh SQL mở/khóa bệnh án HIS / Reset -->
 <div class="modal" id="hisUnlockModal">
     <div class="modal-content" style="max-width: 700px;">
         <div class="modal-header">
-            <h3 id="hisUnlockModalTitle">Mở khóa bệnh án / Reset HIS</h3>
+            <h3 id="hisUnlockModalTitle">SQL xử lý HIS</h3>
             <button class="btn-close" onclick="closeHisUnlockModal()">&times;</button>
         </div>
         <p style="font-size:14px; margin-bottom:15px; color:var(--text-secondary);">
@@ -1596,6 +1608,7 @@
     async function runComparison() {
         const fromDate = document.getElementById('sync_from').value;
         const toDate = document.getElementById('sync_to').value;
+        const includeErrors = document.getElementById('includeErrorsInSync')?.checked || false;
 
         if (!fromDate || !toDate) {
             alert("Vui lòng chọn đầy đủ khoảng ngày!");
@@ -1614,10 +1627,14 @@
         progressPercent.innerText = '0%';
         progressBarFill.style.width = '0%';
 
-        logToConsole(`Đang gửi yêu cầu kích hoạt đối soát từ ${fromDate} đến ${toDate}...`);
+        if (includeErrors) {
+            logToConsole(`Đang gửi yêu cầu đối soát từ ${fromDate} đến ${toDate}, có dùng file lỗi chi tiết...`);
+        } else {
+            logToConsole(`Đang gửi yêu cầu đối soát từ ${fromDate} đến ${toDate}. Chế độ này chỉ dùng listbh để tìm ca FAIL.`);
+        }
         
         try {
-            const res = await fetch(`/api/sync/start?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`, {
+            const res = await fetch(`/api/sync/start?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}&include_errors=${includeErrors}`, {
                 method: 'POST'
             });
             const data = await res.json();
@@ -1691,10 +1708,10 @@
                 document.getElementById('kpiFail').innerText = kpis.fail;
                 document.getElementById('kpiResolved').innerText = kpis.resolved;
                 
-                // Show Step 3 Reset buttons if data is loaded
+                // Show reset buttons only when there are actual FAIL cases.
                 const resetBlock = document.getElementById('syncResetActions');
                 if (resetBlock) {
-                    resetBlock.style.display = kpis.tong_sql > 0 ? 'flex' : 'none';
+                    resetBlock.style.display = kpis.fail > 0 ? 'flex' : 'none';
                 }
             }
         } catch (e) {
@@ -1752,7 +1769,11 @@
                         <td>${formattedDate}</td>
                         <td>${r.loai_ca}</td>
                         <td style="font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
-                        <td><span class="badge badge-pending">PENDING</span></td>
+                        <td>
+                            ${r.status === 'WAITING_RESEND'
+                                ? '<span class="badge badge-waiting">Chờ gửi lại</span>'
+                                : '<span class="badge badge-pending">PENDING</span>'}
+                        </td>
                         <td>
                             <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
                         </td>
@@ -1790,7 +1811,7 @@
                     if (r.requires_his_reset) {
                         if (r.his_unlock_status === 'UNLOCKED') {
                             unlockBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.2); color: #fbbf24;">Trả khoa - Đang sửa</span></div>`;
-                            unlockBtn = `<button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; font-weight:bold;" onclick="toggleHisUnlock(${r.id}, 'CLOSE')">Đóng mở khóa</button>`;
+                            unlockBtn = `<button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; font-weight:bold;" onclick="toggleHisUnlock(${r.id}, 'CLOSE')">Khóa lại</button>`;
                         } else {
                             unlockBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.15); color: #f87171;">Yêu cầu mở khóa</span></div>`;
                             unlockBtn = `<button class="btn" style="padding:4px 8px; font-size:12px; font-weight:bold; background:#f59e0b; color:white; border:none;" onclick="toggleHisUnlock(${r.id}, 'UNLOCK')">Trả khoa (Mở khóa)</button>`;
@@ -1824,7 +1845,7 @@
 
     // Approve and execute SQL reset for department errors (Tab 3)
     async function approveAndReset(id) {
-        if (!confirm("Bạn có chắc chắn muốn xác nhận đã xử lý và duyệt Reset cờ xuất cho ca này? Hệ thống sẽ sinh câu lệnh SQL reset để bạn copy chạy SSMS.")) return;
+        if (!confirm("Duyệt ca này và sinh SQL reset để copy chạy SSMS? Ca bệnh sẽ chuyển sang trạng thái chờ hệ thống gửi XML lại, chưa đánh dấu hoàn tất.")) return;
         
         try {
             const res = await fetch(`/api/records/${id}/approve`, { method: 'POST' });
@@ -1854,9 +1875,9 @@
             const data = await res.json();
             if (res.ok && data.status === 'success') {
                 if (actionType === 'UNLOCK') {
-                    openHisUnlockModal(data.sql_command, "Mở khóa bệnh án (Trả hồ sơ về khoa)");
+                    openHisUnlockModal(data.sql_command, "Mở khóa bệnh án: đưa TrangThai về DaXuatVien");
                 } else {
-                    alert("Đã đóng trạng thái mở khóa thành công!");
+                    openHisUnlockModal(data.sql_command, "Khóa lại bệnh án: đưa TrangThai về DaThanhToan");
                 }
                 fetchReviewRecords();
                 updateGlobalKPIs();
@@ -1908,7 +1929,7 @@
 
     // Bulk Reset from Fail List
     async function resetSelectedFail(loai) {
-        if (!confirm(`Bạn sắp chạy cập nhật reset cờ xuất cho TOÀN BỘ các ca FAIL (${loai}). Hệ thống sẽ sinh câu lệnh SQL reset hàng loạt để bạn copy chạy SSMS. Có chắc chắn không?`)) return;
+        if (!confirm(`Sinh SQL reset cho TOÀN BỘ ca FAIL đang chờ reset (${loai})? Sau bước này ca bệnh sẽ ở trạng thái chờ hệ thống gửi XML lại, chưa được đánh dấu hoàn tất.`)) return;
 
         try {
             const res = await fetch(`/api/records/admin/fail/reset?loai=${loai}`, { method: 'POST' });

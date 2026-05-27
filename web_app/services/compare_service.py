@@ -137,6 +137,23 @@ def process_comparison(
                     db.add(log_entry)
             else:
                 # Có lỗi chi tiết -> TẠO 1 BẢN GHI RIÊNG BIỆT CHO MỖI DÒNG LỖI!
+                # Khi đã có lỗi chi tiết, hồ sơ không còn thuộc định nghĩa FAIL
+                # (có trong SQL, chưa có listbh, và chưa có danh sách lỗi).
+                existing_fail_records = db.query(Record).filter(
+                    Record.ma_lk == ma_lk,
+                    Record.type_group == "FAIL",
+                    Record.status != "RESOLVED"
+                ).all()
+                for fail_rec in existing_fail_records:
+                    fail_rec.status = "RESOLVED"
+                    log = RecordLog(
+                        record_id=fail_rec.id,
+                        username="system",
+                        action="CHANGE_STATUS",
+                        note="He thong tu dong dong nhom FAIL: Ho so da co trong danh sach loi chi tiet BHYT"
+                    )
+                    db.add(log)
+
                 for err_detail in error_map[ma_lk]:
                     maloi = err_detail["maloi"]
                     motaloi = err_detail["motaloi"]

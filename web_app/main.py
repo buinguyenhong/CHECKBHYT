@@ -60,12 +60,16 @@ SYNC_PROGRESS = {
     "logs": []
 }
 
-def run_sync_in_background(from_date: str, to_date: str):
+def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = False):
     global SYNC_PROGRESS
     SYNC_PROGRESS["active"] = True
     SYNC_PROGRESS["progress"] = 5
     SYNC_PROGRESS["status"] = "Đang bắt đầu..."
     SYNC_PROGRESS["logs"] = ["Khởi chạy tiến trình đối soát & đồng bộ..."]
+    if include_errors:
+        SYNC_PROGRESS["logs"].append("Chế độ: đối soát kèm file lỗi HoSoLoiChiTiet.xlsx.")
+    else:
+        SYNC_PROGRESS["logs"].append("Chế độ: đối soát danh sách đã gửi để tìm ca FAIL, chưa dùng file lỗi.")
     
     db_gen = get_db()
     db = next(db_gen)
@@ -121,14 +125,19 @@ def run_sync_in_background(from_date: str, to_date: str):
             SYNC_PROGRESS["logs"].append("Cảnh báo: Không tìm thấy file listbh.xlsx. Bỏ qua so sánh đẩy cổng.")
             
         SYNC_PROGRESS["progress"] = 75
-        SYNC_PROGRESS["status"] = "Đang đọc tệp báo cáo lỗi..."
-        loi_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
-        if os.path.exists(loi_path):
-            df_hsloi = excel_service.load_hosoloichitiet(loi_path)
-            SYNC_PROGRESS["logs"].append(f"Đọc HoSoLoiChiTiet.xlsx thành công. Có {len(df_hsloi)} lỗi chi tiết.")
+        if include_errors:
+            SYNC_PROGRESS["status"] = "Đang đọc tệp báo cáo lỗi..."
+            loi_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
+            if os.path.exists(loi_path):
+                df_hsloi = excel_service.load_hosoloichitiet(loi_path)
+                SYNC_PROGRESS["logs"].append(f"Đọc HoSoLoiChiTiet.xlsx thành công. Có {len(df_hsloi)} lỗi chi tiết.")
+            else:
+                df_hsloi = pd.DataFrame()
+                SYNC_PROGRESS["logs"].append("Cảnh báo: Đã bật dùng file lỗi nhưng chưa tìm thấy HoSoLoiChiTiet.xlsx.")
         else:
             df_hsloi = pd.DataFrame()
-            SYNC_PROGRESS["logs"].append("Cảnh báo: Không tìm thấy file HoSoLoiChiTiet.xlsx. Bỏ qua ghép mã lỗi.")
+            SYNC_PROGRESS["status"] = "Bỏ qua file lỗi chi tiết..."
+            SYNC_PROGRESS["logs"].append("Bỏ qua HoSoLoiChiTiet.xlsx. Các ca chưa có trong listbh và chưa có lỗi sẽ được xếp nhóm FAIL.")
             
         SYNC_PROGRESS["progress"] = 85
         SYNC_PROGRESS["status"] = "Đang chạy đối soát & lưu trữ vào SQLite..."
@@ -440,36 +449,27 @@ def toggle_record_his_unlock(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Bật/Tắt trạng thái 'Đang được trả về khoa' và sinh câu lệnh SQL cho IT tự chạy trên SSMS"""
+    """Bật/Tắt trạng thái mở khóa bệnh án và sinh script TrangThai cho IT copy chạy trên SSMS"""
     record = db.query(Record).filter(Record.id == id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ bệnh nhân này")
         
-    sql_command = ""
     ma_lk = record.ma_lk
-    ho_ten = record.ho_ten
-    
-    if record.loai_ca == "Ngoại trú":
-        sql_command = f"""-- SQL Mở khóa Ngoại trú cho BN: {ho_ten}
-UPDATE xn
-SET Export=0, Export1=0, Export_CV130=0
-FROM TiepNhan tn
-JOIN XacNhanChiPhi xn ON xn.TiepNhan_Id = tn.TiepNhan_Id
-WHERE tn.SoTiepNhan = '{ma_lk}';"""
-    else:
-        sql_command = f"""-- SQL Mở khóa Nội trú cho BN: {ho_ten}
-UPDATE xn
-SET Export=0, Export1=0, Export_CV130=0
-FROM BenhAn ba
-JOIN XacNhanChiPhi xn ON xn.BenhAn_Id = ba.BenhAn_Id
-WHERE ba.SoBenhAn = '{ma_lk}';"""
+
+    if action_type not in {"UNLOCK", "CLOSE"}:
+        raise HTTPException(status_code=400, detail="Loại thao tác mở/khóa HIS không hợp lệ.")
+
+    if record.loai_ca != "Nội trú":
+        raise HTTPException(status_code=400, detail="Script mở khóa bệnh án hiện chỉ áp dụng cho ca Nội trú.")
+
+    sql_command = his_service.build_benhan_unlock_sql([ma_lk], action_type)
 
     if action_type == "UNLOCK":
         record.his_unlock_status = "UNLOCKED"
-        log_action = f"IT Admin đã đổi trạng thái thành 'Đang được trả về khoa' và copy SQL mở khóa."
+        log_action = "IT Admin sinh script đưa BenhAn.TrangThai về DaXuatVien để khoa sửa."
     else:
         record.his_unlock_status = "NORMAL"
-        log_action = f"IT Admin đã đóng trạng thái mở khóa (Khoa phòng báo đã sửa xong)."
+        log_action = "IT Admin sinh script đưa BenhAn.TrangThai về DaThanhToan để khóa lại sau khi khoa sửa."
         
     new_log = RecordLog(
         record_id=record.id,
@@ -636,6 +636,7 @@ async def upload_loi(
 def compare_records(
     from_date: str,
     to_date: str,
+    include_errors: bool = False,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -673,10 +674,13 @@ def compare_records(
         else:
             df_listbh = pd.DataFrame()
 
-        # 3. Đọc file lỗi Excel tạm đã upload
-        loi_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
-        if os.path.exists(loi_path):
-            df_hsloi = excel_service.load_hosoloichitiet(loi_path)
+        # 3. Đọc file lỗi Excel tạm đã upload nếu người dùng chủ động bật
+        if include_errors:
+            loi_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
+            if os.path.exists(loi_path):
+                df_hsloi = excel_service.load_hosoloichitiet(loi_path)
+            else:
+                df_hsloi = pd.DataFrame()
         else:
             df_hsloi = pd.DataFrame()
 
@@ -698,6 +702,7 @@ def start_sync(
     from_date: str,
     to_date: str,
     background_tasks: BackgroundTasks,
+    include_errors: bool = False,
     user: User = Depends(require_admin)
 ):
     """Kích hoạt tiến trình đối soát chạy ngầm bất đồng bộ"""
@@ -705,7 +710,7 @@ def start_sync(
     if SYNC_PROGRESS["active"]:
         raise HTTPException(status_code=400, detail="Đang có một tiến trình đối soát khác chạy ngầm. Vui lòng đợi.")
         
-    background_tasks.add_task(run_sync_in_background, from_date.replace('-', ''), to_date.replace('-', ''))
+    background_tasks.add_task(run_sync_in_background, from_date.replace('-', ''), to_date.replace('-', ''), include_errors)
     return {"status": "success", "message": "Đã bắt đầu đối soát chạy ngầm."}
 
 
@@ -793,6 +798,8 @@ def flag_record_for_review(
 
     if record.status == "RESOLVED":
         raise HTTPException(status_code=400, detail="Ca này phòng IT đã duyệt hoàn tất, không thể chỉnh sửa.")
+    if record.status == "WAITING_RESEND":
+        raise HTTPException(status_code=400, detail="Ca này đang chờ hệ thống gửi XML lại, không thể gửi duyệt thêm.")
 
     note = data.get("note", "").strip()
     record.note = note
@@ -896,7 +903,7 @@ def approve_and_reset_sql(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """IT duyệt hồ sơ lỗi khoa gửi lên: Đánh dấu RESOLVED trên WebApp và sinh câu lệnh SQL reset cờ xuất để IT copy chạy SSMS"""
+    """IT duyệt hồ sơ lỗi khoa gửi lên: sinh SQL reset và chuyển sang trạng thái chờ gửi lại."""
     record = db.query(Record).filter(Record.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Hồ sơ không tồn tại.")
@@ -905,13 +912,14 @@ def approve_and_reset_sql(
         # Sinh câu lệnh SQL Reset hành chính (Export=0)
         sql_command = his_service.build_reset_sql([record.ma_lk], record.loai_ca)
 
-        # Cập nhật trạng thái WebApp thành RESOLVED
-        record.status = "RESOLVED"
+        # Chưa đánh dấu RESOLVED tại thời điểm sinh SQL reset.
+        # RESOLVED chỉ nên xảy ra khi lần đối soát sau thấy MA_LK đã có trong listbh.
+        record.status = "WAITING_RESEND"
         log = RecordLog(
             record_id=record.id,
             username=user.username,
             action="CHANGE_STATUS",
-            note=f"IT duyệt giải trình và copy SQL Reset hành chính chạy trên SSMS."
+            note=f"IT duyệt giải trình và lấy SQL Reset. Chờ hệ thống gửi XML bên ngoài gửi lại."
         )
         db.add(log)
         db.commit()
@@ -927,7 +935,7 @@ def run_bulk_fail_reset(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """IT chạy Reset cờ xuất hàng loạt cho tất cả ca FAIL: Sinh câu lệnh SQL hàng loạt và đổi trạng thái WebApp thành RESOLVED"""
+    """IT sinh SQL reset hàng loạt cho ca FAIL và chuyển sang trạng thái chờ gửi lại."""
     records = db.query(Record).filter(
         Record.type_group == "FAIL",
         Record.status == "PENDING",
@@ -942,14 +950,15 @@ def run_bulk_fail_reset(
         # Sinh câu lệnh SQL Reset hàng loạt
         sql_command = his_service.build_reset_sql(keys, loai)
 
-        # Đánh dấu đã xử lý xong cho các ca trên WebApp
+        # Không đánh dấu RESOLVED ngay khi sinh SQL.
+        # Các ca này chỉ hoàn tất khi lần đối soát sau thấy xuất hiện trong listbh.
         for r in records:
-            r.status = "RESOLVED"
+            r.status = "WAITING_RESEND"
             log = RecordLog(
                 record_id=r.id,
                 username=user.username,
                 action="CHANGE_STATUS",
-                note=f"IT xác nhận xử lý hàng loạt ({loai}) và lấy câu lệnh SQL chạy SSMS."
+                note=f"IT lấy câu lệnh SQL reset hàng loạt ({loai}). Chờ hệ thống gửi XML bên ngoài gửi lại."
             )
             db.add(log)
             
@@ -979,7 +988,10 @@ def get_global_kpis(
     tong_sql = base_query.count()
     da_gui = base_query.filter(Record.status == "RESOLVED", Record.type_group != "LOI").count()
     loi = base_query.filter(Record.type_group == "LOI", Record.status != "RESOLVED").count()
-    fail = base_query.filter(Record.type_group == "FAIL", Record.status == "PENDING").count()
+    fail = base_query.filter(
+        Record.type_group == "FAIL",
+        Record.status != "RESOLVED"
+    ).count()
     resolved = base_query.filter(Record.status == "RESOLVED").count()
 
     return {
@@ -1073,7 +1085,7 @@ def export_fail_list(
     records = db.query(Record).filter(
         Record.ngay_doi_soat == last_record.ngay_doi_soat,
         Record.type_group == "FAIL",
-        Record.status == "PENDING"
+        Record.status != "RESOLVED"
     ).all()
     
     data = []
@@ -1244,11 +1256,9 @@ async def auto_sync_scheduler():
                                 else:
                                     df_listbh = pd.DataFrame()
                                     
-                                loi_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
-                                if os.path.exists(loi_path):
-                                    df_hsloi = excel_service.load_hosoloichitiet(loi_path)
-                                else:
-                                    df_hsloi = pd.DataFrame()
+                                # Scheduler tự động chỉ đối soát SQL HIS với listbh để tìm FAIL.
+                                # File lỗi chi tiết chỉ được dùng khi IT chủ động import/chạy lại.
+                                df_hsloi = pd.DataFrame()
                                     
                                 compare_service.process_comparison(temp_db, df_sql, df_listbh, df_hsloi, now.date())
                                 print("[*] [Scheduler] Dong bo tu dong HIS thanh cong.")
