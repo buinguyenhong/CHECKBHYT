@@ -616,10 +616,18 @@ Logic hiện tại:
 - Nếu `DenNgay` lớn hơn cache cũ, chỉ gọi SQL phần ngày còn thiếu rồi ghép.
 - Nếu cache không dùng được, gọi full range.
 
+Timeout SQL hiện tại:
+
+- `BHYT_SQL_CONNECT_TIMEOUT`: timeout khi kết nối SQL Server, mặc định `60` giây.
+- `BHYT_SQL_QUERY_TIMEOUT`: timeout khi chạy truy vấn/stored procedure/reset SQL qua pyodbc, mặc định `0`.
+- Giá trị `0` nghĩa là không giới hạn timeout truy vấn ở phía pyodbc, phù hợp khi chạy dữ liệu dài như 1 tháng.
+- Nếu bệnh viện muốn giới hạn lại, có thể set biến môi trường `BHYT_SQL_QUERY_TIMEOUT`, ví dụ `1800` cho 30 phút.
+
 Rủi ro:
 
 - Cache chưa phân biệt server/database/SP/user.
 - Đổi cấu hình HIS mà không clear cache có thể dùng nhầm dữ liệu.
+- Không giới hạn query timeout giúp tránh dừng giữa chừng, nhưng nếu SP bị treo thật thì job có thể chạy rất lâu; cần theo dõi log/progress và tối ưu SP/index phía SQL Server nếu thường xuyên quá chậm.
 
 Hướng xử lý nên làm:
 

@@ -17,6 +17,11 @@ except Exception:
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache_sql")
 CACHE_INDEX_FILE = os.path.join(CACHE_DIR, "index.json")
 
+# Truy vấn HIS theo range dài (ví dụ 1 tháng) có thể chạy lâu.
+# 0 = không giới hạn timeout truy vấn ở pyodbc; có thể override bằng biến môi trường.
+SQL_QUERY_TIMEOUT_SECONDS = int(os.environ.get("BHYT_SQL_QUERY_TIMEOUT", "0"))
+SQL_CONNECT_TIMEOUT_SECONDS = int(os.environ.get("BHYT_SQL_CONNECT_TIMEOUT", "60"))
+
 def ensure_cache_dir():
     os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -122,12 +127,21 @@ def get_conn(cfg: dict):
         cfg.get("user", ""),
         cfg.get("password", "")
     )
-    return pyodbc.connect(conn_str, timeout=25)
+    conn = pyodbc.connect(conn_str, timeout=SQL_CONNECT_TIMEOUT_SECONDS)
+    try:
+        conn.timeout = SQL_QUERY_TIMEOUT_SECONDS
+    except Exception:
+        pass
+    return conn
 
 def test_connection(cfg: dict) -> bool:
     conn = get_conn(cfg)
     try:
         cur = conn.cursor()
+        try:
+            cur.timeout = SQL_QUERY_TIMEOUT_SECONDS
+        except Exception:
+            pass
         cur.execute("SELECT 1")
         cur.fetchone()
         return True
@@ -136,6 +150,10 @@ def test_connection(cfg: dict) -> bool:
 
 def sql_exec_sp(conn, sp_name: str, tu: str, den: str) -> pd.DataFrame:
     cur = conn.cursor()
+    try:
+        cur.timeout = SQL_QUERY_TIMEOUT_SECONDS
+    except Exception:
+        pass
     cur.execute(f"SET NOCOUNT ON; EXEC {sp_name} @TuNgay=?, @DenNgay=?", (tu, den))
 
     while cur.description is None:
@@ -149,6 +167,10 @@ def sql_exec_sp(conn, sp_name: str, tu: str, den: str) -> pd.DataFrame:
 
 def run_update_sql(conn, sql_text: str) -> int:
     cur = conn.cursor()
+    try:
+        cur.timeout = SQL_QUERY_TIMEOUT_SECONDS
+    except Exception:
+        pass
     cur.execute("SET NOCOUNT ON;")
     cur.execute(sql_text)
     try:

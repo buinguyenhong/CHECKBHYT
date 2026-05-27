@@ -58,6 +58,33 @@ Nguyên tắc:
 ## 2026-05-27 - Codex
 
 ### Mục tiêu
+- Tránh timeout khi truy vấn dữ liệu SQL HIS range dài như 1 tháng.
+- Làm rõ Bước 3 trên giao diện admin dù chưa có ca `FAIL`.
+
+### Thay đổi
+- `web_app/services/his_service.py`:
+  - Thêm `SQL_CONNECT_TIMEOUT_SECONDS`, mặc định 60 giây.
+  - Thêm `SQL_QUERY_TIMEOUT_SECONDS`, mặc định 0 nghĩa là không giới hạn query timeout pyodbc.
+  - Set timeout cho connection/cursor khi test connection, chạy stored procedure và chạy SQL update.
+- `web_app/templates/admin.html`:
+  - Bước 3 luôn hiển thị.
+  - Nút reset bị disable khi chưa có `FAIL`.
+  - Hiển thị hint số ca `FAIL` sau đối soát.
+- `Project.md`: ghi lại biến môi trường timeout và rủi ro khi query chạy quá lâu.
+
+### Nghiệp vụ ảnh hưởng
+- Chạy đối soát range dài ít bị ngắt bởi pyodbc query timeout.
+- Quy trình UI rõ hơn: người dùng luôn thấy bước tạo SQL reset HIS, nhưng chỉ thao tác được khi có `FAIL`.
+
+### Kiểm tra
+- Cần chạy `py_compile` sau thay đổi.
+
+### Lưu ý cho phiên sau
+- Nếu SQL Server/SP bị treo thật, query timeout 0 sẽ chờ rất lâu. Cần cân nhắc thêm nút hủy job hoặc cấu hình timeout trên UI.
+
+## 2026-05-27 - Codex
+
+### Mục tiêu
 - Tạo file nhật ký để các agent khác đọc hiểu bối cảnh thay đổi qua nhiều phiên làm việc.
 - Đặt quy ước bắt buộc agent phải ghi lại thay đổi sau mỗi lần sửa.
 
