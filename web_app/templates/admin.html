@@ -900,7 +900,10 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Cấu hình Kết nối SQL Server HIS (LAN Bệnh viện)</h2>
-                <button class="btn btn-primary" onclick="saveConfig()">Lưu cấu hình</button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main);" onclick="clearSqlCache()">Xóa Cache SQL</button>
+                    <button class="btn btn-primary" onclick="saveConfig()">Lưu cấu hình</button>
+                </div>
             </div>
             <div class="grid-form">
                 <div class="form-group">
@@ -1405,6 +1408,26 @@
             }
         } catch {
             logToConsole("Lỗi kết nối LAN.");
+        }
+    }
+
+    // Clear SQL Cache
+    async function clearSqlCache() {
+        if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ các tệp Cache SQL Server đã lưu? Hệ thống sẽ phải tải lại dữ liệu từ đầu ở lần đối soát tiếp theo.")) {
+            return;
+        }
+        logToConsole("Đang xóa toàn bộ Cache SQL Server...");
+        try {
+            const res = await fetch('/api/config/clear-cache', { method: 'POST' });
+            if (res.ok) {
+                logToConsole("Đã xóa sạch Cache SQL Server thành công! ✅");
+                alert("Đã xóa sạch Cache SQL Server thành công!");
+            } else {
+                logToConsole("Lỗi khi xóa Cache SQL Server.");
+                alert("Xóa cache thất bại.");
+            }
+        } catch {
+            logToConsole("Lỗi kết nối máy chủ để xóa cache.");
         }
     }
 

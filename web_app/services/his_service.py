@@ -1,12 +1,76 @@
 import pandas as pd
-from typing import Optional
+from typing import Optional, Tuple
 import datetime
+import os
+import json
+import shutil
 
 # Clipboard / ODBC imports
 try:
     import pyodbc
 except Exception:
     pyodbc = None
+
+# ==========================================
+# SQL CACHE CONFIGURATION
+# ==========================================
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache_sql")
+CACHE_INDEX_FILE = os.path.join(CACHE_DIR, "index.json")
+
+def ensure_cache_dir():
+    os.makedirs(CACHE_DIR, exist_ok=True)
+
+def load_cache_index() -> dict:
+    ensure_cache_dir()
+    if not os.path.exists(CACHE_INDEX_FILE):
+        return {}
+    try:
+        with open(CACHE_INDEX_FILE, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+
+def save_cache_index(index: dict):
+    ensure_cache_dir()
+    with open(CACHE_INDEX_FILE, "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=2)
+
+def cache_file_for_start(tu: str) -> str:
+    return os.path.join(CACHE_DIR, f"sql_list_{tu}.pkl")
+
+def cache_get(tu: str) -> Optional[Tuple[str, pd.DataFrame]]:
+    """Lấy dữ liệu từ cache nếu có và khớp cấu trúc"""
+    index = load_cache_index()
+    if tu not in index:
+        return None
+    info = index.get(tu, {})
+    cached_end = info.get("end")
+    path = info.get("file")
+    if not cached_end or not path or not os.path.exists(path):
+        return None
+    try:
+        df = pd.read_pickle(path)
+        if not isinstance(df, pd.DataFrame):
+            return None
+        return cached_end, df
+    except Exception:
+        return None
+
+def cache_put(tu: str, den: str, df: pd.DataFrame):
+    """Lưu dữ liệu vào cache dưới dạng file .pkl"""
+    ensure_cache_dir()
+    index = load_cache_index()
+    path = cache_file_for_start(tu)
+    df.to_pickle(path)
+    index[tu] = {"end": den, "file": path}
+    save_cache_index(index)
+
+def clear_sql_cache():
+    """Xóa toàn bộ thư mục cache SQL"""
+    if os.path.exists(CACHE_DIR):
+        shutil.rmtree(CACHE_DIR, ignore_errors=True)
+    ensure_cache_dir()
+
 
 # Business logic normalization functions (taken from original main.py)
 def chuan_hoa_ma_lk(value) -> str:
@@ -130,9 +194,9 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
 
     return out[["Loại ca", "MA_LK", "Họ tên", "Mã thẻ", "Tên khoa", "Mã y tế", "Ngày ra viện"]].copy()
 
-def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
+def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
     """
-    Kết nối SQL Server HIS và tải danh sách bệnh nhân đã thanh toán
+    Truy vấn trực tiếp từ database cho khoảng ngày cụ thể [tu_ngay, den_ngay]
     """
     conn = get_conn(cfg)
     try:
@@ -145,6 +209,51 @@ def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
         return normalize_sql_list(df_op, df_ip)
     finally:
         conn.close()
+
+def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
+    """
+    Tải danh sách bệnh nhân đã thanh toán kèm cơ chế CACHE:
+    - Nếu đã cache (tu) và cached_end == den_ngay: dùng cache.
+    - Nếu đã cache (tu) và cached_end < den_ngay: chỉ chạy phần thiếu [cached_end + 1, den_ngay] rồi ghép.
+    - Nếu cached_end > den_ngay hoặc tu khác: chạy full (không cắt được).
+    """
+    if tu_ngay > den_ngay:
+        return pd.DataFrame()
+
+    cached = cache_get(tu_ngay)
+    if cached is not None:
+        cached_end, cached_df = cached
+
+        if cached_end == den_ngay:
+            # Dùng cache hoàn toàn
+            return cached_df.copy()
+        elif cached_end < den_ngay:
+            # Chỉ chạy phần thiếu (cached_end + 1 -> den_ngay)
+            try:
+                dt_cached_end = datetime.datetime.strptime(cached_end, "%Y%m%d")
+                dt_next_day = dt_cached_end + datetime.timedelta(days=1)
+                tu2 = dt_next_day.strftime("%Y%m%d")
+            except Exception:
+                tu2 = tu_ngay # Fallback chạy full nếu lỗi parse ngày
+
+            if tu2 <= den_ngay:
+                new_df = fetch_his_data_range(cfg, tu2, den_ngay)
+            else:
+                new_df = pd.DataFrame()
+
+            # Ghép cache cũ và phần mới
+            merged = pd.concat([cached_df, new_df], ignore_index=True)
+            merged = merged.drop_duplicates(subset=["MA_LK"], keep="first")
+            
+            # Cập nhật cache
+            cache_put(tu_ngay, den_ngay, merged)
+            return merged
+            
+    # Chạy full (chưa có cache hoặc cache không khớp)
+    df = fetch_his_data_range(cfg, tu_ngay, den_ngay)
+    cache_put(tu_ngay, den_ngay, df)
+    return df
+
 
 def build_reset_sql(keys: list[str], loai: str) -> str:
     keys = [chuan_hoa_ma_lk(k) for k in keys if chuan_hoa_ma_lk(k)]

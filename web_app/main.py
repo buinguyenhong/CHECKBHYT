@@ -351,6 +351,16 @@ def get_available_drivers(user: User = Depends(require_admin)):
     return {"drivers": drivers}
 
 
+@app.post("/api/config/clear-cache")
+def clear_his_cache(user: User = Depends(require_admin)):
+    """Xóa toàn bộ các tệp cache truy vấn SQL Server HIS để giải phóng dung lượng và tải mới dữ liệu"""
+    try:
+        his_service.clear_sql_cache()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/config/test-connection")
 def test_his_connection(
     test_data: dict = None,
