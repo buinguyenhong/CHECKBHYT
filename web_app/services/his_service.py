@@ -35,7 +35,7 @@ def build_conn_str(driver: str, server: str, db: str, auth: str, user: str, pw: 
     # Khắc phục lỗi kết nối ODBC Driver 18+ trên mạng LAN bệnh viện (không có SSL tin cậy)
     # ODBC 18 mặc định Encrypt=yes và kiểm tra chứng chỉ nghiêm ngặt.
     if "18" in driver or "19" in driver or "20" in driver:
-        conn_str += "TrustServerCertificate=yes;Encrypt=no;"
+        conn_str += "TrustServerCertificate=yes;Encrypt=yes;"
         
     return conn_str
 
