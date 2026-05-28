@@ -1098,11 +1098,7 @@ class MainWindow(QMainWindow):
         if df_fail.empty:
             return []
 
-        ma = df_fail["MA_LK"].astype(str).str.strip()
-        if loai == "Ngoại trú":
-            df_fail = df_fail[ma.str.startswith("TN.")]
-        else:
-            df_fail = df_fail[~ma.str.startswith("TN.")]
+        df_fail = df_fail[df_fail["Loại ca"] == loai]
 
         keys = df_fail["MA_LK"].astype(str).tolist()
         keys = [chuan_hoa_ma_lk(k) for k in keys if chuan_hoa_ma_lk(k)]
