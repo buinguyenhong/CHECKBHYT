@@ -254,7 +254,18 @@ def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame
         if df_op.empty and df_ip.empty:
             return pd.DataFrame()
             
-        return normalize_sql_list(df_op, df_ip)
+        df = normalize_sql_list(df_op, df_ip)
+        if df.empty:
+            return df
+            
+        # Strict dynamic date filter to prevent HIS SP returning records outside the requested range
+        try:
+            dt_tu = datetime.date(int(tu_ngay[0:4]), int(tu_ngay[4:6]), int(tu_ngay[6:8]))
+            dt_den = datetime.date(int(den_ngay[0:4]), int(den_ngay[4:6]), int(den_ngay[6:8]))
+            df = df[(df["Ngày ra viện"] >= dt_tu) & (df["Ngày ra viện"] <= dt_den)]
+        except Exception:
+            pass
+        return df
     finally:
         conn.close()
         discard_conn(conn)

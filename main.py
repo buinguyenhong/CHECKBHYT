@@ -954,7 +954,19 @@ class MainWindow(QMainWindow):
 
         if df_op.empty and df_ip.empty:
             return pd.DataFrame()
-        return normalize_sql_list(df_op, df_ip)
+            
+        df = normalize_sql_list(df_op, df_ip)
+        if df.empty:
+            return df
+            
+        # Strict dynamic date filter to prevent HIS SP returning records outside the requested range
+        try:
+            dt_tu = datetime.strptime(tu, "%Y%m%d").date()
+            dt_den = datetime.strptime(den, "%Y%m%d").date()
+            df = df[(df["Ngày ra viện"] >= dt_tu) & (df["Ngày ra viện"] <= dt_den)]
+        except Exception:
+            pass
+        return df
 
     def on_run_sp(self):
         try:

@@ -928,17 +928,15 @@ def get_admin_fail_records(
     
     if from_date:
         try:
-            fd = from_date.replace("-", "")
-            fd_date = datetime.datetime.strptime(fd, "%Y%m%d").date()
-            query = query.filter(Record.ngay_ra_vien >= fd_date)
+            fd = f"{from_date[0:4]}-{from_date[4:6]}-{from_date[6:8]}"
+            query = query.filter(Record.ngay_ra_vien >= fd)
         except Exception:
             pass
             
     if to_date:
         try:
-            td = to_date.replace("-", "")
-            td_date = datetime.datetime.strptime(td, "%Y%m%d").date()
-            query = query.filter(Record.ngay_ra_vien <= td_date)
+            td = f"{to_date[0:4]}-{to_date[4:6]}-{to_date[6:8]}"
+            query = query.filter(Record.ngay_ra_vien <= td)
         except Exception:
             pass
 
@@ -1056,17 +1054,15 @@ def run_bulk_fail_reset(
     
     if from_date:
         try:
-            fd = from_date.replace("-", "")
-            fd_date = datetime.datetime.strptime(fd, "%Y%m%d").date()
-            query = query.filter(Record.ngay_ra_vien >= fd_date)
+            fd = f"{from_date[0:4]}-{from_date[4:6]}-{from_date[6:8]}"
+            query = query.filter(Record.ngay_ra_vien >= fd)
         except Exception:
             pass
             
     if to_date:
         try:
-            td = to_date.replace("-", "")
-            td_date = datetime.datetime.strptime(td, "%Y%m%d").date()
-            query = query.filter(Record.ngay_ra_vien <= td_date)
+            td = f"{to_date[0:4]}-{to_date[4:6]}-{to_date[6:8]}"
+            query = query.filter(Record.ngay_ra_vien <= td)
         except Exception:
             pass
 
@@ -1229,16 +1225,14 @@ def export_fail_list(
     if from_date or to_date:
         if from_date:
             try:
-                fd = from_date.replace("-", "")
-                fd_date = datetime.datetime.strptime(fd, "%Y%m%d").date()
-                query = query.filter(Record.ngay_ra_vien >= fd_date)
+                fd = f"{from_date[0:4]}-{from_date[4:6]}-{from_date[6:8]}"
+                query = query.filter(Record.ngay_ra_vien >= fd)
             except Exception:
                 pass
         if to_date:
             try:
-                td = to_date.replace("-", "")
-                td_date = datetime.datetime.strptime(td, "%Y%m%d").date()
-                query = query.filter(Record.ngay_ra_vien <= td_date)
+                td = f"{to_date[0:4]}-{to_date[4:6]}-{to_date[6:8]}"
+                query = query.filter(Record.ngay_ra_vien <= td)
             except Exception:
                 pass
     else:
