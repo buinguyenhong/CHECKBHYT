@@ -54,8 +54,13 @@ def process_comparison(
         is_sent = (ma_lk in sent_keys)
         has_error = (ma_lk in error_map)
 
-        # Dữ liệu đối soát hành chính
-        loai_ca = str(row.get("Loại ca", "Ngoại trú"))
+        # Dữ liệu đối soát hành chính với cơ chế fallback thông minh nếu bị NaN/nan
+        loai_ca_val = row.get("Loại ca")
+        if pd.isna(loai_ca_val) or str(loai_ca_val).strip().lower() in ["nan", "", "none"]:
+            loai_ca = "Ngoại trú" if str(ma_lk).startswith("TN.") else "Nội trú"
+        else:
+            loai_ca = str(loai_ca_val).strip()
+
         ho_ten = str(row.get("Họ tên", ""))
         ma_the = str(row.get("Mã thẻ", ""))
         ten_khoa = str(row.get("Tên khoa", ""))

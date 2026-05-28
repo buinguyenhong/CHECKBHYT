@@ -1098,6 +1098,15 @@ class MainWindow(QMainWindow):
         if df_fail.empty:
             return []
 
+        # Fallback cho Loại ca nếu bị nan hoặc trống
+        def resolve_desktop_loai_ca(row):
+            val = row.get("Loại ca")
+            if pd.isna(val) or str(val).strip().lower() in ("nan", "none", ""):
+                ma = str(row.get("MA_LK", ""))
+                return "Ngoại trú" if ma.startswith("TN.") else "Nội trú"
+            return str(val).strip()
+
+        df_fail["Loại ca"] = df_fail.apply(resolve_desktop_loai_ca, axis=1)
         df_fail = df_fail[df_fail["Loại ca"] == loai]
 
         keys = df_fail["MA_LK"].astype(str).tolist()

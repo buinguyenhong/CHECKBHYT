@@ -289,6 +289,13 @@ def build_reset_sql(keys: list[str], loai: str) -> str:
     if not unique_keys:
         return "-- Không có mã nào để reset."
 
+    # Fallback cho loai nếu bị nan/trống
+    if not loai or str(loai).strip().lower() in ("nan", "none", ""):
+        if unique_keys and unique_keys[0].startswith("TN."):
+            loai = "Ngoại trú"
+        else:
+            loai = "Nội trú"
+
     quoted = ",\n    ".join([f"'{k}'" for k in unique_keys])
 
     if loai == "Ngoại trú":

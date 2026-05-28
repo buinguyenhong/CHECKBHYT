@@ -50,6 +50,16 @@ def decrypt_password(encrypted_base64: str) -> str:
     except Exception:
         return encrypted_base64
 
+def resolve_loai_ca(record: Record) -> str:
+    """Trả về 'Ngoại trú' hoặc 'Nội trú' với cơ chế fallback nếu loai_ca bị 'nan' hoặc trống."""
+    loai_ca_val = record.loai_ca
+    if not loai_ca_val or str(loai_ca_val).strip().lower() in ("nan", "none", ""):
+        if record.ma_lk and record.ma_lk.startswith("TN."):
+            return "Ngoại trú"
+        else:
+            return "Nội trú"
+    return str(loai_ca_val).strip()
+
 # ==========================================
 # GLOBAL STATE FOR ASYNC SYNC PROGRESS
 # ==========================================
@@ -490,7 +500,7 @@ def toggle_record_his_unlock(
     if action_type not in {"UNLOCK", "CLOSE"}:
         raise HTTPException(status_code=400, detail="Loại thao tác mở/khóa HIS không hợp lệ.")
 
-    if record.loai_ca != "Nội trú":
+    if resolve_loai_ca(record) != "Nội trú":
         raise HTTPException(status_code=400, detail="Script mở khóa bệnh án hiện chỉ áp dụng cho ca Nội trú.")
 
     sql_command = his_service.build_benhan_unlock_sql([ma_lk], action_type)
@@ -942,7 +952,7 @@ def approve_and_reset_sql(
 
     try:
         # Sinh câu lệnh SQL Reset hành chính (Export=0)
-        sql_command = his_service.build_reset_sql([record.ma_lk], record.loai_ca)
+        sql_command = his_service.build_reset_sql([record.ma_lk], resolve_loai_ca(record))
 
         # Chưa đánh dấu RESOLVED tại thời điểm sinh SQL reset.
         # RESOLVED chỉ nên xảy ra khi lần đối soát sau thấy MA_LK đã có trong listbh.
@@ -968,11 +978,12 @@ def run_bulk_fail_reset(
     db: Session = Depends(get_db)
 ):
     """IT sinh SQL reset hàng loạt cho ca FAIL và chuyển sang trạng thái chờ gửi lại."""
-    records = db.query(Record).filter(
+    all_fail_records = db.query(Record).filter(
         Record.type_group == "FAIL",
-        Record.status.in_(["PENDING", "WAITING_RESEND"]),
-        Record.loai_ca == loai
+        Record.status.in_(["PENDING", "WAITING_RESEND"])
     ).all()
+
+    records = [r for r in all_fail_records if resolve_loai_ca(r) == loai]
 
     if not records:
         return {"success": True, "rowcount": 0, "message": "Không có ca FAIL nào đang chờ reset."}
@@ -1098,7 +1109,7 @@ def export_sql_list(
     data = []
     for r in records:
         data.append({
-            "Loại ca": r.loai_ca,
+            "Loại ca": resolve_loai_ca(r),
             "MA_LK": r.ma_lk,
             "Họ tên": r.ho_ten,
             "Mã thẻ": r.ma_the,
@@ -1133,7 +1144,7 @@ def export_fail_list(
     data = []
     for r in records:
         data.append({
-            "Loại ca": r.loai_ca,
+            "Loại ca": resolve_loai_ca(r),
             "MA_LK": r.ma_lk,
             "Họ tên": r.ho_ten,
             "Mã thẻ": r.ma_the,
