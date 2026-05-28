@@ -1180,7 +1180,7 @@
                 <div class="upload-card">
                     <h3>Danh sách ca FAIL</h3>
                     <p>Danh sách các ca cần kiểm tra thủ công</p>
-                    <button class="btn btn-danger" onclick="exportData('/api/export/fail')">Tải file DANH_SACH_FAIL.xlsx</button>
+                    <button class="btn btn-danger" onclick="exportFailData()">Tải file DANH_SACH_FAIL.xlsx</button>
                 </div>
                 <div class="upload-card">
                     <h3>Danh sách KÈM LỖI</h3>
@@ -1863,7 +1863,11 @@
     // Fetch Fail Records (Tab 2)
     async function fetchFailRecords() {
         try {
-            const res = await fetch('/api/records/admin/fail');
+            const fromDate = document.getElementById('sync_from').value;
+            const toDate = document.getElementById('sync_to').value;
+            const url = `/api/records/admin/fail?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
+            
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
                 const tbody = document.getElementById('failBody');
@@ -2053,7 +2057,11 @@
         if (!confirm(`Sinh SQL reset cho TOÀN BỘ ca FAIL đang chờ reset (${loai})? Sau bước này ca bệnh sẽ ở trạng thái chờ hệ thống gửi XML lại, chưa được đánh dấu hoàn tất.`)) return;
 
         try {
-            const res = await fetch(`/api/records/admin/fail/reset?loai=${loai}`, { method: 'POST' });
+            const fromDate = document.getElementById('sync_from').value;
+            const toDate = document.getElementById('sync_to').value;
+            const url = `/api/records/admin/fail/reset?loai=${loai}&from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
+
+            const res = await fetch(url, { method: 'POST' });
             const data = await res.json();
             if (res.ok && data.success) {
                 if (data.rowcount > 0) {
@@ -2230,6 +2238,13 @@
 
     // Export files
     function exportData(url) {
+        window.open(url, '_blank');
+    }
+
+    function exportFailData() {
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+        const url = `/api/export/fail?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
         window.open(url, '_blank');
     }
 

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 import datetime
 import base64
 import asyncio
@@ -914,14 +915,34 @@ def flag_record_for_review(
 
 @app.get("/api/records/admin/fail")
 def get_admin_fail_records(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Lấy danh sách các ca FAIL (sắp xếp ngày ra viện xa nhất đến mới nhất) để IT sửa tay"""
-    records = db.query(Record).filter(
+    query = db.query(Record).filter(
         Record.type_group == "FAIL",
         Record.status != "RESOLVED"
-    ).order_by(Record.ngay_ra_vien.asc()).all()
+    )
+    
+    if from_date:
+        try:
+            fd = from_date.replace("-", "")
+            fd_date = datetime.datetime.strptime(fd, "%Y%m%d").date()
+            query = query.filter(Record.ngay_ra_vien >= fd_date)
+        except Exception:
+            pass
+            
+    if to_date:
+        try:
+            td = to_date.replace("-", "")
+            td_date = datetime.datetime.strptime(td, "%Y%m%d").date()
+            query = query.filter(Record.ngay_ra_vien <= td_date)
+        except Exception:
+            pass
+
+    records = query.order_by(Record.ngay_ra_vien.asc()).all()
     
     for r in records:
         r.root_cause = ""
@@ -1022,15 +1043,34 @@ def approve_and_reset_sql(
 @app.post("/api/records/admin/fail/reset")
 def run_bulk_fail_reset(
     loai: str,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """IT sinh SQL reset hàng loạt cho ca FAIL và chuyển sang trạng thái chờ gửi lại."""
-    all_fail_records = db.query(Record).filter(
+    query = db.query(Record).filter(
         Record.type_group == "FAIL",
         Record.status.in_(["PENDING", "WAITING_RESEND"])
-    ).all()
+    )
+    
+    if from_date:
+        try:
+            fd = from_date.replace("-", "")
+            fd_date = datetime.datetime.strptime(fd, "%Y%m%d").date()
+            query = query.filter(Record.ngay_ra_vien >= fd_date)
+        except Exception:
+            pass
+            
+    if to_date:
+        try:
+            td = to_date.replace("-", "")
+            td_date = datetime.datetime.strptime(td, "%Y%m%d").date()
+            query = query.filter(Record.ngay_ra_vien <= td_date)
+        except Exception:
+            pass
 
+    all_fail_records = query.all()
     records = [r for r in all_fail_records if resolve_loai_ca(r) == loai]
 
     if not records:
@@ -1175,19 +1215,39 @@ def export_sql_list(
 
 @app.get("/api/export/fail")
 def export_fail_list(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Xuất file Excel danh sách các ca bị FAIL"""
-    last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
-    if not last_record:
-        raise HTTPException(status_code=400, detail="Không có dữ liệu đối soát để xuất.")
-        
-    records = db.query(Record).filter(
-        Record.ngay_doi_soat == last_record.ngay_doi_soat,
+    query = db.query(Record).filter(
         Record.type_group == "FAIL",
         Record.status != "RESOLVED"
-    ).all()
+    )
+    
+    if from_date or to_date:
+        if from_date:
+            try:
+                fd = from_date.replace("-", "")
+                fd_date = datetime.datetime.strptime(fd, "%Y%m%d").date()
+                query = query.filter(Record.ngay_ra_vien >= fd_date)
+            except Exception:
+                pass
+        if to_date:
+            try:
+                td = to_date.replace("-", "")
+                td_date = datetime.datetime.strptime(td, "%Y%m%d").date()
+                query = query.filter(Record.ngay_ra_vien <= td_date)
+            except Exception:
+                pass
+    else:
+        last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
+        if not last_record:
+            raise HTTPException(status_code=400, detail="Không có dữ liệu đối soát để xuất.")
+        query = query.filter(Record.ngay_doi_soat == last_record.ngay_doi_soat)
+
+    records = query.all()
     
     data = []
     for r in records:
