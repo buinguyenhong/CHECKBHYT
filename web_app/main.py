@@ -61,6 +61,14 @@ def resolve_loai_ca(record: Record) -> str:
             return "Nội trú"
     return str(loai_ca_val).strip()
 
+def normalize_date_to_iso(d_str: str) -> str:
+    if not d_str:
+        return ""
+    clean = "".join([c for c in str(d_str) if c.isdigit()])
+    if len(clean) == 8:
+        return f"{clean[0:4]}-{clean[4:6]}-{clean[6:8]}"
+    return ""
+
 # ==========================================
 # GLOBAL STATE FOR ASYNC SYNC PROGRESS
 # ==========================================
@@ -926,19 +934,13 @@ def get_admin_fail_records(
         Record.status != "RESOLVED"
     )
     
-    if from_date:
-        try:
-            fd = f"{from_date[0:4]}-{from_date[4:6]}-{from_date[6:8]}"
-            query = query.filter(Record.ngay_ra_vien >= fd)
-        except Exception:
-            pass
+    fd = normalize_date_to_iso(from_date)
+    if fd:
+        query = query.filter(Record.ngay_ra_vien >= fd)
             
-    if to_date:
-        try:
-            td = f"{to_date[0:4]}-{to_date[4:6]}-{to_date[6:8]}"
-            query = query.filter(Record.ngay_ra_vien <= td)
-        except Exception:
-            pass
+    td = normalize_date_to_iso(to_date)
+    if td:
+        query = query.filter(Record.ngay_ra_vien <= td)
 
     records = query.order_by(Record.ngay_ra_vien.asc()).all()
     
@@ -1052,19 +1054,13 @@ def run_bulk_fail_reset(
         Record.status.in_(["PENDING", "WAITING_RESEND"])
     )
     
-    if from_date:
-        try:
-            fd = f"{from_date[0:4]}-{from_date[4:6]}-{from_date[6:8]}"
-            query = query.filter(Record.ngay_ra_vien >= fd)
-        except Exception:
-            pass
+    fd = normalize_date_to_iso(from_date)
+    if fd:
+        query = query.filter(Record.ngay_ra_vien >= fd)
             
-    if to_date:
-        try:
-            td = f"{to_date[0:4]}-{to_date[4:6]}-{to_date[6:8]}"
-            query = query.filter(Record.ngay_ra_vien <= td)
-        except Exception:
-            pass
+    td = normalize_date_to_iso(to_date)
+    if td:
+        query = query.filter(Record.ngay_ra_vien <= td)
 
     all_fail_records = query.all()
     records = [r for r in all_fail_records if resolve_loai_ca(r) == loai]
@@ -1223,18 +1219,12 @@ def export_fail_list(
     )
     
     if from_date or to_date:
-        if from_date:
-            try:
-                fd = f"{from_date[0:4]}-{from_date[4:6]}-{from_date[6:8]}"
-                query = query.filter(Record.ngay_ra_vien >= fd)
-            except Exception:
-                pass
-        if to_date:
-            try:
-                td = f"{to_date[0:4]}-{to_date[4:6]}-{to_date[6:8]}"
-                query = query.filter(Record.ngay_ra_vien <= td)
-            except Exception:
-                pass
+        fd = normalize_date_to_iso(from_date)
+        if fd:
+            query = query.filter(Record.ngay_ra_vien >= fd)
+        td = normalize_date_to_iso(to_date)
+        if td:
+            query = query.filter(Record.ngay_ra_vien <= td)
     else:
         last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
         if not last_record:
