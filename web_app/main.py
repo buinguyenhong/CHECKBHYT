@@ -67,7 +67,8 @@ SYNC_PROGRESS = {
     "active": False,
     "progress": 0,
     "status": "Idle",
-    "logs": []
+    "logs": [],
+    "should_stop": False
 }
 
 def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = False):
@@ -84,6 +85,9 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
     db_gen = get_db()
     db = next(db_gen)
     try:
+        if SYNC_PROGRESS.get("should_stop"):
+            raise ValueError("Tiến trình bị dừng bởi người dùng.")
+
         cfg = db.query(AppConfig).first()
         if not cfg:
             SYNC_PROGRESS["active"] = False
@@ -91,6 +95,9 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
             SYNC_PROGRESS["logs"].append("Lỗi: Chưa cấu hình kết nối SQL Server HIS.")
             return
             
+        if SYNC_PROGRESS.get("should_stop"):
+            raise ValueError("Tiến trình bị dừng bởi người dùng.")
+
         SYNC_PROGRESS["progress"] = 15
         SYNC_PROGRESS["status"] = "Đang kết nối SQL Server HIS..."
         SYNC_PROGRESS["logs"].append("Đang kiểm tra kết nối LAN tới CSDL SQL Server...")
@@ -107,19 +114,29 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
             "sp_ip": cfg.sp_ip
         }
         
+        if SYNC_PROGRESS.get("should_stop"):
+            raise ValueError("Tiến trình bị dừng bởi người dùng.")
+
         SYNC_PROGRESS["progress"] = 30
         SYNC_PROGRESS["status"] = "Đang truy vấn SQL Server HIS..."
         SYNC_PROGRESS["logs"].append(f"Truy vấn stored procedure Ngoại trú và Nội trú từ {from_date} đến {to_date}...")
         
         try:
             df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date)
+            if SYNC_PROGRESS.get("should_stop"):
+                raise ValueError("Tiến trình bị dừng bởi người dùng.")
             SYNC_PROGRESS["logs"].append(f"Đã tải thành công {len(df_sql)} bản ghi từ CSDL HIS.")
         except Exception as e:
+            if SYNC_PROGRESS.get("should_stop") or str(e) == "Tiến trình bị dừng bởi người dùng.":
+                raise ValueError("Tiến trình bị dừng bởi người dùng.")
             SYNC_PROGRESS["active"] = False
             SYNC_PROGRESS["status"] = "Lỗi"
             SYNC_PROGRESS["logs"].append(f"Lỗi truy vấn HIS LAN: {str(e)}")
             return
             
+        if SYNC_PROGRESS.get("should_stop"):
+            raise ValueError("Tiến trình bị dừng bởi người dùng.")
+
         tu_date = datetime.datetime.strptime(from_date, "%Y%m%d").date()
         den_date = datetime.datetime.strptime(to_date, "%Y%m%d").date()
         
@@ -134,6 +151,9 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
             df_listbh = pd.DataFrame()
             SYNC_PROGRESS["logs"].append("Cảnh báo: Không tìm thấy file listbh.xlsx. Bỏ qua so sánh đẩy cổng.")
             
+        if SYNC_PROGRESS.get("should_stop"):
+            raise ValueError("Tiến trình bị dừng bởi người dùng.")
+
         SYNC_PROGRESS["progress"] = 75
         if include_errors:
             SYNC_PROGRESS["status"] = "Đang đọc tệp báo cáo lỗi..."
@@ -149,6 +169,9 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
             SYNC_PROGRESS["status"] = "Bỏ qua file lỗi chi tiết..."
             SYNC_PROGRESS["logs"].append("Bỏ qua HoSoLoiChiTiet.xlsx. Các ca chưa có trong listbh và chưa có lỗi sẽ được xếp nhóm FAIL.")
             
+        if SYNC_PROGRESS.get("should_stop"):
+            raise ValueError("Tiến trình bị dừng bởi người dùng.")
+
         SYNC_PROGRESS["progress"] = 85
         SYNC_PROGRESS["status"] = "Đang chạy đối soát & lưu trữ vào SQLite..."
         SYNC_PROGRESS["logs"].append("Đang đối soát 2 chiều, kế thừa ghi chú và tự động duyệt...")
@@ -157,6 +180,9 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat)
         save_last_kpis(db, stats, df_listbh, ngay_doi_soat)
         
+        if SYNC_PROGRESS.get("should_stop"):
+            raise ValueError("Tiến trình bị dừng bởi người dùng.")
+
         SYNC_PROGRESS["progress"] = 100
         SYNC_PROGRESS["status"] = "Hoàn tất"
         SYNC_PROGRESS["logs"].append(f"ĐỐI SOÁT HOÀN TẤT THÀNH CÔNG. Ghi nhận: Tổng ca: {stats['total']} | Lỗi BHYT: {stats['loi']} | FAIL: {stats['fail']} | Đã gửi: {stats['sent']}")
@@ -164,8 +190,12 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         
     except Exception as e:
         SYNC_PROGRESS["active"] = False
-        SYNC_PROGRESS["status"] = "Lỗi"
-        SYNC_PROGRESS["logs"].append(f"Lỗi đối soát ngầm: {str(e)}")
+        if SYNC_PROGRESS.get("should_stop") or str(e) == "Tiến trình bị dừng bởi người dùng.":
+            SYNC_PROGRESS["status"] = "Đã dừng"
+            SYNC_PROGRESS["logs"].append("Tiến trình đối soát đã DỪNG theo yêu cầu người dùng.")
+        else:
+            SYNC_PROGRESS["status"] = "Lỗi"
+            SYNC_PROGRESS["logs"].append(f"Lỗi đối soát ngầm: {str(e)}")
     finally:
         db.close()
 
@@ -752,6 +782,7 @@ def start_sync(
     if SYNC_PROGRESS["active"]:
         raise HTTPException(status_code=400, detail="Đang có một tiến trình đối soát khác chạy ngầm. Vui lòng đợi.")
         
+    SYNC_PROGRESS["should_stop"] = False
     background_tasks.add_task(run_sync_in_background, from_date.replace('-', ''), to_date.replace('-', ''), include_errors)
     return {"status": "success", "message": "Đã bắt đầu đối soát chạy ngầm."}
 
@@ -761,6 +792,23 @@ def get_sync_status(user: User = Depends(require_admin)):
     """Lấy trạng thái & phần trăm tiến trình đối soát thời gian thực"""
     global SYNC_PROGRESS
     return SYNC_PROGRESS
+
+
+@app.post("/api/sync/stop")
+def stop_sync(user: User = Depends(require_admin)):
+    """Dừng tiến trình đối soát đang chạy ngầm và ngắt các câu lệnh SQL đang thực thi"""
+    global SYNC_PROGRESS
+    if not SYNC_PROGRESS["active"]:
+        return {"status": "success", "message": "Không có tiến trình đối soát nào đang chạy."}
+        
+    SYNC_PROGRESS["should_stop"] = True
+    SYNC_PROGRESS["status"] = "Đang dừng..."
+    SYNC_PROGRESS["logs"].append("Người dùng yêu cầu dừng đối soát. Đang ngắt kết nối SQL và dừng luồng...")
+    
+    # Ngắt các kết nối SQL đang hoạt động
+    his_service.abort_all_queries()
+    
+    return {"status": "success", "message": "Đã gửi yêu cầu dừng đối soát."}
 
 
 @app.get("/api/departments/unique")

@@ -1025,9 +1025,12 @@
                 
                 <!-- PROGRESS BAR -->
                 <div class="progress-container" id="syncProgressContainer">
-                    <div class="progress-header">
+                    <div class="progress-header" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                         <span class="progress-status" id="syncProgressStatus">Sẵn sàng đối soát...</span>
-                        <span class="progress-percent" id="syncProgressPercent">0%</span>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span class="progress-percent" id="syncProgressPercent">0%</span>
+                            <button id="btnStopSync" class="btn btn-danger" style="padding:4px 10px; font-size:11px; font-weight:bold; display:none; background:#ef4444; border-color:#ef4444; color:#fff;" onclick="stopComparison()">Dừng đối soát</button>
+                        </div>
                     </div>
                     <div class="progress-bar-track">
                         <div class="progress-bar-fill" id="syncProgressBarFill"></div>
@@ -1627,6 +1630,12 @@
         progressStatus.innerText = 'Đang bắt đầu đối soát...';
         progressPercent.innerText = '0%';
         progressBarFill.style.width = '0%';
+        const stopBtn = document.getElementById('btnStopSync');
+        if (stopBtn) {
+            stopBtn.style.display = 'inline-block';
+            stopBtn.disabled = false;
+            stopBtn.innerText = 'Dừng đối soát';
+        }
 
         if (includeErrors) {
             logToConsole(`Đang gửi yêu cầu đối soát từ ${fromDate} đến ${toDate}, có dùng file lỗi chi tiết...`);
@@ -1673,9 +1682,13 @@
                         if (!statusData.active) {
                             clearInterval(syncInterval);
                             btn.disabled = false;
+                            const stopBtn = document.getElementById('btnStopSync');
+                            if (stopBtn) stopBtn.style.display = 'none';
                             
                             if (statusData.status === 'Lỗi') {
                                 alert("Quá trình đối soát thất bại! Vui lòng kiểm tra Log Console.");
+                            } else if (statusData.status === 'Đã dừng') {
+                                alert("Đã dừng quá trình đối soát theo yêu cầu người dùng.");
                             } else {
                                 alert("Quá trình đối soát & đồng bộ dữ liệu HIS đã hoàn tất!");
                                 updateGlobalKPIs();
@@ -1694,6 +1707,102 @@
         } catch {
             logToConsole("Lỗi kết nối LAN khi kích hoạt đối soát.");
             btn.disabled = false;
+        }
+    }
+
+    async function stopComparison() {
+        if (!confirm("Bạn có chắc chắn muốn DỪNG tiến trình đối soát này? Các câu lệnh truy vấn SQL đang thực thi sẽ bị ngắt lập tức.")) return;
+        
+        const stopBtn = document.getElementById('btnStopSync');
+        stopBtn.disabled = true;
+        stopBtn.innerText = 'Đang dừng...';
+        
+        try {
+            const res = await fetch('/api/sync/stop', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                logToConsole("Đã gửi yêu cầu dừng đối soát thành công.");
+            } else {
+                logToConsole(`Lỗi khi yêu cầu dừng đối soát: ${data.detail || 'Không xác định'}`);
+                stopBtn.disabled = false;
+                stopBtn.innerText = 'Dừng đối soát';
+            }
+        } catch {
+            logToConsole("Lỗi kết nối khi gửi yêu cầu dừng.");
+            stopBtn.disabled = false;
+            stopBtn.innerText = 'Dừng đối soát';
+        }
+    }
+
+    async function checkSyncStatusOnLoad() {
+        try {
+            const statusRes = await fetch('/api/sync/status');
+            if (statusRes.ok) {
+                const statusData = await statusRes.json();
+                if (statusData.active) {
+                    logToConsole("Phát hiện tiến trình đối soát đang chạy ngầm từ trước. Đang liên kết theo dõi...");
+                    
+                    const btn = document.getElementById('btnStartSync');
+                    const progressContainer = document.getElementById('syncProgressContainer');
+                    const progressStatus = document.getElementById('syncProgressStatus');
+                    const progressPercent = document.getElementById('syncProgressPercent');
+                    const progressBarFill = document.getElementById('syncProgressBarFill');
+                    const stopBtn = document.getElementById('btnStopSync');
+                    
+                    btn.disabled = true;
+                    progressContainer.style.display = 'block';
+                    if (stopBtn) {
+                        stopBtn.style.display = 'inline-block';
+                        stopBtn.disabled = false;
+                        stopBtn.innerText = 'Dừng đối soát';
+                    }
+                    
+                    let lastLogIndex = 0;
+                    if (syncInterval) clearInterval(syncInterval);
+                    
+                    syncInterval = setInterval(async () => {
+                        try {
+                            const currentRes = await fetch('/api/sync/status');
+                            if (currentRes.ok) {
+                                const currentData = await currentRes.json();
+                                
+                                progressStatus.innerText = currentData.status;
+                                progressPercent.innerText = `${currentData.progress}%`;
+                                progressBarFill.style.width = `${currentData.progress}%`;
+                                
+                                if (currentData.logs && currentData.logs.length > lastLogIndex) {
+                                    for (let i = lastLogIndex; i < currentData.logs.length; i++) {
+                                        logToConsole(currentData.logs[i]);
+                                    }
+                                    lastLogIndex = currentData.logs.length;
+                                }
+                                
+                                if (!currentData.active) {
+                                    clearInterval(syncInterval);
+                                    btn.disabled = false;
+                                    if (stopBtn) stopBtn.style.display = 'none';
+                                    
+                                    if (currentData.status === 'Lỗi') {
+                                        alert("Quá trình đối soát thất bại! Vui lòng kiểm tra Log Console.");
+                                    } else if (currentData.status === 'Đã dừng') {
+                                        alert("Đã dừng quá trình đối soát theo yêu cầu người dùng.");
+                                    } else {
+                                        alert("Quá trình đối soát & đồng bộ dữ liệu HIS đã hoàn tất!");
+                                        updateGlobalKPIs();
+                                        if (activeTab === 'fail') fetchFailRecords();
+                                        if (activeTab === 'review') fetchReviewRecords();
+                                        if (activeTab === 'reports') fetchDeptReport();
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Lỗi polling status:", e);
+                        }
+                    }, 1000);
+                }
+            }
+        } catch (e) {
+            console.error("Lỗi kiểm tra trạng thái đối soát khi tải trang:", e);
         }
     }
 
@@ -2334,6 +2443,7 @@
     // Initialize
     loadConfig();
     toggleUserDept();
+    checkSyncStatusOnLoad();
 </script>
 </body>
 </html>

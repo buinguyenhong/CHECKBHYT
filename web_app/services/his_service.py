@@ -108,7 +108,10 @@ def build_conn_str(driver: str, server: str, db: str, auth: str, user: str, pw: 
         
     return conn_str
 
+ACTIVE_CONNS = set()
+
 def get_conn(cfg: dict):
+    global ACTIVE_CONNS
     if pyodbc is None:
         raise RuntimeError("Chưa cài pyodbc trên hệ thống. Vui lòng chạy: pip install pyodbc")
     
@@ -132,7 +135,29 @@ def get_conn(cfg: dict):
         conn.timeout = SQL_QUERY_TIMEOUT_SECONDS
     except Exception:
         pass
+    
+    try:
+        ACTIVE_CONNS.add(conn)
+    except Exception:
+        pass
     return conn
+
+def discard_conn(conn):
+    global ACTIVE_CONNS
+    try:
+        ACTIVE_CONNS.discard(conn)
+    except Exception:
+        pass
+
+def abort_all_queries():
+    global ACTIVE_CONNS
+    conns = list(ACTIVE_CONNS)
+    ACTIVE_CONNS.clear()
+    for conn in conns:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def test_connection(cfg: dict) -> bool:
     conn = get_conn(cfg)
@@ -147,6 +172,7 @@ def test_connection(cfg: dict) -> bool:
         return True
     finally:
         conn.close()
+        discard_conn(conn)
 
 def sql_exec_sp(conn, sp_name: str, tu: str, den: str) -> pd.DataFrame:
     cur = conn.cursor()
@@ -231,6 +257,7 @@ def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame
         return normalize_sql_list(df_op, df_ip)
     finally:
         conn.close()
+        discard_conn(conn)
 
 def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
     """
