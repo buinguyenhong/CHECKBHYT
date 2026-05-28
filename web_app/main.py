@@ -970,7 +970,7 @@ def run_bulk_fail_reset(
     """IT sinh SQL reset hàng loạt cho ca FAIL và chuyển sang trạng thái chờ gửi lại."""
     records = db.query(Record).filter(
         Record.type_group == "FAIL",
-        Record.status == "PENDING",
+        Record.status.in_(["PENDING", "WAITING_RESEND"]),
         Record.loai_ca == loai
     ).all()
 
