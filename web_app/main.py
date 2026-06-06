@@ -1325,11 +1325,6 @@ def export_fail_list(
         td = normalize_date_to_iso(to_date)
         if td:
             query = query.filter(Record.ngay_ra_vien <= td)
-    else:
-        last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
-        if not last_record:
-            raise HTTPException(status_code=400, detail="Không có dữ liệu đối soát để xuất.")
-        query = query.filter(Record.ngay_doi_soat == last_record.ngay_doi_soat)
 
     records = query.all()
     

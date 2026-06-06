@@ -2031,9 +2031,7 @@
     // Fetch Fail Records (Tab 2)
     async function fetchFailRecords() {
         try {
-            const fromDate = document.getElementById('sync_from').value;
-            const toDate = document.getElementById('sync_to').value;
-            const url = `/api/records/admin/fail?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
+            const url = `/api/records/admin/fail`;
             
             const res = await fetch(url);
             if (res.ok) {
@@ -2237,9 +2235,7 @@
         if (!confirm(`Sinh SQL reset cho TOÀN BỘ ca FAIL đang chờ reset (${loai})? Sau bước này ca bệnh sẽ ở trạng thái chờ hệ thống gửi XML lại, chưa được đánh dấu hoàn tất.`)) return;
 
         try {
-            const fromDate = document.getElementById('sync_from').value;
-            const toDate = document.getElementById('sync_to').value;
-            const url = `/api/records/admin/fail/reset?loai=${loai}&from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
+            const url = `/api/records/admin/fail/reset?loai=${loai}`;
 
             const res = await fetch(url, { method: 'POST' });
             const data = await res.json();
@@ -2422,9 +2418,7 @@
     }
 
     function exportFailData() {
-        const fromDate = document.getElementById('sync_from').value;
-        const toDate = document.getElementById('sync_to').value;
-        const url = `/api/export/fail?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
+        const url = `/api/export/fail`;
         window.open(url, '_blank');
     }
 
