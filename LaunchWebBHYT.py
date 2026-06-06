@@ -103,22 +103,32 @@ class BHYTLauncher:
         self.btn_tab_install = tk.Button(
             tab_nav_frame, 
             text="1. Cài đặt lần đầu", 
-            font=("Segoe UI", 10, "bold"),
+            font=("Segoe UI", 9, "bold"),
             command=lambda: self.switch_tab("install"),
             bd=0,
             cursor="hand2"
         )
-        self.btn_tab_install.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(0, 5))
+        self.btn_tab_install.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(0, 4))
         
         self.btn_tab_sys = tk.Button(
             tab_nav_frame, 
             text="2. Thông tin hệ thống", 
-            font=("Segoe UI", 10, "bold"),
+            font=("Segoe UI", 9, "bold"),
             command=lambda: self.switch_tab("sys"),
             bd=0,
             cursor="hand2"
         )
-        self.btn_tab_sys.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(5, 0))
+        self.btn_tab_sys.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=4)
+
+        self.btn_tab_autostart = tk.Button(
+            tab_nav_frame, 
+            text="3. Tự khởi động", 
+            font=("Segoe UI", 9, "bold"),
+            command=lambda: self.switch_tab("autostart"),
+            bd=0,
+            cursor="hand2"
+        )
+        self.btn_tab_autostart.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(4, 0))
 
         # 3. Tab Container (Card)
         self.card_container = tk.Frame(self.root, bg=self.card_bg, bd=1, relief=tk.FLAT)
@@ -131,6 +141,10 @@ class BHYTLauncher:
         # --- TAB 2 FRAME: SYSTEM INFO & CONTROL ---
         self.frame_sys = tk.Frame(self.card_container, bg=self.card_bg)
         self.setup_sys_tab()
+
+        # --- TAB 3 FRAME: AUTOSTART ---
+        self.frame_autostart = tk.Frame(self.card_container, bg=self.card_bg)
+        self.setup_autostart_tab()
         
         # Mặc định mở Tab 1
         self.switch_tab("install")
@@ -141,13 +155,25 @@ class BHYTLauncher:
         if tab_name == "install":
             self.btn_tab_install.configure(bg=self.accent_blue, fg=self.text_main, activebackground=self.accent_blue, activeforeground=self.text_main)
             self.btn_tab_sys.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
+            self.btn_tab_autostart.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
             self.frame_install.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
             self.frame_sys.pack_forget()
-        else:
+            self.frame_autostart.pack_forget()
+        elif tab_name == "sys":
             self.btn_tab_install.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
             self.btn_tab_sys.configure(bg=self.accent_blue, fg=self.text_main, activebackground=self.accent_blue, activeforeground=self.text_main)
+            self.btn_tab_autostart.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
             self.frame_sys.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
             self.frame_install.pack_forget()
+            self.frame_autostart.pack_forget()
+        else: # autostart
+            self.btn_tab_install.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
+            self.btn_tab_sys.configure(bg="#334155", fg=self.text_sec, activebackground="#334155", activeforeground=self.text_sec)
+            self.btn_tab_autostart.configure(bg=self.accent_blue, fg=self.text_main, activebackground=self.accent_blue, activeforeground=self.text_main)
+            self.frame_autostart.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
+            self.frame_install.pack_forget()
+            self.frame_sys.pack_forget()
+            self.update_autostart_status()
 
     # ========================================================
     # TAB 1: CÀI ĐẶT LẦN ĐẦU (INSTALLATION)
@@ -540,6 +566,196 @@ class BHYTLauncher:
                 self.lbl_status_badge.configure(fg=self.accent_red)
                 
             self.stop_check_event.wait(1.2)
+
+    def setup_autostart_tab(self):
+        lbl_desc = tk.Label(
+            self.frame_autostart, 
+            text="💡 Cấu hình tự động khởi động WebApp khi bật máy:", 
+            font=("Segoe UI", 10, "bold"), 
+            bg=self.card_bg, 
+            fg=self.accent_orange
+        )
+        lbl_desc.pack(anchor=tk.W, pady=(0, 15))
+
+        self.autostart_mode = tk.StringVar(value="boot")
+        
+        mode_frame = tk.LabelFrame(
+            self.frame_autostart, 
+            text="CHỌN CHẾ ĐỘ TỰ ĐỘNG CHẠY", 
+            font=("Segoe UI", 9, "bold"), 
+            bg=self.card_bg, 
+            fg=self.text_sec,
+            bd=1,
+            relief=tk.GROOVE,
+            padx=10,
+            pady=10
+        )
+        mode_frame.pack(fill=tk.X, pady=(0, 20))
+
+        r_boot = tk.Radiobutton(
+            mode_frame, 
+            text="Khởi động cùng Windows (Chạy ngầm ở background - Khuyên dùng cho Server)", 
+            variable=self.autostart_mode, 
+            value="boot",
+            bg=self.card_bg, 
+            fg=self.text_main,
+            selectcolor=self.card_bg,
+            activebackground=self.card_bg,
+            activeforeground=self.text_main,
+            font=("Segoe UI", 9)
+        )
+        r_boot.pack(anchor=tk.W, pady=5)
+
+        r_logon = tk.Radiobutton(
+            mode_frame, 
+            text="Khởi động khi User đăng nhập (Phù hợp cho máy trạm/PC thường)", 
+            variable=self.autostart_mode, 
+            value="logon",
+            bg=self.card_bg, 
+            fg=self.text_main,
+            selectcolor=self.card_bg,
+            activebackground=self.card_bg,
+            activeforeground=self.text_main,
+            font=("Segoe UI", 9)
+        )
+        r_logon.pack(anchor=tk.W, pady=5)
+
+        # Status Label
+        status_row = tk.Frame(self.frame_autostart, bg=self.card_bg)
+        status_row.pack(fill=tk.X, pady=(0, 20))
+
+        lbl_status_title = tk.Label(
+            status_row, 
+            text="TRẠNG THÁI NHIỆM VỤ:", 
+            font=("Segoe UI", 9, "bold"), 
+            bg=self.card_bg, 
+            fg=self.text_sec
+        )
+        lbl_status_title.pack(side=tk.LEFT)
+
+        self.autostart_status_text = tk.StringVar(value="Đang kiểm tra...")
+        self.lbl_autostart_status = tk.Label(
+            status_row, 
+            textvariable=self.autostart_status_text, 
+            font=("Segoe UI", 9, "bold"), 
+            bg=self.card_bg, 
+            fg=self.accent_orange
+        )
+        self.lbl_autostart_status.pack(side=tk.LEFT, padx=10)
+
+        # Buttons to register/unregister
+        btn_action_frame = tk.Frame(self.frame_autostart, bg=self.card_bg)
+        btn_action_frame.pack(fill=tk.X, pady=10)
+
+        self.btn_reg_autostart = tk.Button(
+            btn_action_frame, 
+            text="Kích hoạt tự động chạy", 
+            command=self.register_autostart, 
+            font=("Segoe UI", 10, "bold"), 
+            bg=self.accent_green, 
+            fg=self.text_main, 
+            activebackground="#059669", 
+            activeforeground="white", 
+            bd=0, 
+            cursor="hand2"
+        )
+        self.btn_reg_autostart.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=10, padx=(0, 5))
+
+        self.btn_unreg_autostart = tk.Button(
+            btn_action_frame, 
+            text="Hủy tự động chạy", 
+            command=self.unregister_autostart, 
+            font=("Segoe UI", 10, "bold"), 
+            bg=self.accent_red, 
+            fg=self.text_main, 
+            activebackground="#dc2626", 
+            activeforeground="white", 
+            bd=0, 
+            cursor="hand2"
+        )
+        self.btn_unreg_autostart.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=10, padx=(5, 0))
+
+    def update_autostart_status(self):
+        try:
+            cmd = ["schtasks", "/query", "/tn", "CheckBHYT_LAN_WebApp"]
+            res = subprocess.run(cmd, capture_output=True, text=True, creationflags=0x08000000)
+            if res.returncode == 0:
+                self.autostart_status_text.set("ĐÃ KÍCH HOẠT (ACTIVE) ✅")
+                self.lbl_autostart_status.configure(fg=self.accent_green)
+            else:
+                self.autostart_status_text.set("CHƯA KÍCH HOẠT (INACTIVE) ❌")
+                self.lbl_autostart_status.configure(fg=self.accent_red)
+        except Exception:
+            self.autostart_status_text.set("LỖI KIỂM TRA")
+            self.lbl_autostart_status.configure(fg=self.accent_red)
+
+    def register_autostart(self):
+        if not self.validate_inputs():
+            return
+            
+        folder = self.folder_path.get().strip()
+        port = self.port_val.get().strip()
+        
+        # Locate pythonw.exe in the same folder as current python interpreter
+        python_dir = os.path.dirname(sys.executable)
+        pythonw_path = os.path.join(python_dir, "pythonw.exe")
+        if not os.path.exists(pythonw_path):
+            pythonw_path = sys.executable
+            
+        run_script_path = os.path.join(folder, "web_app", "run.py")
+        mode = self.autostart_mode.get()
+        
+        tr_command = f'"{pythonw_path}" "{run_script_path}" --port {port}'
+        
+        if mode == "boot":
+            cmd = [
+                "schtasks", "/create", 
+                "/tn", "CheckBHYT_LAN_WebApp", 
+                "/tr", tr_command, 
+                "/sc", "onstart", 
+                "/ru", "SYSTEM", 
+                "/f"
+            ]
+        else:
+            cmd = [
+                "schtasks", "/create", 
+                "/tn", "CheckBHYT_LAN_WebApp", 
+                "/tr", tr_command, 
+                "/sc", "onlogon", 
+                "/f"
+            ]
+            
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, creationflags=0x08000000)
+            if res.returncode == 0:
+                messagebox.showinfo("Thành công", "Đăng ký tác vụ tự khởi động cùng Windows thành công! ✅")
+                self.update_autostart_status()
+            else:
+                error_msg = res.stderr or res.stdout or "Không rõ lỗi."
+                if "Access is denied" in error_msg or "Từ chối truy cập" in error_msg or res.returncode == 5:
+                    messagebox.showerror(
+                        "Lỗi phân quyền", 
+                        "Đăng ký khởi động cùng hệ thống cần quyền Administrator.\n\n"
+                        "Vui lòng tắt ứng dụng này, sau đó click chuột phải vào file Launcher và chọn 'Run as administrator' để thực hiện lại!"
+                    )
+                else:
+                    messagebox.showerror("Thất bại", f"Đăng ký thất bại: {error_msg}")
+        except Exception as e:
+            messagebox.showerror("Lỗi hệ thống", f"Không thể kích hoạt Task Scheduler: {e}")
+
+    def unregister_autostart(self):
+        cmd = ["schtasks", "/delete", "/tn", "CheckBHYT_LAN_WebApp", "/f"]
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, creationflags=0x08000000)
+            if res.returncode == 0:
+                messagebox.showinfo("Thành công", "Đã xóa tác vụ tự khởi động cùng Windows thành công! ❌")
+                self.update_autostart_status()
+            else:
+                error_msg = res.stderr or res.stdout or "Nhiệm vụ chưa đăng ký."
+                messagebox.showinfo("Thông tin", f"Hủy đăng ký: {error_msg}")
+                self.update_autostart_status()
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể xóa nhiệm vụ: {e}")
 
     def on_closing(self):
         self.stop_check_event.set()
