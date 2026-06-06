@@ -402,8 +402,8 @@ def parse_datetime_to_date(series: pd.Series) -> pd.Series:
         if not val_str:
             return None
         try:
-            # Nếu bắt đầu bằng 4 chữ số năm (ví dụ: 2026-06-01 hoặc 2026/06/01)
-            if len(val_str) >= 5 and val_str[:4].isdigit() and (val_str[4] in ('-', '/')):
+            # Nếu bắt đầu bằng 4 chữ số năm (ví dụ: 202606050823 hoặc 2026-06-01)
+            if len(val_str) >= 4 and val_str[:4].isdigit():
                 ts = pd.to_datetime(val_str, errors="coerce", dayfirst=False)
             else:
                 ts = pd.to_datetime(val_str, errors="coerce", dayfirst=True)
