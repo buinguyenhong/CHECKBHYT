@@ -921,6 +921,70 @@ def flag_record_for_review(
 # API: IT ADMIN PROCESS (FAIL & REVIEW LIST)
 # ==========================================
 
+@app.get("/api/records/admin/sql")
+def get_admin_sql_records(
+    from_date: str,
+    to_date: str,
+    loai_ca: Optional[str] = None,
+    ngay_ra_vien: Optional[str] = None,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Lấy danh sách dữ liệu bệnh nhân tải từ SQL HIS (dùng cache nếu có)"""
+    cfg = db.query(AppConfig).first()
+    if not cfg:
+        raise HTTPException(status_code=400, detail="Chưa cấu hình kết nối SQL Server HIS.")
+        
+    try:
+        password_plain = decrypt_password(cfg.password) if cfg.password else ""
+        cfg_dict = {
+            "driver": cfg.driver,
+            "server": cfg.server,
+            "database": cfg.database,
+            "auth": cfg.auth,
+            "user": cfg.user,
+            "password": password_plain,
+            "sp_op": cfg.sp_op,
+            "sp_ip": cfg.sp_ip
+        }
+        
+        # Gọi fetch_his_data để tận dụng tối đa cơ chế cache .pkl
+        df = his_service.fetch_his_data(cfg_dict, from_date.replace('-', ''), to_date.replace('-', ''))
+        if df.empty:
+            return []
+            
+        # Lọc loại ca
+        if loai_ca and loai_ca != "All":
+            df = df[df["Loại ca"] == loai_ca]
+            
+        # Lọc ngày ra viện (dạng YYYY-MM-DD)
+        if ngay_ra_vien:
+            try:
+                dt_filter = datetime.datetime.strptime(ngay_ra_vien, "%Y-%m-%d").date()
+                df = df[df["Ngày ra viện"] == dt_filter]
+            except Exception:
+                pass
+                
+        # Sắp xếp và giới hạn tối đa 5000 bản ghi để trình duyệt chạy mượt mà
+        df = df.sort_values(by="Ngày ra viện", ascending=True)
+        
+        records = []
+        for _, r in df.iterrows():
+            dt_str = r["Ngày ra viện"].strftime("%Y-%m-%d") if r["Ngày ra viện"] else ""
+            records.append({
+                "loai_ca": r["Loại ca"],
+                "ma_lk": r["MA_LK"],
+                "ho_ten": r["Họ tên"],
+                "ma_the": r["Mã thẻ"],
+                "ten_khoa": r["Tên khoa"],
+                "ma_y_te": r["Mã y tế"],
+                "ngay_ra_vien": dt_str
+            })
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/records/admin/fail")
 def get_admin_fail_records(
     from_date: Optional[str] = None,

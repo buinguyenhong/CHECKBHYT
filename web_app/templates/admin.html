@@ -888,11 +888,12 @@
     <!-- Navigation Tabs -->
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('sync')">1. Đồng bộ & Đối soát</button>
-        <button class="tab-btn" onclick="switchTab('fail')">2. Danh sách FAIL (IT Sửa)</button>
-        <button class="tab-btn" onclick="switchTab('review')">3. Chờ Duyệt (Khoa Gửi)</button>
-        <button class="tab-btn" onclick="switchTab('users')">4. Quản lý Khoa Phòng</button>
-        <button class="tab-btn" onclick="switchTab('reports')">5. Xuất báo cáo</button>
-        <button class="tab-btn" onclick="switchTab('error-defs')">6. Hướng dẫn Lỗi</button>
+        <button class="tab-btn" onclick="switchTab('sql_data')">2. Dữ liệu SQL HIS</button>
+        <button class="tab-btn" onclick="switchTab('fail')">3. Danh sách FAIL (IT Sửa)</button>
+        <button class="tab-btn" onclick="switchTab('review')">4. Chờ Duyệt (Khoa Gửi)</button>
+        <button class="tab-btn" onclick="switchTab('users')">5. Quản lý Khoa Phòng</button>
+        <button class="tab-btn" onclick="switchTab('reports')">6. Xuất báo cáo</button>
+        <button class="tab-btn" onclick="switchTab('error-defs')">7. Hướng dẫn Lỗi</button>
     </div>
 
     <!-- TAB 1: SYNC & COMPARE -->
@@ -1046,6 +1047,68 @@
                 <button class="btn" style="padding:4px 10px; font-size:12px;" onclick="clearConsole()">Xoá Log</button>
             </div>
             <div id="logConsole">Hệ thống sẵn sàng. Vui lòng kiểm tra cấu hình SQL và nạp tệp Excel để tiến hành đối soát.</div>
+        </div>
+    </div>
+
+    <!-- TAB SQL DATA: SQL HIS LIST -->
+    <div id="tab_sql_data" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Dữ liệu Bệnh nhân tải từ SQL HIS của bệnh viện</h2>
+                <div style="display:flex; gap:15px; align-items:center;">
+                    <span style="font-size:14px; font-weight:700; color:var(--text-secondary);">
+                        Tổng số ca: <span id="sql_total_count" style="color:var(--primary); font-size:16px;">0</span>
+                    </span>
+                    <button class="btn btn-primary" onclick="fetchSqlData()" style="padding:6px 14px; font-size:13px;">Tải lại dữ liệu</button>
+                </div>
+            </div>
+            
+            <!-- Bộ lọc -->
+            <div style="display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px 16px; border-radius:8px; margin-bottom:15px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label style="font-size:13px; color:var(--text-secondary); white-space:nowrap;">Loại ca:</label>
+                    <select id="sql_filter_loai" class="form-control" style="width:130px; padding:6px 10px;" onchange="fetchSqlData()">
+                        <option value="All">Tất cả</option>
+                        <option value="Ngoại trú">Ngoại trú</option>
+                        <option value="Nội trú">Nội trú</option>
+                    </select>
+                </div>
+                
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label style="font-size:13px; color:var(--text-secondary); white-space:nowrap;">Lọc Ngày ra viện:</label>
+                    <input type="date" id="sql_filter_date" class="form-control" style="width:140px; padding:5px 10px;" onchange="fetchSqlData()">
+                    <button class="btn" style="padding:4px 8px; font-size:12px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color);" onclick="document.getElementById('sql_filter_date').value=''; fetchSqlData();">Xóa ngày</button>
+                </div>
+                
+                <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+                    <label style="font-size:13px; color:var(--text-secondary); white-space:nowrap;">Tìm kiếm nhanh:</label>
+                    <input type="text" id="sql_search" class="form-control" style="width:220px; padding:6px 12px;" placeholder="Mã LK, Họ tên, Khoa..." oninput="filterSqlTable()">
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div style="overflow-x:auto; max-height: 500px;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Mã liên kết</th>
+                            <th>Họ tên</th>
+                            <th>Mã thẻ BHYT</th>
+                            <th>Tên khoa</th>
+                            <th>Mã y tế / Số phiếu</th>
+                            <th>Ngày ra viện</th>
+                            <th>Loại ca</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sqlDataBody">
+                        <tr>
+                            <td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">
+                                Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -1402,6 +1465,7 @@
         activeTab = tabId;
 
         // Fetch corresponding tab data
+        if (tabId === 'sql_data') fetchSqlData();
         if (tabId === 'fail') fetchFailRecords();
         if (tabId === 'review') fetchReviewRecords();
         if (tabId === 'users') { fetchUsers(); }
@@ -1858,6 +1922,96 @@
             return 'warning-orange';
         }
         return '';
+    }
+
+    // Fetch SQL HIS Data (Tab SQL DATA)
+    async function fetchSqlData() {
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+        if (!fromDate || !toDate) {
+            const tbody = document.getElementById('sqlDataBody');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.</td></tr>';
+            return;
+        }
+        
+        const loaiCa = document.getElementById('sql_filter_loai').value;
+        const filterDate = document.getElementById('sql_filter_date').value;
+        
+        let url = `/api/records/admin/sql?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}&loai_ca=${loaiCa}`;
+        if (filterDate) {
+            url += `&ngay_ra_vien=${filterDate}`;
+        }
+        
+        const tbody = document.getElementById('sqlDataBody');
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">Đang tải dữ liệu SQL HIS...</td></tr>';
+        
+        try {
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                tbody.innerHTML = '';
+                document.getElementById('sql_total_count').innerText = data.length;
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">Không tìm thấy bản ghi SQL HIS nào khớp với bộ lọc.</td></tr>';
+                    return;
+                }
+                
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const formattedDate = r.ngay_ra_vien ? new Date(r.ngay_ra_vien).toLocaleDateString('vi-VN') : '';
+                    tr.innerHTML = `
+                        <td><strong>${r.ma_lk}</strong></td>
+                        <td>${r.ho_ten}</td>
+                        <td><code>${r.ma_the}</code></td>
+                        <td>${r.ten_khoa}</td>
+                        <td>${r.ma_y_te || '<span style="color:var(--text-secondary); font-style:italic;">Trống</span>'}</td>
+                        <td>${formattedDate}</td>
+                        <td><span class="badge" style="background:${r.loai_ca === 'Nội trú' ? 'rgba(59,130,246,0.15)' : 'rgba(16,185,129,0.15)'}; color:${r.loai_ca === 'Nội trú' ? '#60a5fa' : '#34d399'}; font-weight:700;">${r.loai_ca}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                
+                // Trực tiếp trigger tìm kiếm nhanh nếu ô tìm kiếm có sẵn văn bản
+                filterSqlTable();
+            } else {
+                const err = await res.json();
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--accent-red);">Lỗi: ${err.detail || 'Không thể tải dữ liệu'}</td></tr>`;
+            }
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--accent-red);">Lỗi kết nối LAN hoặc máy chủ đã dừng hoạt động.</td></tr>';
+        }
+    }
+
+    function filterSqlTable() {
+        const query = document.getElementById('sql_search').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#sqlDataBody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            if (row.cells.length < 7) return; // Skip no data row
+            
+            const maLk = row.cells[0].textContent.toLowerCase();
+            const hoTen = row.cells[1].textContent.toLowerCase();
+            const maThe = row.cells[2].textContent.toLowerCase();
+            const tenKhoa = row.cells[3].textContent.toLowerCase();
+            const maYTe = row.cells[4].textContent.toLowerCase();
+            
+            if (maLk.includes(query) || hoTen.includes(query) || maThe.includes(query) || tenKhoa.includes(query) || maYTe.includes(query)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        if (query !== "") {
+            document.getElementById('sql_total_count').innerText = `${visibleCount} (lọc từ ${rows.length})`;
+        } else {
+            // Check if there is data rows
+            const actualRows = Array.from(rows).filter(r => r.cells.length >= 7);
+            document.getElementById('sql_total_count').innerText = actualRows.length;
+        }
     }
 
     // Fetch Fail Records (Tab 2)
