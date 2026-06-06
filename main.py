@@ -390,8 +390,29 @@ def unique_keep_order(items: List[str]) -> List[str]:
 
 
 def parse_datetime_to_date(series: pd.Series) -> pd.Series:
-    dt = pd.to_datetime(series, errors="coerce", dayfirst=True)
-    return dt.dt.date
+    import datetime as dt_module
+    def parse_single(val):
+        if pd.isna(val) or val is None:
+            return None
+        if isinstance(val, (dt_module.date, dt_module.datetime)):
+            if isinstance(val, dt_module.datetime):
+                return val.date()
+            return val
+        val_str = str(val).strip()
+        if not val_str:
+            return None
+        try:
+            # Nếu bắt đầu bằng 4 chữ số năm (ví dụ: 2026-06-01 hoặc 2026/06/01)
+            if len(val_str) >= 5 and val_str[:4].isdigit() and (val_str[4] in ('-', '/')):
+                ts = pd.to_datetime(val_str, errors="coerce", dayfirst=False)
+            else:
+                ts = pd.to_datetime(val_str, errors="coerce", dayfirst=True)
+            if pd.isna(ts):
+                return None
+            return ts.date()
+        except Exception:
+            return None
+    return series.apply(parse_single)
 
 
 # =========================

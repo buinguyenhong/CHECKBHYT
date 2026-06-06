@@ -128,8 +128,28 @@ def remove_leading_A(value) -> str:
     return s
 
 def parse_datetime_to_date(series: pd.Series) -> pd.Series:
-    dt = pd.to_datetime(series, errors="coerce", dayfirst=True)
-    return dt.dt.date
+    def parse_single(val):
+        if pd.isna(val) or val is None:
+            return None
+        if isinstance(val, (datetime.date, datetime.datetime)):
+            if isinstance(val, datetime.datetime):
+                return val.date()
+            return val
+        val_str = str(val).strip()
+        if not val_str:
+            return None
+        try:
+            # Nếu bắt đầu bằng 4 chữ số năm (ví dụ: 2026-06-01 hoặc 2026/06/01)
+            if len(val_str) >= 5 and val_str[:4].isdigit() and (val_str[4] in ('-', '/')):
+                ts = pd.to_datetime(val_str, errors="coerce", dayfirst=False)
+            else:
+                ts = pd.to_datetime(val_str, errors="coerce", dayfirst=True)
+            if pd.isna(ts):
+                return None
+            return ts.date()
+        except Exception:
+            return None
+    return series.apply(parse_single)
 
 def build_conn_str(driver: str, server: str, db: str, auth: str, user: str, pw: str) -> str:
     if auth == "Windows Auth":
