@@ -14,7 +14,7 @@ class BHYTLauncher:
     def __init__(self, root):
         self.root = root
         self.root.title("CheckBHYT LAN WebApp Launcher")
-        self.root.geometry("620x560")
+        self.root.geometry("620x720")
         self.root.resizable(False, False)
         
         # Thiết lập chủ đề màu sắc Glassmorphic Dark-Theme
