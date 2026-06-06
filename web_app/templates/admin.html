@@ -1088,7 +1088,7 @@
 
             <!-- Table -->
             <div style="overflow-x:auto; max-height: 500px;">
-                <table class="table">
+                <table class="data-table">
                     <thead>
                         <tr>
                             <th>Mã liên kết</th>
@@ -1959,7 +1959,20 @@
                 
                 data.forEach(r => {
                     const tr = document.createElement('tr');
-                    const formattedDate = r.ngay_ra_vien ? new Date(r.ngay_ra_vien).toLocaleDateString('vi-VN') : '';
+                    // Format directly from returned value (YYYY-MM-DD -> DD/MM/YYYY) without timezone bugs
+                    let formattedDate = '';
+                    if (r.ngay_ra_vien) {
+                        if (r.ngay_ra_vien.includes('-')) {
+                            const parts = r.ngay_ra_vien.split(' ')[0].split('-');
+                            if (parts.length === 3) {
+                                formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                            } else {
+                                formattedDate = r.ngay_ra_vien;
+                            }
+                        } else {
+                            formattedDate = r.ngay_ra_vien;
+                        }
+                    }
                     tr.innerHTML = `
                         <td><strong>${r.ma_lk}</strong></td>
                         <td>${r.ho_ten}</td>
@@ -1976,10 +1989,11 @@
                 filterSqlTable();
             } else {
                 const err = await res.json();
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--accent-red);">Lỗi: ${err.detail || 'Không thể tải dữ liệu'}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--danger);">Lỗi: ${err.detail || 'Không thể tải dữ liệu'}</td></tr>`;
             }
         } catch (e) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--accent-red);">Lỗi kết nối LAN hoặc máy chủ đã dừng hoạt động.</td></tr>';
+            console.error("Lỗi fetchSqlData:", e);
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--danger);">Lỗi xử lý dữ liệu hoặc kết nối: ${e.message || e}</td></tr>`;
         }
     }
 
@@ -2026,12 +2040,12 @@
                 const data = await res.json();
                 const tbody = document.getElementById('failBody');
                 tbody.innerHTML = '';
-
+ 
                 if (data.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào cần xử lý.</td></tr>`;
                     return;
                 }
-
+ 
                 data.forEach(r => {
                     const tr = document.createElement('tr');
                     const warnClass = getWarningClass(r.ngay_ra_vien);
@@ -2039,7 +2053,19 @@
                         tr.className = warnClass;
                     }
                     
-                    const formattedDate = r.ngay_ra_vien ? new Date(r.ngay_ra_vien).toLocaleDateString('vi-VN') : '';
+                    let formattedDate = '';
+                    if (r.ngay_ra_vien) {
+                        if (r.ngay_ra_vien.includes('-')) {
+                            const parts = r.ngay_ra_vien.split(' ')[0].split('-');
+                            if (parts.length === 3) {
+                                formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                            } else {
+                                formattedDate = r.ngay_ra_vien;
+                            }
+                        } else {
+                            formattedDate = r.ngay_ra_vien;
+                        }
+                    }
                     tr.innerHTML = `
                         <td><strong>${r.ma_lk}</strong></td>
                         <td>${r.ho_ten}</td>
