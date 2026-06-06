@@ -324,6 +324,33 @@ def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=No
         df_ip = sql_exec_sp(conn, cfg.get("sp_ip"), tu_ngay, den_ngay)
         log(f"  -> Nội trú trả về: {len(df_ip)} dòng. Cột: {list(df_ip.columns)}")
         
+        # Ghi debug ra file log để theo dõi dạng dữ liệu ngày thực tế dưới CSDL HIS bệnh viện
+        try:
+            debug_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "debug_date.log")
+            with open(debug_path, "w", encoding="utf-8") as f:
+                f.write(f"--- DEBUG DATE: {datetime.datetime.now()} ---\n")
+                f.write(f"Query range: {tu_ngay} -> {den_ngay}\n")
+                
+                f.write("\n=== NGOẠI TRÚ ===\n")
+                if not df_op.empty and "NgayRa" in df_op.columns:
+                    f.write("Raw values of NgayRa (first 30 rows):\n")
+                    for idx in range(min(30, len(df_op))):
+                        val = df_op.loc[idx, "NgayRa"]
+                        f.write(f"Row {idx}: Raw={repr(val)} | Type={type(val)}\n")
+                else:
+                    f.write("df_op is empty or NgayRa not in columns\n")
+                    
+                f.write("\n=== NỘI TRÚ ===\n")
+                if not df_ip.empty and "NgayRa" in df_ip.columns:
+                    f.write("Raw values of NgayRa (first 30 rows):\n")
+                    for idx in range(min(30, len(df_ip))):
+                        val = df_ip.loc[idx, "NgayRa"]
+                        f.write(f"Row {idx}: Raw={repr(val)} | Type={type(val)}\n")
+                else:
+                    f.write("df_ip is empty or NgayRa not in columns\n")
+        except Exception as e:
+            log(f"Lỗi ghi file debug: {str(e)}")
+            
         if df_op.empty and df_ip.empty:
             log("Cả hai Stored Procedure đều trả về danh sách rỗng.")
             return pd.DataFrame()
