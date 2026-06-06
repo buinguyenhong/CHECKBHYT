@@ -51,12 +51,33 @@ def cache_get(tu: str) -> Optional[Tuple[str, pd.DataFrame]]:
     info = index.get(tu, {})
     cached_end = info.get("end")
     path = info.get("file")
+    updated_at = info.get("updated_at")
     if not cached_end or not path or not os.path.exists(path):
         return None
     try:
         df = pd.read_pickle(path)
         if not isinstance(df, pd.DataFrame):
             return None
+            
+        # Nếu có thông tin ngày cập nhật cache, tự động trim bỏ phần cache không an toàn (sau ngày chạy sync)
+        if updated_at:
+            try:
+                dt_update = datetime.datetime.strptime(updated_at, "%Y%m%d").date()
+                # Ngày an toàn tối đa của dữ liệu cũ là ngày trước ngày cập nhật
+                dt_safe = dt_update - datetime.timedelta(days=1)
+                safe_end_str = dt_safe.strftime("%Y%m%d")
+                
+                # Nếu cache tuyên bố có dữ liệu vượt quá ngày an toàn, trim bớt để đảm bảo không bị stale
+                if cached_end > safe_end_str:
+                    try:
+                        df_date = pd.to_datetime(df["Ngày ra viện"], errors="coerce").dt.date
+                        df = df[df_date <= dt_safe]
+                        cached_end = safe_end_str
+                    except Exception:
+                        return None # Lỗi filter thì bỏ qua cache
+            except Exception:
+                pass
+                
         return cached_end, df
     except Exception:
         return None
@@ -67,7 +88,12 @@ def cache_put(tu: str, den: str, df: pd.DataFrame):
     index = load_cache_index()
     path = cache_file_for_start(tu)
     df.to_pickle(path)
-    index[tu] = {"end": den, "file": path}
+    today_str = datetime.date.today().strftime("%Y%m%d")
+    index[tu] = {
+        "end": den,
+        "file": path,
+        "updated_at": today_str
+    }
     save_cache_index(index)
 
 def clear_sql_cache():
@@ -242,35 +268,69 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
 
     return out[["Loại ca", "MA_LK", "Họ tên", "Mã thẻ", "Tên khoa", "Mã y tế", "Ngày ra viện"]].copy()
 
-def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
+def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=None) -> pd.DataFrame:
     """
     Truy vấn trực tiếp từ database cho khoảng ngày cụ thể [tu_ngay, den_ngay]
     """
+    def log(msg):
+        if log_callback:
+            log_callback(msg)
+        else:
+            print(f"[*] [SQL HIS] {msg}")
+
     conn = get_conn(cfg)
     try:
+        log(f"Bắt đầu gọi Stored Procedure Ngoại trú: {cfg.get('sp_op')} từ {tu_ngay} đến {den_ngay}...")
         df_op = sql_exec_sp(conn, cfg.get("sp_op"), tu_ngay, den_ngay)
+        log(f"  -> Ngoại trú trả về: {len(df_op)} dòng. Cột: {list(df_op.columns)}")
+
+        log(f"Bắt đầu gọi Stored Procedure Nội trú: {cfg.get('sp_ip')} từ {tu_ngay} đến {den_ngay}...")
         df_ip = sql_exec_sp(conn, cfg.get("sp_ip"), tu_ngay, den_ngay)
+        log(f"  -> Nội trú trả về: {len(df_ip)} dòng. Cột: {list(df_ip.columns)}")
         
         if df_op.empty and df_ip.empty:
+            log("Cả hai Stored Procedure đều trả về danh sách rỗng.")
             return pd.DataFrame()
             
         df = normalize_sql_list(df_op, df_ip)
+        log(f"Sau khi chuẩn hóa và loại trùng lặp: {len(df)} ca.")
+        
         if df.empty:
             return df
             
+        # Tính toán min/max của cột Ngày ra viện thực tế để phục vụ phân tích
+        try:
+            non_null_dates = df["Ngày ra viện"].dropna()
+            if not non_null_dates.empty:
+                min_date = non_null_dates.min()
+                max_date = non_null_dates.max()
+                log(f"Khoảng Ngày ra viện thực tế trong dữ liệu thô: {min_date} -> {max_date}")
+            else:
+                log("Cảnh báo: Không có dòng nào có Ngày ra viện hợp lệ.")
+        except Exception as ex:
+            log(f"Không thể thống kê khoảng Ngày ra viện: {str(ex)}")
+
         # Strict dynamic date filter to prevent HIS SP returning records outside the requested range
         try:
             dt_tu = datetime.date(int(tu_ngay[0:4]), int(tu_ngay[4:6]), int(tu_ngay[6:8]))
             dt_den = datetime.date(int(den_ngay[0:4]), int(den_ngay[4:6]), int(den_ngay[6:8]))
-            df = df[(df["Ngày ra viện"] >= dt_tu) & (df["Ngày ra viện"] <= dt_den)]
-        except Exception:
-            pass
+            
+            df_filtered = df[(df["Ngày ra viện"] >= dt_tu) & (df["Ngày ra viện"] <= dt_den)]
+            log(f"Sau khi lọc Ngày ra viện trong khoảng đối soát [{dt_tu} -> {dt_den}]: {len(df_filtered)} ca.")
+            
+            diff = len(df) - len(df_filtered)
+            if diff > 0:
+                log(f"[Cảnh báo] Có {diff} ca có Ngày ra viện nằm ngoài khoảng đối soát đã bị loại bỏ.")
+            df = df_filtered
+        except Exception as ex:
+            log(f"Lỗi khi áp dụng bộ lọc Ngày ra viện: {str(ex)}")
+            
         return df
     finally:
         conn.close()
         discard_conn(conn)
 
-def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
+def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=None) -> pd.DataFrame:
     """
     Tải danh sách bệnh nhân đã thanh toán kèm cơ chế CACHE:
     - Nếu đã cache (tu) và cached_end == den_ngay: dùng cache.
@@ -280,15 +340,20 @@ def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
     if tu_ngay > den_ngay:
         return pd.DataFrame()
 
+    def log(msg):
+        if log_callback:
+            log_callback(msg)
+        else:
+            print(f"[*] [SQL Cache] {msg}")
+
     cached = cache_get(tu_ngay)
     if cached is not None:
         cached_end, cached_df = cached
 
         if cached_end == den_ngay:
-            # Dùng cache hoàn toàn
+            log(f"Sử dụng dữ liệu cache hoàn toàn từ {tu_ngay} đến {den_ngay} ({len(cached_df)} ca).")
             return cached_df.copy()
         elif cached_end < den_ngay:
-            # Chỉ chạy phần thiếu (cached_end + 1 -> den_ngay)
             try:
                 dt_cached_end = datetime.datetime.strptime(cached_end, "%Y%m%d")
                 dt_next_day = dt_cached_end + datetime.timedelta(days=1)
@@ -297,7 +362,8 @@ def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
                 tu2 = tu_ngay # Fallback chạy full nếu lỗi parse ngày
 
             if tu2 <= den_ngay:
-                new_df = fetch_his_data_range(cfg, tu2, den_ngay)
+                log(f"Cache hiện tại chỉ đến {cached_end}. Bắt đầu truy vấn phần còn thiếu [{tu2} -> {den_ngay}]...")
+                new_df = fetch_his_data_range(cfg, tu2, den_ngay, log_callback=log_callback)
             else:
                 new_df = pd.DataFrame()
 
@@ -307,10 +373,12 @@ def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str) -> pd.DataFrame:
             
             # Cập nhật cache
             cache_put(tu_ngay, den_ngay, merged)
+            log(f"Đã cập nhật và ghi đè cache mới. Tổng số ca: {len(merged)}.")
             return merged
             
     # Chạy full (chưa có cache hoặc cache không khớp)
-    df = fetch_his_data_range(cfg, tu_ngay, den_ngay)
+    log(f"Không tìm thấy cache phù hợp cho {tu_ngay}. Thực hiện truy vấn mới toàn bộ...")
+    df = fetch_his_data_range(cfg, tu_ngay, den_ngay, log_callback=log_callback)
     cache_put(tu_ngay, den_ngay, df)
     return df
 

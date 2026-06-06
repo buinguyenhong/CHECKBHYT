@@ -130,11 +130,15 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         SYNC_PROGRESS["status"] = "Đang truy vấn SQL Server HIS..."
         SYNC_PROGRESS["logs"].append(f"Truy vấn stored procedure Ngoại trú và Nội trú từ {from_date} đến {to_date}...")
         
+        def sync_log(msg):
+            SYNC_PROGRESS["logs"].append(msg)
+            print(f"[*] [Sync] {msg}")
+
         try:
-            df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date)
+            df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=sync_log)
             if SYNC_PROGRESS.get("should_stop"):
                 raise ValueError("Tiến trình bị dừng bởi người dùng.")
-            SYNC_PROGRESS["logs"].append(f"Đã tải thành công {len(df_sql)} bản ghi từ CSDL HIS.")
+            SYNC_PROGRESS["logs"].append(f"Đã tải thành công tổng cộng {len(df_sql)} bản ghi từ CSDL HIS.")
         except Exception as e:
             if SYNC_PROGRESS.get("should_stop") or str(e) == "Tiến trình bị dừng bởi người dùng.":
                 raise ValueError("Tiến trình bị dừng bởi người dùng.")
@@ -738,7 +742,7 @@ def compare_records(
             "sp_op": cfg.sp_op,
             "sp_ip": cfg.sp_ip
         }
-        df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date)
+        df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=lambda msg: print(f"[*] [Compare] {msg}"))
         if df_sql.empty:
             raise HTTPException(status_code=400, detail="Stored Procedure HIS không trả về bản ghi nào trong khoảng ngày này.")
 
@@ -949,7 +953,7 @@ def get_admin_sql_records(
         }
         
         # Gọi fetch_his_data để tận dụng tối đa cơ chế cache .pkl
-        df = his_service.fetch_his_data(cfg_dict, from_date.replace('-', ''), to_date.replace('-', ''))
+        df = his_service.fetch_his_data(cfg_dict, from_date.replace('-', ''), to_date.replace('-', ''), log_callback=lambda msg: print(f"[*] [AdminSQL] {msg}"))
         if df.empty:
             return []
             
@@ -1474,7 +1478,7 @@ async def auto_sync_scheduler():
                         def run_sync_sync():
                             temp_db = next(get_db())
                             try:
-                                df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date)
+                                df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=lambda msg: print(f"[*] [Scheduler] {msg}"))
                                 
                                 listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
                                 if os.path.exists(listbh_path):
