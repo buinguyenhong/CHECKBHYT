@@ -3,6 +3,7 @@ import sys
 import json
 import socket
 import threading
+import datetime
 import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -501,12 +502,19 @@ class BHYTLauncher:
             
             cmd = [sys.executable, run_script_path, "--port", str(port)]
             
+            log_file_path = os.path.join(folder, "web_app_server.log")
+            log_file = open(log_file_path, "a", encoding="utf-8")
+            log_file.write(f"\n--- KHỞI ĐỘNG HỆ THỐNG: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+            log_file.flush()
+
             # DETACHED_PROCESS = 0x00000008, CREATE_NO_WINDOW = 0x08000000
             subprocess.Popen(
                 cmd,
                 cwd=folder,
                 env=env,
-                close_fds=True,
+                stdout=log_file,
+                stderr=log_file,
+                close_fds=False,  # Cần thiết khi redirect stdout/stderr trên Windows
                 creationflags=0x00000008 | 0x08000000
             )
             
