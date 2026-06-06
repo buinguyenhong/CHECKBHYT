@@ -961,7 +961,18 @@ def get_admin_sql_records(
         if ngay_ra_vien:
             try:
                 dt_filter = datetime.datetime.strptime(ngay_ra_vien, "%Y-%m-%d").date()
-                df = df[df["Ngày ra viện"] == dt_filter]
+                
+                # So sánh an toàn cả dạng date/datetime lẫn chuỗi string, bỏ qua giá trị rỗng
+                def match_date(val):
+                    if pd.isna(val) or val is None:
+                        return False
+                    if isinstance(val, (datetime.date, datetime.datetime)):
+                        return val == dt_filter
+                    # Fallback so sánh chuỗi
+                    val_str = str(val).split()[0].replace('/', '-').strip()
+                    return val_str == ngay_ra_vien
+                    
+                df = df[df["Ngày ra viện"].apply(match_date)]
             except Exception:
                 pass
                 
@@ -970,14 +981,21 @@ def get_admin_sql_records(
         
         records = []
         for _, r in df.iterrows():
-            dt_str = r["Ngày ra viện"].strftime("%Y-%m-%d") if r["Ngày ra viện"] else ""
+            val = r.get("Ngày ra viện")
+            dt_str = ""
+            if val and not pd.isna(val):
+                try:
+                    dt_str = val.strftime("%Y-%m-%d")
+                except Exception:
+                    dt_str = str(val).split()[0]
+                    
             records.append({
-                "loai_ca": r["Loại ca"],
-                "ma_lk": r["MA_LK"],
-                "ho_ten": r["Họ tên"],
-                "ma_the": r["Mã thẻ"],
-                "ten_khoa": r["Tên khoa"],
-                "ma_y_te": r["Mã y tế"],
+                "loai_ca": r.get("Loại ca", "Ngoại trú"),
+                "ma_lk": r.get("MA_LK", ""),
+                "ho_ten": r.get("Họ tên", ""),
+                "ma_the": r.get("Mã thẻ", ""),
+                "ten_khoa": r.get("Tên khoa", ""),
+                "ma_y_te": r.get("Mã y tế", ""),
                 "ngay_ra_vien": dt_str
             })
         return records
