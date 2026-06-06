@@ -966,21 +966,35 @@ def get_admin_sql_records(
             try:
                 dt_filter = datetime.datetime.strptime(ngay_ra_vien, "%Y-%m-%d").date()
                 
-                # So sánh an toàn cả dạng date/datetime lẫn chuỗi string, bỏ qua giá trị rỗng
+                # So sánh an toàn cả dạng date/datetime/Timestamp lẫn chuỗi string, bỏ qua giá trị rỗng
                 def match_date(val):
                     if pd.isna(val) or val is None:
                         return False
-                    if isinstance(val, (datetime.date, datetime.datetime)):
+                    
+                    # Nếu là Timestamp hoặc datetime.datetime (có thuộc tính date)
+                    if hasattr(val, "date"):
+                        try:
+                            return val.date() == dt_filter
+                        except Exception:
+                            pass
+                            
+                    # Nếu là datetime.date
+                    if isinstance(val, datetime.date):
                         return val == dt_filter
+                        
                     # Fallback so sánh chuỗi
-                    val_str = str(val).split()[0].replace('/', '-').strip()
-                    return val_str == ngay_ra_vien
+                    try:
+                        val_str = str(val).split()[0].replace('/', '-').strip()
+                        return val_str == ngay_ra_vien
+                    except Exception:
+                        return False
                     
                 df = df[df["Ngày ra viện"].apply(match_date)]
             except Exception:
                 pass
                 
         # Sắp xếp và giới hạn tối đa 5000 bản ghi để trình duyệt chạy mượt mà
+        df["Ngày ra viện"] = pd.to_datetime(df["Ngày ra viện"], errors="coerce")
         df = df.sort_values(by="Ngày ra viện", ascending=True)
         
         records = []
