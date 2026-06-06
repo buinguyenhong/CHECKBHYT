@@ -284,7 +284,30 @@ class BHYTLauncher:
             bd=0, 
             cursor="hand2"
         )
-        self.btn_setup.pack(fill=tk.X, ipady=10, pady=(0, 15))
+        self.btn_setup.pack(fill=tk.X, ipady=10, pady=(0, 10))
+
+        # Khung chứa cửa sổ Log cài đặt
+        log_frame = tk.Frame(self.frame_install, bg=self.card_bg)
+        log_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.txt_log = tk.Text(
+            log_frame, 
+            height=6, 
+            bg="#0f172a", 
+            fg=self.accent_green, 
+            bd=1, 
+            relief=tk.SOLID, 
+            font=("Consolas", 9), 
+            wrap=tk.WORD
+        )
+        self.txt_log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = tk.Scrollbar(log_frame, command=self.txt_log.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.txt_log.configure(yscrollcommand=scrollbar.set)
+        
+        self.txt_log.insert(tk.END, ">>> Tiến trình cài đặt thư viện sẽ hiển thị trực tiếp tại đây...\n")
+        self.txt_log.configure(state=tk.DISABLED)
 
     # ========================================================
     # TAB 2: THÔNG TIN HỆ THỐNG & ĐIỀU KHIỂN (SYSTEM INFO)
@@ -404,9 +427,20 @@ class BHYTLauncher:
         self.btn_setup.configure(state=tk.DISABLED, text="Đang tải các thư viện...")
         threading.Thread(target=self.run_setup, daemon=True).start()
 
+    def append_log(self, text):
+        self.txt_log.configure(state=tk.NORMAL)
+        self.txt_log.insert(tk.END, text)
+        self.txt_log.see(tk.END)
+        self.txt_log.configure(state=tk.DISABLED)
+
     def run_setup(self):
         folder = self.folder_path.get().strip()
         try:
+            self.root.after(0, lambda: self.txt_log.configure(state=tk.NORMAL))
+            self.root.after(0, lambda: self.txt_log.delete("1.0", tk.END))
+            self.root.after(0, lambda: self.txt_log.insert(tk.END, ">>> Đang kết nối mạng và chuẩn bị cài đặt thư viện...\n"))
+            self.root.after(0, lambda: self.txt_log.configure(state=tk.DISABLED))
+
             cmd = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
             process = subprocess.Popen(
                 cmd,
@@ -416,14 +450,24 @@ class BHYTLauncher:
                 text=True,
                 creationflags=0x08000000  # CREATE_NO_WINDOW
             )
+            
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    break
+                self.root.after(0, lambda l=line: self.append_log(l))
+                
             process.wait()
             
             if process.returncode == 0:
+                self.root.after(0, lambda: self.append_log("\n>>> CÀI ĐẶT THÀNH CÔNG! ✅\n"))
                 messagebox.showinfo("Thành công", "Cài đặt thành công toàn bộ thư viện dependencies BHYT! Chuyển sang Tab 2 để khởi chạy Server.")
                 self.root.after(0, lambda: self.switch_tab("sys"))
             else:
+                self.root.after(0, lambda: self.append_log(f"\n>>> CÀI ĐẶT THẤT BẠI! Mã lỗi: {process.returncode} ❌\n"))
                 messagebox.showerror("Lỗi cài đặt", f"Cài đặt thất bại, vui lòng kiểm tra kết nối mạng máy tính. Mã lỗi: {process.returncode}")
         except Exception as e:
+            self.root.after(0, lambda: self.append_log(f"\n>>> LỖI HỆ THỐNG: {e}\n"))
             messagebox.showerror("Lỗi hệ thống", f"Không thể kích hoạt bộ cài: {e}")
         finally:
             self.root.after(0, lambda: self.btn_setup.configure(state=tk.NORMAL, text="Kích hoạt cài đặt thư viện (pip setup)"))
