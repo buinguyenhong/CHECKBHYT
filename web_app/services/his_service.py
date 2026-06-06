@@ -4,6 +4,16 @@ import datetime
 import os
 import json
 import shutil
+import sys
+
+def safe_print(msg: str):
+    try:
+        print(msg)
+    except Exception:
+        try:
+            print(msg.encode('ascii', errors='replace').decode('ascii'))
+        except Exception:
+            pass
 
 # Clipboard / ODBC imports
 try:
@@ -274,9 +284,15 @@ def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=No
     """
     def log(msg):
         if log_callback:
-            log_callback(msg)
+            try:
+                log_callback(msg)
+            except Exception:
+                pass
         else:
-            print(f"[*] [SQL HIS] {msg}")
+            try:
+                safe_print(f"[*] [SQL HIS] {msg}")
+            except Exception:
+                pass
 
     conn = get_conn(cfg)
     try:
@@ -342,9 +358,15 @@ def fetch_his_data(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=None) ->
 
     def log(msg):
         if log_callback:
-            log_callback(msg)
+            try:
+                log_callback(msg)
+            except Exception:
+                pass
         else:
-            print(f"[*] [SQL Cache] {msg}")
+            try:
+                safe_print(f"[*] [SQL Cache] {msg}")
+            except Exception:
+                pass
 
     cached = cache_get(tu_ngay)
     if cached is not None:

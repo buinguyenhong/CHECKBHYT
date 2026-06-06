@@ -132,7 +132,7 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         
         def sync_log(msg):
             SYNC_PROGRESS["logs"].append(msg)
-            print(f"[*] [Sync] {msg}")
+            his_service.safe_print(f"[*] [Sync] {msg}")
 
         try:
             df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=sync_log)
@@ -742,7 +742,7 @@ def compare_records(
             "sp_op": cfg.sp_op,
             "sp_ip": cfg.sp_ip
         }
-        df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=lambda msg: print(f"[*] [Compare] {msg}"))
+        df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=lambda msg: his_service.safe_print(f"[*] [Compare] {msg}"))
         if df_sql.empty:
             raise HTTPException(status_code=400, detail="Stored Procedure HIS không trả về bản ghi nào trong khoảng ngày này.")
 
@@ -953,7 +953,7 @@ def get_admin_sql_records(
         }
         
         # Gọi fetch_his_data để tận dụng tối đa cơ chế cache .pkl
-        df = his_service.fetch_his_data(cfg_dict, from_date.replace('-', ''), to_date.replace('-', ''), log_callback=lambda msg: print(f"[*] [AdminSQL] {msg}"))
+        df = his_service.fetch_his_data(cfg_dict, from_date.replace('-', ''), to_date.replace('-', ''), log_callback=lambda msg: his_service.safe_print(f"[*] [AdminSQL] {msg}"))
         if df.empty:
             return []
             
@@ -1478,7 +1478,7 @@ async def auto_sync_scheduler():
                         def run_sync_sync():
                             temp_db = next(get_db())
                             try:
-                                df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=lambda msg: print(f"[*] [Scheduler] {msg}"))
+                                df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=lambda msg: his_service.safe_print(f"[*] [Scheduler] {msg}"))
                                 
                                 listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
                                 if os.path.exists(listbh_path):
