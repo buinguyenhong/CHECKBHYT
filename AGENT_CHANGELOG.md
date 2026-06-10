@@ -55,6 +55,76 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-10 - Antigravity (Bổ sung: Trả hồ sơ khoa hàng loạt)
+
+### Mục tiêu
+- Thêm công cụ sinh script trả hồ sơ về khoa (mở khóa bệnh án) hàng loạt theo khoa.
+- IT chọn khoa → sinh SQL đưa BenhAn.TrangThai về DaXuatVien → khoa sửa → IT khóa lại.
+
+### Thay đổi
+- `web_app/main.py`:
+  - **Thêm** `POST /api/admin/bulk-unlock` — sinh script mở khóa/khóa lại bệnh án hàng loạt theo khoa. Chỉ lấy ca LOI chưa RESOLVED khớp ErrorDefinition có `requires_his_reset=True`.
+  - **Thêm** `GET /api/admin/dept-unlock-preview` — xem trước danh sách ca cần trả hồ sơ.
+- `web_app/templates/admin.html`:
+  - **Thay tab 4** "Chờ Duyệt (Khoa Gửi)" → "Trả hồ sơ khoa".
+  - UI mới: dropdown chọn khoa, nút Xem trước / Mở khóa / Khóa lại, bảng preview.
+  - Bỏ JS functions: `fetchReviewRecords()`, `approveAndReset()`.
+  - Thêm JS functions: `loadUnlockDeptList()`, `previewDeptUnlock()`, `bulkDeptUnlock()`.
+
+### Nghiệp vụ ảnh hưởng
+- IT không còn chờ khoa gửi duyệt qua webapp. IT chủ động chọn khoa và sinh script.
+- Chỉ ca nội trú mới cần mở khóa bệnh án. Ca ngoại trú được ghi chú nhưng không sinh script.
+- Luồng mới: Khoa liên hệ IT → IT mở tab "Trả hồ sơ khoa" → chọn khoa → UNLOCK → copy SQL chạy SSMS → khoa sửa trên HIS → IT CLOSE.
+
+### Kiểm tra
+- `py_compile` thành công cho `main.py`.
+- Cần smoke test trên trình duyệt.
+
+### Lưu ý cho phiên sau
+- API `POST /api/records/{id}/approve` đã bị xóa ở phiên trước. `toggleHisUnlock()` (single record) vẫn được giữ lại cho backward compatibility.
+- ErrorDefinition phải có `requires_his_reset=True` cho các mã lỗi cần trả hồ sơ, nếu không tab này sẽ không tìm thấy ca nào.
+
+
+
+### Mục tiêu
+- Đơn giản hóa logic xử lý hồ sơ và trạng thái tại giao diện khoa lâm sàng.
+- Bỏ quy trình khoa gửi duyệt IT qua webapp; thay bằng liên hệ trực tiếp.
+- Thêm màn hình thống kê theo tháng cho khoa.
+
+### Thay đổi
+- `web_app/models.py`: cập nhật comment trạng thái, bỏ `WAITING_REVIEW`.
+- `web_app/main.py`:
+  - **Xóa** `POST /api/records/{record_id}/flag` (khoa gắn cờ gửi IT duyệt).
+  - **Xóa** `GET /api/records/admin/review` (IT xem danh sách chờ duyệt).
+  - **Xóa** `POST /api/records/{record_id}/approve` (IT duyệt và sinh SQL reset).
+  - Cập nhật `GET /api/records/dept`: thêm lọc tháng, gom PENDING+WAITING_RESEND thành "Chưa xử lý".
+  - **Thêm** `GET /api/records/dept/stats?month=YYYY-MM` (thống kê theo tháng cho khoa).
+  - **Thêm** `GET /api/export/dept/loi?month=YYYY-MM` (xuất Excel lỗi theo khoa/tháng).
+- `web_app/templates/department.html`:
+  - Viết lại hoàn toàn giao diện khoa.
+  - Bỏ nút hành động, modal ghi chú. Giao diện khoa chỉ đọc.
+  - Đổi hướng dẫn: "liên hệ trực tiếp phòng IT".
+  - Chỉ còn 2 trạng thái hiển thị: Chưa xử lý / Đã xử lý.
+  - Màu sắc theo ngày ra viện: đỏ ≥7 ngày, cam 5-6 ngày, xanh cho RESOLVED.
+  - KPI cards: Tổng lỗi, Chưa xử lý, Đã xử lý, Quá 7 ngày.
+  - Thêm tab "Thống kê tháng" với: 5 stat cards, progress bar, nút xuất Excel.
+  - Bỏ badge mở khóa HIS khỏi giao diện khoa.
+- `admin.html`: không cần sửa — không có reference trực tiếp tới WAITING_REVIEW/review/approve.
+
+### Nghiệp vụ ảnh hưởng
+- `WAITING_REVIEW` bị loại bỏ khỏi hệ thống. Records hiện có trạng thái này vẫn nằm trong DB nhưng sẽ được auto-resolve khi đối soát lại nếu MA_LK có trong listbh.
+- Khoa không còn thao tác gì trên webapp ngoài xem danh sách lỗi và xuất Excel.
+- Quy trình mới: Khoa xem lỗi trên webapp → sửa trực tiếp trên HIS → liên hệ IT → IT reset/xử lý trên admin.
+
+### Kiểm tra
+- `py_compile` thành công cho `main.py` và `models.py`.
+- Cần smoke test với trình duyệt để xác nhận UI hiển thị đúng.
+
+### Lưu ý cho phiên sau
+- Records cũ có `status=WAITING_REVIEW` vẫn tồn tại trong DB. Cần migration để chuyển về `PENDING` nếu muốn clean up.
+- API `POST /api/records/{record_id}/approve` đã bị xóa. Nếu admin cần sinh SQL reset cho ca LOI, hiện phải dùng `POST /api/records/{record_id}/admin-resolve` hoặc thao tác thủ công.
+
+
 ## 2026-05-27 - Codex
 
 ### Mục tiêu

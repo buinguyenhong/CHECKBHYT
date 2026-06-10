@@ -49,7 +49,7 @@ class Record(Base):
     loai_ca = Column(String, default="Ngoại trú")  # 'Ngoại trú' | 'Nội trú'
     
     ngay_doi_soat = Column(Date, index=True, nullable=False)  # Ngày thực hiện đối soát
-    status = Column(String, default="PENDING")  # 'PENDING' | 'WAITING_REVIEW' | 'RESOLVED'
+    status = Column(String, default="PENDING")  # 'PENDING' | 'WAITING_RESEND' | 'RESOLVED'
     type_group = Column(String, default="FAIL")  # 'LOI' (Danh sách lỗi) | 'FAIL' (Danh sách fail)
     his_unlock_status = Column(String, default="NORMAL") # 'NORMAL' (Bình thường) | 'UNLOCKED' (Đang được trả về khoa)
     

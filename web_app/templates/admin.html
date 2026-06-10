@@ -890,7 +890,7 @@
         <button class="tab-btn active" onclick="switchTab('sync')">1. Đồng bộ & Đối soát</button>
         <button class="tab-btn" onclick="switchTab('sql_data')">2. Dữ liệu SQL HIS</button>
         <button class="tab-btn" onclick="switchTab('fail')">3. Danh sách FAIL (IT Sửa)</button>
-        <button class="tab-btn" onclick="switchTab('review')">4. Chờ Duyệt (Khoa Gửi)</button>
+        <button class="tab-btn" onclick="switchTab('review')">4. Trả hồ sơ khoa</button>
         <button class="tab-btn" onclick="switchTab('users')">5. Quản lý Khoa Phòng</button>
         <button class="tab-btn" onclick="switchTab('reports')">6. Xuất báo cáo</button>
         <button class="tab-btn" onclick="switchTab('error-defs')">7. Hướng dẫn Lỗi</button>
@@ -1149,25 +1149,66 @@
     <div id="tab_review" class="tab-pane">
         <div class="panel">
             <div class="panel-header">
-                <h2>Danh sách ca Khoa đã xử lý lỗi (Chờ IT xác nhận và Reset SQL)</h2>
+                <h2>Trả hồ sơ về khoa — Sinh script mở khóa / khóa lại bệnh án</h2>
             </div>
+
+            <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.15); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+                <strong style="color: var(--primary);">💡 Hướng dẫn:</strong><br>
+                1. Chọn khoa cần trả hồ sơ → <strong>Xem trước</strong> để kiểm tra danh sách ca.<br>
+                2. Bấm <strong style="color: #f59e0b;">Mở khóa (Trả khoa)</strong> để sinh script SQL đưa BenhAn.TrangThai về <code>DaXuatVien</code>.<br>
+                3. Copy script vào SSMS và chạy. Thông báo cho khoa sửa hồ sơ trên HIS.<br>
+                4. Sau khi khoa báo sửa xong, bấm <strong style="color: var(--success);">Khóa lại</strong> để sinh script đưa TrangThai về <code>DaThanhToan</code>.<br>
+                <em>Lưu ý: Chỉ các ca có mã lỗi nằm trong <strong>Hướng dẫn Lỗi</strong> và đánh dấu "Cần Reset HIS" mới được xử lý.</em>
+            </div>
+
+            <div class="grid-form" style="grid-template-columns: 1fr auto auto auto; align-items: end;">
+                <div class="form-group">
+                    <label>Chọn Khoa Phòng</label>
+                    <select class="form-control" id="unlockDeptSelect">
+                        <option value="">— Chọn khoa —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-primary" onclick="previewDeptUnlock()" style="white-space:nowrap;">🔍 Xem trước</button>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn" onclick="bulkDeptUnlock('UNLOCK')" style="white-space:nowrap; background:#f59e0b; color:white; border:none; font-weight:800;">🔓 Mở khóa (Trả khoa)</button>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-success" onclick="bulkDeptUnlock('CLOSE')" style="white-space:nowrap;">🔒 Khóa lại</button>
+                </div>
+            </div>
+
+            <!-- Preview summary -->
+            <div id="unlockPreviewSummary" style="display:none; margin-bottom: 16px; padding: 12px 16px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px;">
+                <div style="display: flex; gap: 25px; flex-wrap: wrap; font-size: 14px; font-weight: 600;">
+                    <span>Tổng ca cần xử lý: <strong id="prevTotal" style="color: var(--primary);">0</strong></span>
+                    <span>Nội trú (mở khóa): <strong id="prevNoiTru" style="color: #f59e0b;">0</strong></span>
+                    <span>Ngoại trú (chỉ cần sửa): <strong id="prevNgoaiTru" style="color: var(--text-secondary);">0</strong></span>
+                </div>
+            </div>
+
+            <!-- Preview table -->
             <div class="table-responsive">
-                <table class="data-table" id="reviewTable">
+                <table class="data-table" id="unlockPreviewTable">
                     <thead>
                         <tr>
+                            <th>STT</th>
                             <th>Mã liên kết</th>
                             <th>Họ tên</th>
                             <th>Mã thẻ</th>
-                            <th>Khoa điều trị</th>
-                            <th>Mã lỗi</th>
-                            <th>Ý kiến/Ghi chú của Khoa</th>
                             <th>Loại ca</th>
-                            <th>Trạng thái</th>
-                            <th>Hành động</th>
+                            <th>Mã lỗi</th>
+                            <th>Mô tả lỗi</th>
+                            <th>Ngày ra viện</th>
+                            <th>Trạng thái HIS</th>
                         </tr>
                     </thead>
-                    <tbody id="reviewBody">
-                        <!-- Ajax data -->
+                    <tbody id="unlockPreviewBody">
+                        <tr><td colspan="9" style="text-align:center; color:var(--text-secondary); padding:30px;">Chọn khoa và bấm "Xem trước" để hiển thị danh sách.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1306,7 +1347,7 @@
                         <tr>
                             <th>Tên khoa</th>
                             <th>Số ca lỗi chưa sửa (PENDING)</th>
-                            <th>Số ca đã sửa chờ IT duyệt (WAITING_REVIEW)</th>
+                            <th>Số ca chờ gửi lại (WAITING_RESEND)</th>
                             <th>Tổng lỗi phát sinh</th>
                         </tr>
                     </thead>
@@ -1467,7 +1508,7 @@
         // Fetch corresponding tab data
         if (tabId === 'sql_data') fetchSqlData();
         if (tabId === 'fail') fetchFailRecords();
-        if (tabId === 'review') fetchReviewRecords();
+        if (tabId === 'review') loadUnlockDeptList();
         if (tabId === 'users') { fetchUsers(); }
         if (tabId === 'reports') { fetchDeptReport(); }
         if (tabId === 'error-defs') { fetchErrorDefinitions(); }
@@ -1758,7 +1799,7 @@
                                 updateGlobalKPIs();
                                 // Reload reports and data lists
                                 if (activeTab === 'fail') fetchFailRecords();
-                                if (activeTab === 'review') fetchReviewRecords();
+                                if (activeTab === 'review') loadUnlockDeptList();
                                 if (activeTab === 'reports') fetchDeptReport();
                             }
                         }
@@ -1854,7 +1895,7 @@
                                         alert("Quá trình đối soát & đồng bộ dữ liệu HIS đã hoàn tất!");
                                         updateGlobalKPIs();
                                         if (activeTab === 'fail') fetchFailRecords();
-                                        if (activeTab === 'review') fetchReviewRecords();
+                                        if (activeTab === 'review') loadUnlockDeptList();
                                         if (activeTab === 'reports') fetchDeptReport();
                                     }
                                 }
@@ -2087,85 +2128,105 @@
         } catch {}
     }
 
-    // Fetch Review Records (Tab 3)
-    async function fetchReviewRecords() {
+    // ========== TAB 4: TRẢ HỒ SƠ KHOA ==========
+    async function loadUnlockDeptList() {
         try {
-            const res = await fetch('/api/records/admin/review');
+            const res = await fetch('/api/departments/unique');
             if (res.ok) {
-                const data = await res.json();
-                const tbody = document.getElementById('reviewBody');
-                tbody.innerHTML = '';
-
-                if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có yêu cầu chờ duyệt nào từ các Khoa lâm sàng.</td></tr>`;
-                    return;
-                }
-
-                data.forEach(r => {
-                    const tr = document.createElement('tr');
-                    const warnClass = getWarningClass(r.ngay_ra_vien);
-                    if (warnClass) {
-                        tr.className = warnClass;
-                    }
-                    
-                    let unlockBadge = '';
-                    let unlockBtn = '';
-                    
-                    if (r.requires_his_reset) {
-                        if (r.his_unlock_status === 'UNLOCKED') {
-                            unlockBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.2); color: #fbbf24;">Trả khoa - Đang sửa</span></div>`;
-                            unlockBtn = `<button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; font-weight:bold;" onclick="toggleHisUnlock(${r.id}, 'CLOSE')">Khóa lại</button>`;
-                        } else {
-                            unlockBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.15); color: #f87171;">Yêu cầu mở khóa</span></div>`;
-                            unlockBtn = `<button class="btn" style="padding:4px 8px; font-size:12px; font-weight:bold; background:#f59e0b; color:white; border:none;" onclick="toggleHisUnlock(${r.id}, 'UNLOCK')">Trả khoa (Mở khóa)</button>`;
-                        }
-                    }
-                    
-                    tr.innerHTML = `
-                        <td><strong>${r.ma_lk}</strong></td>
-                        <td>${r.ho_ten}</td>
-                        <td><code>${r.ma_the}</code></td>
-                        <td>${r.ten_khoa}</td>
-                        <td><span style="color:#f87171; font-weight:700;">${r.maloi || ''}</span></td>
-                        <td style="font-style:italic; max-width:250px; white-space:normal; color:#fbbf24;">${r.note || ''}</td>
-                        <td>${r.loai_ca}</td>
-                        <td>
-                            <span class="badge badge-waiting">Chờ duyệt</span>
-                            ${unlockBadge}
-                        </td>
-                        <td>
-                            <div style="display:flex; flex-direction:column; gap:4px;">
-                                <button class="btn btn-success" style="padding:4px 8px; font-size:12px; font-weight:bold;" onclick="approveAndReset(${r.id})">Duyệt & Reset</button>
-                                ${unlockBtn}
-                            </div>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
+                const depts = await res.json();
+                const sel = document.getElementById('unlockDeptSelect');
+                const currentVal = sel.value;
+                sel.innerHTML = '<option value="">— Chọn khoa —</option>';
+                depts.forEach(d => {
+                    sel.innerHTML += `<option value="${d}" ${d === currentVal ? 'selected' : ''}>${d}</option>`;
                 });
             }
         } catch {}
     }
 
-    // Approve and execute SQL reset for department errors (Tab 3)
-    async function approveAndReset(id) {
-        if (!confirm("Duyệt ca này và sinh SQL reset để copy chạy SSMS? Ca bệnh sẽ chuyển sang trạng thái chờ hệ thống gửi XML lại, chưa đánh dấu hoàn tất.")) return;
-        
+    async function previewDeptUnlock() {
+        const dept = document.getElementById('unlockDeptSelect').value;
+        if (!dept) { alert('Vui lòng chọn khoa trước.'); return; }
+
         try {
-            const res = await fetch(`/api/records/${id}/approve`, { method: 'POST' });
+            const res = await fetch(`/api/admin/dept-unlock-preview?department_name=${encodeURIComponent(dept)}`);
+            if (!res.ok) { alert('Lỗi lấy dữ liệu xem trước.'); return; }
             const data = await res.json();
-            if (res.ok && data.success) {
-                openHisUnlockModal(data.sql_command, "Duyệt & Reset cờ xuất HIS");
-                fetchReviewRecords();
-                updateGlobalKPIs();
-            } else {
-                alert(`Lỗi duyệt: ${data.detail || 'Không thể cập nhật CSDL HIS'}`);
+
+            // Summary
+            document.getElementById('unlockPreviewSummary').style.display = 'block';
+            document.getElementById('prevTotal').innerText = data.total;
+            document.getElementById('prevNoiTru').innerText = data.noi_tru;
+            document.getElementById('prevNgoaiTru').innerText = data.ngoai_tru;
+
+            // Table
+            const tbody = document.getElementById('unlockPreviewBody');
+            tbody.innerHTML = '';
+            if (data.records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-secondary); padding:30px;">Không có ca nào cần trả hồ sơ về khoa (theo danh mục Hướng dẫn Lỗi).</td></tr>`;
+                return;
             }
-        } catch {
-            alert("Lỗi kết nối máy chủ LAN.");
+
+            data.records.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+                let hisBadge = '';
+                if (r.his_unlock_status === 'UNLOCKED') {
+                    hisBadge = '<span class="badge badge-waiting">ĐANG MỞ KHÓA</span>';
+                } else {
+                    hisBadge = '<span class="badge badge-pending">BÌNH THƯỜNG</span>';
+                }
+                tr.innerHTML = `
+                    <td style="font-weight:700; color:var(--text-secondary);">${idx + 1}</td>
+                    <td><strong>${r.ma_lk}</strong></td>
+                    <td>${r.ho_ten}</td>
+                    <td><code style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:13px;">${r.ma_the}</code></td>
+                    <td>${r.loai_ca}</td>
+                    <td><span style="color:#f87171; font-weight:700;">${r.maloi || ''}</span></td>
+                    <td style="max-width:250px; white-space:normal;">${r.motaloi || ''}</td>
+                    <td>${r.ngay_ra_vien ? new Date(r.ngay_ra_vien).toLocaleDateString('vi-VN') : ''}</td>
+                    <td>${hisBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error(e);
+            alert('Lỗi kết nối máy chủ LAN.');
         }
     }
 
-    // Toggle HIS unlock status
+    async function bulkDeptUnlock(actionType) {
+        const dept = document.getElementById('unlockDeptSelect').value;
+        if (!dept) { alert('Vui lòng chọn khoa trước.'); return; }
+
+        const actionLabel = actionType === 'UNLOCK'
+            ? `mở khóa bệnh án (trả về khoa) cho tất cả ca lỗi cần reset HIS của khoa [${dept}]`
+            : `khóa lại bệnh án (đưa về DaThanhToan) cho tất cả ca của khoa [${dept}]`;
+        if (!confirm(`Bạn chắc chắn muốn ${actionLabel}?`)) return;
+
+        try {
+            const res = await fetch('/api/admin/bulk-unlock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ department_name: dept, action_type: actionType })
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                const title = actionType === 'UNLOCK'
+                    ? `Mở khóa hàng loạt — ${dept} (${data.count} ca nội trú)`
+                    : `Khóa lại hàng loạt — ${dept} (${data.count} ca nội trú)`;
+                openHisUnlockModal(data.sql_command, title);
+                previewDeptUnlock(); // Refresh preview
+                updateGlobalKPIs();
+            } else {
+                alert(`Lỗi: ${data.detail || 'Không thể xử lý yêu cầu.'}`);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Lỗi kết nối máy chủ LAN.');
+        }
+    }
+
+    // Toggle HIS unlock status (single record — kept for backward compatibility)
     async function toggleHisUnlock(id, actionType) {
         const formData = new FormData();
         formData.append("action_type", actionType);
@@ -2182,7 +2243,6 @@
                 } else {
                     openHisUnlockModal(data.sql_command, "Khóa lại bệnh án: đưa TrangThai về DaThanhToan");
                 }
-                fetchReviewRecords();
                 updateGlobalKPIs();
             } else {
                 alert(`Lỗi: ${data.detail || 'Không thể cập nhật trạng thái mở khóa'}`);

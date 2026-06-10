@@ -571,6 +571,162 @@ def toggle_record_his_unlock(
     }
 
 
+@app.post("/api/admin/bulk-unlock")
+def bulk_unlock_department_records(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    IT sinh script mở khóa / khóa lại bệnh án hàng loạt theo khoa.
+    Chỉ lấy các ca LOI chưa RESOLVED mà ErrorDefinition đánh dấu requires_his_reset=True.
+    """
+    department_name = data.get("department_name", "").strip()
+    action_type = data.get("action_type", "").strip()  # 'UNLOCK' | 'CLOSE'
+    
+    if not department_name:
+        raise HTTPException(status_code=400, detail="Chưa chọn khoa phòng.")
+    if action_type not in {"UNLOCK", "CLOSE"}:
+        raise HTTPException(status_code=400, detail="Loại thao tác không hợp lệ. Chỉ hỗ trợ UNLOCK hoặc CLOSE.")
+
+    # 1. Lấy danh sách mã lỗi cần trả hồ sơ về khoa
+    from models import ErrorDefinition
+    reset_defs = db.query(ErrorDefinition).filter(
+        ErrorDefinition.requires_his_reset == True
+    ).all()
+    
+    if not reset_defs:
+        return {
+            "status": "success",
+            "sql_command": "-- Chưa có mã lỗi nào được đánh dấu 'Cần trả hồ sơ về khoa' trong danh mục Hướng dẫn Lỗi.",
+            "count": 0,
+            "records": []
+        }
+
+    # 2. Lấy tất cả ca LOI chưa RESOLVED của khoa
+    dept_records = db.query(Record).filter(
+        Record.ten_khoa == department_name,
+        Record.type_group == "LOI",
+        Record.status != "RESOLVED"
+    ).all()
+
+    # 3. Lọc theo ErrorDefinition: chỉ lấy ca khớp mã lỗi + keyword
+    matched_records = []
+    for r in dept_records:
+        for d in reset_defs:
+            if d.error_code == r.maloi:
+                if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
+                    matched_records.append(r)
+                    break
+
+    if not matched_records:
+        action_label = "mở khóa" if action_type == "UNLOCK" else "khóa lại"
+        return {
+            "status": "success",
+            "sql_command": f"-- Không có ca nào trong khoa [{department_name}] cần {action_label} bệnh án.",
+            "count": 0,
+            "records": []
+        }
+
+    # 4. Lọc chỉ lấy nội trú (script mở khóa bệnh án chỉ áp dụng nội trú)
+    noi_tru_records = [r for r in matched_records if resolve_loai_ca(r) == "Nội trú"]
+    ngoai_tru_records = [r for r in matched_records if resolve_loai_ca(r) != "Nội trú"]
+
+    keys = [r.ma_lk for r in noi_tru_records]
+    sql_command = his_service.build_benhan_unlock_sql(keys, action_type) if keys else ""
+
+    # Nếu có ca ngoại trú khớp ErrorDef nhưng không cần mở khóa, ghi chú thêm
+    notes = []
+    if ngoai_tru_records:
+        notes.append(f"-- Lưu ý: Có {len(ngoai_tru_records)} ca ngoại trú cần sửa lỗi nhưng không cần mở khóa bệnh án.")
+    if not keys:
+        sql_command = "-- Không có ca nội trú nào cần mở khóa bệnh án trong khoa này."
+        if notes:
+            sql_command = "\n".join(notes) + "\n" + sql_command
+
+    if keys:
+        if notes:
+            sql_command = "\n".join(notes) + "\n\n" + sql_command
+            
+        # 5. Cập nhật trạng thái mở khóa cho từng record
+        new_status = "UNLOCKED" if action_type == "UNLOCK" else "NORMAL"
+        action_label = "Trả hồ sơ về khoa (mở khóa bệnh án)" if action_type == "UNLOCK" else "Khóa lại bệnh án sau khi khoa sửa xong"
+        
+        for r in noi_tru_records:
+            r.his_unlock_status = new_status
+            log = RecordLog(
+                record_id=r.id,
+                username=user.username,
+                action="CHANGE_STATUS",
+                note=f"[Hàng loạt] {action_label}. Khoa: {department_name}"
+            )
+            db.add(log)
+        db.commit()
+
+    # Trả về thông tin ca đã xử lý để frontend hiển thị
+    record_info = []
+    for r in noi_tru_records:
+        record_info.append({
+            "ma_lk": r.ma_lk,
+            "ho_ten": r.ho_ten,
+            "ma_the": r.ma_the,
+            "maloi": r.maloi,
+            "motaloi": r.motaloi
+        })
+
+    return {
+        "status": "success",
+        "sql_command": sql_command,
+        "count": len(noi_tru_records),
+        "ngoai_tru_count": len(ngoai_tru_records),
+        "records": record_info
+    }
+
+
+@app.get("/api/admin/dept-unlock-preview")
+def preview_department_unlock(
+    department_name: str,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Xem trước danh sách ca LOI cần trả hồ sơ về khoa (dựa trên ErrorDefinition.requires_his_reset)"""
+    from models import ErrorDefinition
+    reset_defs = db.query(ErrorDefinition).filter(
+        ErrorDefinition.requires_his_reset == True
+    ).all()
+
+    dept_records = db.query(Record).filter(
+        Record.ten_khoa == department_name,
+        Record.type_group == "LOI",
+        Record.status != "RESOLVED"
+    ).all()
+
+    matched = []
+    for r in dept_records:
+        for d in reset_defs:
+            if d.error_code == r.maloi:
+                if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
+                    matched.append({
+                        "id": r.id,
+                        "ma_lk": r.ma_lk,
+                        "ho_ten": r.ho_ten,
+                        "ma_the": r.ma_the,
+                        "maloi": r.maloi,
+                        "motaloi": r.motaloi,
+                        "loai_ca": resolve_loai_ca(r),
+                        "ngay_ra_vien": r.ngay_ra_vien.isoformat() if r.ngay_ra_vien else "",
+                        "his_unlock_status": r.his_unlock_status or "NORMAL"
+                    })
+                    break
+
+    return {
+        "department_name": department_name,
+        "total": len(matched),
+        "noi_tru": len([m for m in matched if m["loai_ca"] == "Nội trú"]),
+        "ngoai_tru": len([m for m in matched if m["loai_ca"] != "Nội trú"]),
+        "records": matched
+    }
+
 @app.post("/api/config/test-connection")
 def test_his_connection(
     test_data: dict = None,
@@ -844,10 +1000,11 @@ def get_unique_departments(
 @app.get("/api/records/dept")
 def get_department_records(
     status: str = "ALL",
+    month: Optional[str] = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Lấy danh sách các ca LỖI thuộc quản lý của khoa (sắp xếp ngày ra viện xa nhất đến mới nhất)"""
+    """Lấy danh sách các ca LỖI thuộc quản lý của khoa (chỉ đọc, sắp xếp ngày ra viện xa nhất đến mới nhất)"""
     if not user.department_name:
         return []
         
@@ -856,8 +1013,28 @@ def get_department_records(
         Record.type_group == "LOI"
     )
     
-    if status != "ALL":
+    if status == "PENDING":
+        query = query.filter(Record.status.in_(["PENDING", "WAITING_RESEND"]))
+    elif status == "RESOLVED":
+        query = query.filter(Record.status == "RESOLVED")
+    elif status != "ALL":
         query = query.filter(Record.status == status)
+
+    # Lọc theo tháng nếu có (format YYYY-MM)
+    if month:
+        try:
+            year, mon = map(int, month.split("-"))
+            month_start = datetime.date(year, mon, 1)
+            if mon == 12:
+                month_end = datetime.date(year + 1, 1, 1)
+            else:
+                month_end = datetime.date(year, mon + 1, 1)
+            query = query.filter(
+                Record.ngay_ra_vien >= month_start,
+                Record.ngay_ra_vien < month_end
+            )
+        except (ValueError, TypeError):
+            pass
         
     records = query.order_by(Record.status.asc(), Record.ngay_ra_vien.asc()).all()
     
@@ -880,45 +1057,137 @@ def get_department_records(
     return records
 
 
-@app.post("/api/records/{record_id}/flag")
-def flag_record_for_review(
-    record_id: int,
-    data: dict,
+@app.get("/api/records/dept/stats")
+def get_department_stats(
+    month: Optional[str] = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Khoa lâm sàng điền giải trình/ghi chú sửa lỗi và đổi cờ trạng thái
-    sang WAITING_REVIEW (Chờ kiểm tra) để gửi báo cáo lên phòng IT.
-    """
-    record = db.query(Record).filter(Record.id == record_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Hồ sơ ca bệnh không tồn tại.")
-        
-    # Chỉ cho phép khoa sở quản cập nhật thông tin
-    if record.ten_khoa != user.department_name:
-        raise HTTPException(status_code=403, detail="Hồ sơ này không thuộc quyền quản lý của khoa phòng bạn.")
+    """Thống kê theo tháng cho khoa lâm sàng: tổng lỗi, đã xử lý, chưa xử lý, quá 7 ngày, số lần đối soát"""
+    if not user.department_name:
+        return {"month": month or "", "total_loi": 0, "resolved": 0, "pending": 0, "overdue_7_days": 0, "sync_count": 0}
 
-    if record.status == "RESOLVED":
-        raise HTTPException(status_code=400, detail="Ca này phòng IT đã duyệt hoàn tất, không thể chỉnh sửa.")
-    if record.status == "WAITING_RESEND":
-        raise HTTPException(status_code=400, detail="Ca này đang chờ hệ thống gửi XML lại, không thể gửi duyệt thêm.")
+    # Parse tháng, mặc định tháng hiện tại
+    today = datetime.date.today()
+    if month:
+        try:
+            year, mon = map(int, month.split("-"))
+        except (ValueError, TypeError):
+            year, mon = today.year, today.month
+    else:
+        year, mon = today.year, today.month
+        month = f"{year:04d}-{mon:02d}"
 
-    note = data.get("note", "").strip()
-    record.note = note
-    record.status = "WAITING_REVIEW"
-    
-    # Ghi log lịch sử thay đổi
-    log = RecordLog(
-        record_id=record.id,
-        username=user.username,
-        action="CHANGE_STATUS",
-        note=f"Khoa gửi yêu cầu kiểm tra. Ghi chú: {note}"
+    month_start = datetime.date(year, mon, 1)
+    if mon == 12:
+        month_end = datetime.date(year + 1, 1, 1)
+    else:
+        month_end = datetime.date(year, mon + 1, 1)
+
+    base_query = db.query(Record).filter(
+        Record.ten_khoa == user.department_name,
+        Record.type_group == "LOI",
+        Record.ngay_ra_vien >= month_start,
+        Record.ngay_ra_vien < month_end
     )
-    db.add(log)
-    db.commit()
-    
-    return {"status": "success"}
+
+    all_records = base_query.all()
+    total_loi = len(all_records)
+    resolved = sum(1 for r in all_records if r.status == "RESOLVED")
+    pending = total_loi - resolved
+
+    # Đếm quá 7 ngày: chỉ tính ca chưa RESOLVED
+    overdue_threshold = today - datetime.timedelta(days=7)
+    overdue_7_days = sum(
+        1 for r in all_records
+        if r.status != "RESOLVED" and r.ngay_ra_vien and r.ngay_ra_vien <= overdue_threshold
+    )
+
+    # Đếm số lần đối soát có tạo record LOI thuộc khoa trong tháng
+    sync_dates = db.query(Record.ngay_doi_soat).filter(
+        Record.ten_khoa == user.department_name,
+        Record.type_group == "LOI",
+        Record.ngay_doi_soat >= month_start,
+        Record.ngay_doi_soat < month_end
+    ).distinct().all()
+    sync_count = len(sync_dates)
+
+    return {
+        "month": month,
+        "total_loi": total_loi,
+        "resolved": resolved,
+        "pending": pending,
+        "overdue_7_days": overdue_7_days,
+        "sync_count": sync_count
+    }
+
+
+@app.get("/api/export/dept/loi")
+def export_department_loi(
+    month: Optional[str] = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Xuất file Excel danh sách lỗi BHYT của khoa theo tháng"""
+    if not user.department_name:
+        raise HTTPException(status_code=400, detail="Tài khoản chưa được gán khoa phòng.")
+
+    today = datetime.date.today()
+    if month:
+        try:
+            year, mon = map(int, month.split("-"))
+        except (ValueError, TypeError):
+            year, mon = today.year, today.month
+    else:
+        year, mon = today.year, today.month
+
+    month_start = datetime.date(year, mon, 1)
+    if mon == 12:
+        month_end = datetime.date(year + 1, 1, 1)
+    else:
+        month_end = datetime.date(year, mon + 1, 1)
+
+    records = db.query(Record).filter(
+        Record.ten_khoa == user.department_name,
+        Record.type_group == "LOI",
+        Record.ngay_ra_vien >= month_start,
+        Record.ngay_ra_vien < month_end
+    ).order_by(Record.ngay_ra_vien.asc()).all()
+
+    data = []
+    for r in records:
+        status_text = "Đã xử lý" if r.status == "RESOLVED" else "Chưa xử lý"
+        days_overdue = ""
+        if r.ngay_ra_vien and r.status != "RESOLVED":
+            diff = (today - r.ngay_ra_vien).days
+            if diff >= 7:
+                days_overdue = f"Quá {diff} ngày"
+            elif diff >= 5:
+                days_overdue = f"Cảnh báo {diff} ngày"
+
+        data.append({
+            "MA_LK": r.ma_lk,
+            "Họ tên": r.ho_ten,
+            "Mã thẻ BHYT": r.ma_the,
+            "Ngày ra viện": r.ngay_ra_vien,
+            "Loại ca": resolve_loai_ca(r),
+            "Mã lỗi": r.maloi,
+            "Mô tả lỗi": r.motaloi,
+            "Trạng thái": status_text,
+            "Cảnh báo": days_overdue,
+            "Ghi chú": r.note or ""
+        })
+
+    df = pd.DataFrame(data)
+    dept_safe = user.department_name.replace(" ", "_").replace("/", "_")
+    filename = f"LOI_BHYT_{dept_safe}_{year}{mon:02d}.xlsx"
+    out_path = os.path.join(UPLOAD_DIR, filename)
+    df.to_excel(out_path, index=False)
+    return FileResponse(
+        out_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=filename
+    )
 
 
 # ==========================================
@@ -1051,35 +1320,6 @@ def get_admin_fail_records(
     return records
 
 
-@app.get("/api/records/admin/review")
-def get_admin_review_records(
-    user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """Lấy danh sách hồ sơ lỗi do các Khoa lâm sàng gửi yêu cầu duyệt kiểm tra"""
-    records = db.query(Record).filter(
-        Record.status == "WAITING_REVIEW"
-    ).order_by(Record.updated_at.desc()).all()
-    
-    # Làm giàu dữ liệu hướng dẫn sửa lỗi từ danh mục
-    from models import ErrorDefinition
-    defs = db.query(ErrorDefinition).all()
-    
-    for r in records:
-        r.root_cause = "Chưa rõ nguyên nhân (Hệ thống tự động quét)"
-        r.resolution = "Chờ phòng IT bổ sung hướng dẫn chi tiết"
-        r.requires_his_reset = False
-        
-        for d in defs:
-            if d.error_code == r.maloi:
-                if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
-                    r.root_cause = d.root_cause
-                    r.resolution = d.resolution
-                    r.requires_his_reset = d.requires_his_reset
-                    break
-    return records
-
-
 @app.post("/api/records/{record_id}/admin-resolve")
 def resolve_fail_record(
     record_id: int,
@@ -1106,38 +1346,6 @@ def resolve_fail_record(
     db.add(log)
     db.commit()
     return {"status": "success"}
-
-
-@app.post("/api/records/{record_id}/approve")
-def approve_and_reset_sql(
-    record_id: int,
-    user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """IT duyệt hồ sơ lỗi khoa gửi lên: sinh SQL reset và chuyển sang trạng thái chờ gửi lại."""
-    record = db.query(Record).filter(Record.id == record_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Hồ sơ không tồn tại.")
-
-    try:
-        # Sinh câu lệnh SQL Reset hành chính (Export=0)
-        sql_command = his_service.build_reset_sql([record.ma_lk], resolve_loai_ca(record))
-
-        # Chưa đánh dấu RESOLVED tại thời điểm sinh SQL reset.
-        # RESOLVED chỉ nên xảy ra khi lần đối soát sau thấy MA_LK đã có trong listbh.
-        record.status = "WAITING_RESEND"
-        log = RecordLog(
-            record_id=record.id,
-            username=user.username,
-            action="CHANGE_STATUS",
-            note=f"IT duyệt giải trình và lấy SQL Reset. Chờ hệ thống gửi XML bên ngoài gửi lại."
-        )
-        db.add(log)
-        db.commit()
-
-        return {"success": True, "sql_command": sql_command, "rowcount": 1}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi sinh câu lệnh SQL reset: {str(e)}")
 
 
 @app.post("/api/records/admin/fail/reset")
@@ -1268,7 +1476,7 @@ def get_department_breakdown(
         dept_map[dept]["total"] += 1
         if r.status == "PENDING":
             dept_map[dept]["pending"] += 1
-        elif r.status == "WAITING_REVIEW":
+        elif r.status in {"WAITING_REVIEW", "WAITING_RESEND"}:
             dept_map[dept]["waiting"] += 1
             
     return list(dept_map.values())
