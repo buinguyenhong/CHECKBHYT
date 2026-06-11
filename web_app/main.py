@@ -689,7 +689,7 @@ def preview_department_unlock(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Xem trước danh sách ca LOI cần trả hồ sơ về khoa (dựa trên ErrorDefinition.requires_his_reset)"""
+    """Xem trước danh sách ca LOI của khoa và cờ requires_his_reset"""
     from models import ErrorDefinition
     reset_defs = db.query(ErrorDefinition).filter(
         ErrorDefinition.requires_his_reset == True
@@ -703,27 +703,31 @@ def preview_department_unlock(
 
     matched = []
     for r in dept_records:
+        requires_reset = False
         for d in reset_defs:
             if d.error_code == r.maloi:
                 if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
-                    matched.append({
-                        "id": r.id,
-                        "ma_lk": r.ma_lk,
-                        "ho_ten": r.ho_ten,
-                        "ma_the": r.ma_the,
-                        "maloi": r.maloi,
-                        "motaloi": r.motaloi,
-                        "loai_ca": resolve_loai_ca(r),
-                        "ngay_ra_vien": r.ngay_ra_vien.isoformat() if r.ngay_ra_vien else "",
-                        "his_unlock_status": r.his_unlock_status or "NORMAL"
-                    })
+                    requires_reset = True
                     break
+        matched.append({
+            "id": r.id,
+            "ma_lk": r.ma_lk,
+            "ho_ten": r.ho_ten,
+            "ma_the": r.ma_the,
+            "maloi": r.maloi,
+            "motaloi": r.motaloi,
+            "loai_ca": resolve_loai_ca(r),
+            "ngay_ra_vien": r.ngay_ra_vien.isoformat() if r.ngay_ra_vien else "",
+            "his_unlock_status": r.his_unlock_status or "NORMAL",
+            "requires_his_reset": requires_reset
+        })
+
+    noi_tru_reset = len([m for m in matched if m["loai_ca"] == "Nội trú" and m["requires_his_reset"]])
 
     return {
         "department_name": department_name,
         "total": len(matched),
-        "noi_tru": len([m for m in matched if m["loai_ca"] == "Nội trú"]),
-        "ngoai_tru": len([m for m in matched if m["loai_ca"] != "Nội trú"]),
+        "noi_tru_reset": noi_tru_reset,
         "records": matched
     }
 
@@ -1406,37 +1410,30 @@ def get_global_kpis(
 ):
     """Lấy số liệu KPI tổng quan cho Dashboard"""
     cfg = db.query(AppConfig).first()
+    tong_sql = 0
+    tong_bh = 0
+    da_gui = 0
+    
     if cfg and getattr(cfg, "last_sync_date", None):
-        return {
-            "tong_sql": getattr(cfg, "last_tong_sql", 0) or 0,
-            "tong_bh": getattr(cfg, "last_tong_bh", 0) or 0,
-            "da_gui": getattr(cfg, "last_da_gui", 0) or 0,
-            "loi": getattr(cfg, "last_loi", 0) or 0,
-            "fail": getattr(cfg, "last_fail", 0) or 0,
-            "resolved": getattr(cfg, "last_resolved", 0) or 0
-        }
-    
-    # Lấy đối soát của ngày gần nhất có dữ liệu
-    last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
-    if not last_record:
-        return {"tong_sql": 0, "tong_bh": 0, "da_gui": 0, "loi": 0, "fail": 0, "resolved": 0}
-        
-    target_date = last_record.ngay_doi_soat
+        tong_sql = getattr(cfg, "last_tong_sql", 0) or 0
+        tong_bh = getattr(cfg, "last_tong_bh", 0) or 0
+        da_gui = getattr(cfg, "last_da_gui", 0) or 0
+    else:
+        last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
+        if last_record:
+            target_date = last_record.ngay_doi_soat
+            base_query = db.query(Record).filter(Record.ngay_doi_soat == target_date)
+            tong_sql = base_query.count()
+            da_gui = base_query.filter(Record.status == "RESOLVED", Record.type_group != "LOI").count()
 
-    base_query = db.query(Record).filter(Record.ngay_doi_soat == target_date)
-    
-    tong_sql = base_query.count()
-    da_gui = base_query.filter(Record.status == "RESOLVED", Record.type_group != "LOI").count()
-    loi = base_query.filter(Record.type_group == "LOI", Record.status != "RESOLVED").count()
-    fail = base_query.filter(
-        Record.type_group == "FAIL",
-        Record.status != "RESOLVED"
-    ).count()
-    resolved = base_query.filter(Record.status == "RESOLVED").count()
+    # Dynamic active counts representing the actual current state of the database
+    loi = db.query(Record).filter(Record.type_group == "LOI", Record.status != "RESOLVED").count()
+    fail = db.query(Record).filter(Record.type_group == "FAIL", Record.status != "RESOLVED").count()
+    resolved = db.query(Record).filter(Record.status == "RESOLVED").count()
 
     return {
         "tong_sql": tong_sql,
-        "tong_bh": 0,
+        "tong_bh": tong_bh,
         "da_gui": da_gui,
         "loi": loi,
         "fail": fail,
@@ -1460,10 +1457,10 @@ def get_department_breakdown(
         
     target_date = last_record.ngay_doi_soat
     
-    # Query tất cả các records lỗi trong ngày đối soát gần nhất
+    # Query tất cả các records lỗi chưa giải quyết trong hệ thống
     err_records = db.query(Record).filter(
-        Record.ngay_doi_soat == target_date,
-        Record.type_group == "LOI"
+        Record.type_group == "LOI",
+        Record.status != "RESOLVED"
     ).all()
     
     # Tổng hợp bằng Python dict
@@ -1561,13 +1558,9 @@ def export_loi_list(
     db: Session = Depends(get_db)
 ):
     """Xuất file Excel danh sách các ca bị LỖI kèm thông tin bệnh án"""
-    last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
-    if not last_record:
-        raise HTTPException(status_code=400, detail="Không có dữ liệu đối soát để xuất.")
-        
     records = db.query(Record).filter(
-        Record.ngay_doi_soat == last_record.ngay_doi_soat,
-        Record.type_group == "LOI"
+        Record.type_group == "LOI",
+        Record.status != "RESOLVED"
     ).all()
     
     data = []

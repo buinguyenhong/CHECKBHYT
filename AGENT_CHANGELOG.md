@@ -55,6 +55,29 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-11 - Antigravity (Sửa lỗi: Thống kê và Hiển thị danh sách Lỗi trên Admin)
+
+### Mục tiêu
+- Sửa lỗi các khoa có danh sách lỗi nhưng giao diện admin hiển thị số ca lỗi bằng 0 (danh sách lỗi trống) và không thể xem/tải danh sách lỗi khi chạy đối soát không kèm file HoSoLoiChiTiet.
+- Sửa lỗi preview trả hồ sơ khoa trống khi các ca lỗi chưa được định nghĩa requires_his_reset=True.
+
+### Thay đổi
+- `web_app/main.py`:
+  - **KPIs động**: Cập nhật `get_global_kpis` tính trực tiếp số ca lỗi (`type_group="LOI"`) và ca FAIL (`type_group="FAIL"`) chưa xử lý từ DB, thay vì lấy thống kê của riêng lần đối soát cuối.
+  - **Báo cáo động**: Cập nhật `get_department_breakdown` đếm tất cả ca lỗi đang hoạt động thay vì lọc theo `ngay_doi_soat` của lần đối soát cuối.
+  - **Xuất Excel động**: Cập nhật `export_loi_list` xuất toàn bộ ca lỗi chưa giải quyết (`status != "RESOLVED"`) trong DB.
+  - **Xem trước đầy đủ**: Cập nhật `preview_department_unlock` trả về toàn bộ ca LOI chưa giải quyết của khoa kèm cờ `requires_his_reset` thay vì lọc cứng bỏ qua ca không cần mở khóa.
+- `web_app/templates/admin.html`:
+  - Cập nhật JS `previewDeptUnlock` hiển thị toàn bộ ca lỗi của khoa, phân biệt ca cần mở khóa HIS với ca "Khoa tự sửa" (hiển thị badge trực quan), cập nhật cách tính số lượng nội trú/ngoại trú trên summary.
+
+### Nghiệp vụ ảnh hưởng
+- Admin luôn nhìn thấy chính xác tổng số lỗi đang tồn đọng trên Dashboard và báo cáo chi tiết khoa phòng.
+- File export `DANH_SACH_KEM_LOI.xlsx` chứa đầy đủ các ca lỗi chưa giải quyết thay vì bị trống khi lần đối soát cuối không nạp file lỗi.
+- IT có thể kiểm tra toàn bộ danh sách lỗi của khoa phòng tại tab "Trả hồ sơ khoa" và biết rõ ca nào tự sửa, ca nào cần IT can thiệp chạy SQL.
+
+### Kiểm tra
+- Chạy `py_compile` thành công cho `main.py`.
+
 ## 2026-06-10 - Antigravity (Bổ sung: Trả hồ sơ khoa hàng loạt)
 
 ### Mục tiêu

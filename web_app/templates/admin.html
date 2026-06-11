@@ -2156,24 +2156,28 @@
             // Summary
             document.getElementById('unlockPreviewSummary').style.display = 'block';
             document.getElementById('prevTotal').innerText = data.total;
-            document.getElementById('prevNoiTru').innerText = data.noi_tru;
-            document.getElementById('prevNgoaiTru').innerText = data.ngoai_tru;
+            document.getElementById('prevNoiTru').innerText = data.noi_tru_reset;
+            document.getElementById('prevNgoaiTru').innerText = data.total - data.noi_tru_reset;
 
             // Table
             const tbody = document.getElementById('unlockPreviewBody');
             tbody.innerHTML = '';
             if (data.records.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-secondary); padding:30px;">Không có ca nào cần trả hồ sơ về khoa (theo danh mục Hướng dẫn Lỗi).</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-secondary); padding:30px;">Không có ca lỗi nào thuộc khoa này.</td></tr>`;
                 return;
             }
 
             data.records.forEach((r, idx) => {
                 const tr = document.createElement('tr');
                 let hisBadge = '';
-                if (r.his_unlock_status === 'UNLOCKED') {
-                    hisBadge = '<span class="badge badge-waiting">ĐANG MỞ KHÓA</span>';
+                if (r.requires_his_reset) {
+                    if (r.his_unlock_status === 'UNLOCKED') {
+                        hisBadge = '<span class="badge badge-waiting">ĐANG MỞ KHÓA</span>';
+                    } else {
+                        hisBadge = '<span class="badge badge-pending">BÌNH THƯỜNG</span>';
+                    }
                 } else {
-                    hisBadge = '<span class="badge badge-pending">BÌNH THƯỜNG</span>';
+                    hisBadge = '<span class="badge badge-resolved" style="background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.15); color:#34d399;">Khoa tự sửa</span>';
                 }
                 tr.innerHTML = `
                     <td style="font-weight:700; color:var(--text-secondary);">${idx + 1}</td>
