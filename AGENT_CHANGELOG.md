@@ -55,6 +55,18 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-15 - Antigravity (Sửa lỗi: Loại bỏ lỗi đã xử lý khỏi các file xuất Excel)
+
+### Mục tiêu
+- Sửa lỗi xuất danh sách kèm lỗi xuất cả các ca đã xử lý rồi (RESOLVED).
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật API `export_department_loi` (`GET /api/export/dept/loi`) lọc bỏ các ca lỗi đã xử lý (`status != "RESOLVED"`), giúp file xuất ra cho khoa chỉ hiển thị các ca lỗi thực sự chưa được khắc phục.
+
+### Nghiệp vụ ảnh hưởng
+- File Excel xuất danh sách lỗi của khoa phòng (`LOI_BHYT_*.xlsx`) chỉ chứa các ca lỗi đang cần xử lý, không bị lẫn các ca đã xử lý thành công.
+
 ## 2026-06-11 - Antigravity (Sửa lỗi: Thống kê và Hiển thị danh sách Lỗi trên Admin)
 
 ### Mục tiêu

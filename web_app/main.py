@@ -1154,6 +1154,7 @@ def export_department_loi(
     records = db.query(Record).filter(
         Record.ten_khoa == user.department_name,
         Record.type_group == "LOI",
+        Record.status != "RESOLVED",
         Record.ngay_ra_vien >= month_start,
         Record.ngay_ra_vien < month_end
     ).order_by(Record.ngay_ra_vien.asc()).all()
