@@ -1120,6 +1120,7 @@
                 <div style="display:flex; gap:10px;">
                     <button class="btn btn-success" onclick="resetSelectedFail('Ngoại trú')">Chạy Reset Ngoại trú</button>
                     <button class="btn btn-success" onclick="resetSelectedFail('Nội trú')">Chạy Reset Nội trú</button>
+                    <button class="btn btn-danger" onclick="exportFailData()">Xuất Excel ca FAIL</button>
                 </div>
             </div>
             <div class="table-responsive">
@@ -1398,9 +1399,10 @@
             <label>Nội dung ghi chú xử lý của IT</label>
             <textarea class="form-control" style="min-height:100px; resize:vertical;" id="adminNoteText" placeholder="Nhập ghi chú..."></textarea>
         </div>
-        <div style="display:flex; justify-content:flex-end; gap:10px;">
-            <button class="btn" onclick="closeAdminModal()">Hủy</button>
-            <button class="btn btn-primary" id="btnAdminSaveNote">Lưu & Đánh dấu xử lý</button>
+        <div style="display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="closeAdminModal()">Hủy</button>
+            <button class="btn btn-primary" id="btnAdminSaveNoteOnly" style="background-color: #3b82f6; border-color: #3b82f6;">Lưu Ghi Chú (Vẫn hiển thị)</button>
+            <button class="btn btn-success" id="btnAdminResolve" style="background-color: #10b981; border-color: #10b981;">Duyệt & Hoàn Tất (Không hiển thị lại)</button>
         </div>
     </div>
 </div>
@@ -2271,7 +2273,7 @@
         selectedRecordId = null;
     }
 
-    document.getElementById('btnAdminSaveNote').onclick = async () => {
+    async function saveAdminNote(action) {
         if (!selectedRecordId) return;
         const note = adminTextarea.value.trim();
 
@@ -2279,7 +2281,7 @@
             const res = await fetch(`/api/records/${selectedRecordId}/admin-resolve`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({note: note})
+                body: JSON.stringify({note: note, action: action})
             });
 
             if (res.ok) {
@@ -2292,7 +2294,10 @@
         } catch {
             alert("Lỗi kết nối LAN.");
         }
-    };
+    }
+
+    document.getElementById('btnAdminSaveNoteOnly').onclick = () => saveAdminNote('edit');
+    document.getElementById('btnAdminResolve').onclick = () => saveAdminNote('resolve');
 
     // Bulk Reset from Fail List
     async function resetSelectedFail(loai) {
@@ -2482,7 +2487,15 @@
     }
 
     function exportFailData() {
-        const url = `/api/export/fail`;
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+        let url = `/api/export/fail`;
+        const params = [];
+        if (fromDate) params.push(`from_date=${fromDate}`);
+        if (toDate) params.push(`to_date=${toDate}`);
+        if (params.length > 0) {
+            url += `?` + params.join('&');
+        }
         window.open(url, '_blank');
     }
 

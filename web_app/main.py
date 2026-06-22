@@ -1338,15 +1338,23 @@ def resolve_fail_record(
         raise HTTPException(status_code=404, detail="Hồ sơ không tồn tại.")
 
     note = data.get("note", "").strip()
+    action = data.get("action", "resolve").strip()
+
     record.note = note
-    record.status = "RESOLVED"
+    if action == "edit":
+        log_msg = f"IT cập nhật ghi chú. Nội dung: {note}"
+        log_action = "EDIT_NOTE"
+    else:
+        record.status = "RESOLVED"
+        log_msg = f"IT xác nhận xử lý thành công. Ghi chú: {note}"
+        log_action = "CHANGE_STATUS"
 
     # Ghi log
     log = RecordLog(
         record_id=record.id,
         username=user.username,
-        action="CHANGE_STATUS",
-        note=f"IT xác nhận xử lý thành công. Ghi chú: {note}"
+        action=log_action,
+        note=log_msg
     )
     db.add(log)
     db.commit()
@@ -1515,14 +1523,16 @@ def export_sql_list(
 def export_fail_list(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
+    include_resolved: bool = True,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Xuất file Excel danh sách các ca bị FAIL"""
+    """Xuất file Excel danh sách các ca bị FAIL kèm ghi chú và trạng thái"""
     query = db.query(Record).filter(
-        Record.type_group == "FAIL",
-        Record.status != "RESOLVED"
+        Record.type_group == "FAIL"
     )
+    if not include_resolved:
+        query = query.filter(Record.status != "RESOLVED")
     
     if from_date or to_date:
         fd = normalize_date_to_iso(from_date)
@@ -1532,10 +1542,11 @@ def export_fail_list(
         if td:
             query = query.filter(Record.ngay_ra_vien <= td)
 
-    records = query.all()
+    records = query.order_by(Record.ngay_ra_vien.asc()).all()
     
     data = []
     for r in records:
+        status_text = "Đã duyệt" if r.status == "RESOLVED" else ("Chờ gửi lại" if r.status == "WAITING_RESEND" else "Chưa xử lý (PENDING)")
         data.append({
             "Loại ca": resolve_loai_ca(r),
             "MA_LK": r.ma_lk,
@@ -1544,7 +1555,8 @@ def export_fail_list(
             "Tên khoa": r.ten_khoa,
             "Mã y tế": r.ma_y_te,
             "Ngày ra viện": r.ngay_ra_vien,
-            "Ghi chú IT": r.note
+            "Trạng thái": status_text,
+            "Ghi chú IT": r.note or ""
         })
         
     df = pd.DataFrame(data)
