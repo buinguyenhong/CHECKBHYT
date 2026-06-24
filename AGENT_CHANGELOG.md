@@ -55,6 +55,24 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-22 - buinguyenhong (Tính năng: Tách biệt sửa/duyệt ca FAIL và nâng cấp xuất Excel ca FAIL)
+
+### Mục tiêu
+- Hỗ trợ IT cập nhật ghi chú cho ca FAIL mà không cần đánh dấu hoàn tất (RESOLVED) ngay lập tức.
+- Nâng cấp chức năng xuất Excel ca FAIL để hỗ trợ bộ lọc khoảng ngày ra viện, hiển thị rõ ràng trạng thái và ghi chú xử lý.
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật API `resolve_fail_record` (`POST /api/records/{record_id}/admin-resolve`) hỗ trợ tham số `action`. Nếu `action == "edit"`, hệ thống chỉ cập nhật ghi chú (chuyển log `EDIT_NOTE`), không chuyển trạng thái sang `RESOLVED`.
+  - Cập nhật API `export_fail_list` (`GET /api/export/fail`) hỗ trợ tham số `include_resolved` (mặc định `True`), sắp xếp theo ngày ra viện tăng dần, xuất thêm cột "Trạng thái" (được Việt hóa trực quan) và ghi chú xử lý của IT.
+- `web_app/templates/admin.html`:
+  - Trong Modal Sửa/Duyệt ca FAIL: Tách nút "Lưu & Đánh dấu xử lý" thành 2 nút riêng biệt là "Lưu Ghi Chú (Vẫn hiển thị)" và "Duyệt & Hoàn Tất (Không hiển thị lại)".
+  - Trong danh sách ca FAIL (Tab 3): Thêm nút "Xuất Excel ca FAIL" liên kết với chức năng lọc theo khoảng ngày ra viện (`from_date` và `to_date`).
+
+### Nghiệp vụ ảnh hưởng
+- IT có thể tạm lưu thông tin xử lý/ghi chú cho các ca FAIL chưa hoàn tất mà không sợ ca đó bị biến mất khỏi danh sách chờ xử lý.
+- Dễ dàng xuất báo cáo Excel cho riêng danh sách ca FAIL có bộ lọc thời gian và thông tin chi tiết về trạng thái/ghi chú xử lý để báo cáo lãnh đạo hoặc các khoa phòng.
+
 ## 2026-06-15 - Antigravity (Sửa lỗi: Loại bỏ lỗi đã xử lý khỏi các file xuất Excel)
 
 ### Mục tiêu

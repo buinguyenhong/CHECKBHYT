@@ -418,13 +418,13 @@ Danh sách FAIL:
 - Câu SQL trả về để IT copy chạy ngoài SSMS.
 - Chỉ khi lần đối soát sau thấy `MA_LK` xuất hiện trong `listbh`, hệ thống mới tự chuyển sang `RESOLVED`.
 
-Danh sách chờ duyệt từ khoa:
+Trả hồ sơ về khoa (mở khóa/khóa lại bệnh án hàng loạt):
 
-- `GET /api/records/admin/review`
-- IT xem các ca `WAITING_REVIEW`.
-- Có thể `Duyệt & Reset` qua `POST /api/records/{record_id}/approve`.
-- Code hiện chuyển record sang `WAITING_RESEND` và trả về SQL reset để IT copy chạy SSMS.
-- Khi lần đối soát sau thấy `MA_LK` xuất hiện trong `listbh`, hệ thống tự chuyển record sang `RESOLVED`.
+- `GET /api/admin/dept-unlock-preview?department_name=...`
+- IT xem trước các ca lỗi (`LOI`) của khoa kèm cờ `requires_his_reset` (xác định ca nào cần can thiệp mở khóa HIS, ca nào khoa tự sửa được).
+- `POST /api/admin/bulk-unlock`
+- IT chọn khoa và loại thao tác (`UNLOCK` hoặc `CLOSE`).
+- Hệ thống sinh SQL cập nhật trạng thái bệnh án nội trú (`BenhAn.TrangThai = 'DaXuatVien'` khi mở khóa hoặc `DaThanhToan` khi khóa lại) và đổi trạng thái hồ sơ thành `UNLOCKED` hoặc `NORMAL`. IT copy script chạy trên SSMS.
 
 Mở khóa/trả khoa:
 
@@ -436,7 +436,9 @@ Mở khóa/trả khoa:
 Đánh dấu xử lý thủ công:
 
 - `POST /api/records/{record_id}/admin-resolve`
-- IT nhập ghi chú và đổi record sang `RESOLVED`.
+- IT có hai tùy chọn qua tham số `action`:
+  - `edit`: Chỉ lưu ghi chú xử lý của IT (giữ nguyên trạng thái hồ sơ).
+  - `resolve` (mặc định): Lưu ghi chú và đổi trạng thái hồ sơ sang `RESOLVED`.
 
 ### 8.9. Scheduler tự đồng bộ
 
@@ -449,13 +451,12 @@ Khi app startup, scheduler chạy nền:
 
 ### 8.10. Xuất báo cáo
 
-Admin có thể export:
+Hệ thống hỗ trợ các loại export Excel:
 
-- `GET /api/export/sql_list`
-- `GET /api/export/fail`
-- `GET /api/export/loi`
-
-Các export hiện lấy ngày đối soát gần nhất có dữ liệu trong SQLite.
+- `GET /api/export/sql_list`: Xuất toàn bộ danh sách nạp từ HIS SQL ở ngày đối soát gần nhất.
+- `GET /api/export/fail`: Xuất danh sách ca FAIL chưa giải quyết (hỗ trợ các tham số `from_date`, `to_date` để lọc theo ngày ra viện và cờ `include_resolved` để quyết định có xuất ca đã duyệt hay không).
+- `GET /api/export/loi`: Xuất danh sách tất cả các ca lỗi (`LOI`) chưa giải quyết trong hệ thống.
+- `GET /api/export/dept/loi`: Khoa lâm sàng xuất danh sách lỗi chưa giải quyết của riêng khoa mình theo tháng.
 
 ## 9. Quy trình nghiệp vụ chuẩn đề xuất khi vận hành hằng ngày
 
@@ -969,18 +970,19 @@ Upload/đối soát:
 Khoa:
 
 - `GET /api/records/dept`
-- `POST /api/records/{record_id}/flag`
+- `GET /api/records/dept/stats`
+- `GET /api/export/dept/loi`
 
 Admin xử lý:
 
 - `GET /api/records/admin/fail`
-- `GET /api/records/admin/review`
 - `POST /api/records/{record_id}/admin-resolve`
-- `POST /api/records/{record_id}/approve`
 - `POST /api/records/admin/fail/reset`
 - `POST /api/records/{id}/toggle-his-unlock`
+- `GET /api/admin/dept-unlock-preview`
+- `POST /api/admin/bulk-unlock`
 
-Báo cáo:
+Báo cáo & Xuất file:
 
 - `GET /api/records/kpi`
 - `GET /api/reports/departments`
