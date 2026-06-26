@@ -215,6 +215,17 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
 # 1. Khởi tạo cơ sở dữ liệu SQLite
 Base.metadata.create_all(bind=engine)
 
+# Tự động dọn dẹp các bản ghi trùng lặp trong DB khi khởi chạy WebApp
+try:
+    from services.compare_service import deduplicate_database_records
+    db_clean = SessionLocal()
+    try:
+        deduplicate_database_records(db_clean)
+    finally:
+        db_clean.close()
+except Exception as startup_dedup_err:
+    print(f"[STARTUP] Loi khi tu dong don dep trung lap du lieu cu: {startup_dedup_err}")
+
 # Tự động đồng bộ các cột mới trong app_config nếu đã tồn tại CSDL cũ
 from sqlalchemy import text
 try:

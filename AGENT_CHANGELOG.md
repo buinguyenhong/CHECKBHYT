@@ -55,6 +55,31 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-26 - Antigravity (Sửa lỗi: Loại bỏ lỗi trùng lặp khi đối soát BHYT)
+
+### Mục tiêu
+- Khắc phục tình trạng các lỗi trùng lặp (cùng mã liên kết, mã lỗi, mô tả lỗi) xuất hiện nhiều lần hoặc bị nhân đôi trong cơ sở dữ liệu và hiển thị trên giao diện do sự khác biệt nhỏ về khoảng trắng, xuống dòng, chữ hoa/chữ thường trong file Excel đầu vào và cách so khớp chính xác trong SQLite.
+
+### Thay đổi
+- `web_app/services/compare_service.py`:
+  - Thêm hàm `deduplicate_database_records(db: Session)` để tự động quét, nhóm và loại bỏ các bản ghi lỗi trùng lặp trong cơ sở dữ liệu (ưu tiên giữ lại bản ghi có trạng thái `PENDING` hoặc có ngày cập nhật mới nhất, đồng thời chuyển ghi chú cũ sang bản ghi được giữ lại).
+  - Chuẩn hóa mã liên kết `ma_lk` (bằng cách chuyển thành chữ in hoa và rút gọn qua `chuan_hoa_ma_lk`) trên toàn bộ các nguồn dữ liệu đối soát.
+  - Chuẩn hóa mã lỗi `maloi` (chữ in hoa) và mô tả lỗi `motaloi` (dọn dẹp khoảng trắng thừa, tab, xuống dòng qua hàm `clean_error_desc`).
+  - Lọc trùng ngay từ danh sách lỗi của cùng một hồ sơ từ file Excel đầu vào (`error_map`).
+  - Thay đổi logic đối soát lỗi chi tiết: Tải toàn bộ bản ghi lỗi `LOI` hiện có của bệnh nhân lên bộ nhớ và thực hiện so khớp mềm dẻo (không phân biệt chữ hoa/thường và khoảng trắng thừa) để cập nhật thay vì tạo bản ghi mới trùng lặp.
+  - Gọi hàm `deduplicate_database_records(db)` ở đầu tiến trình đối soát `process_comparison`.
+- `web_app/main.py`:
+  - Tự động gọi `deduplicate_database_records(db)` khi ứng dụng khởi chạy (`Base.metadata.create_all`) để làm sạch toàn bộ dữ liệu trùng lặp lịch sử trong SQLite.
+
+### Nghiệp vụ ảnh hưởng
+- Không còn tình trạng một ca bệnh hiển thị nhiều lỗi giống hệt nhau trên màn hình của khoa và quản trị admin.
+- Cơ sở dữ liệu SQLite được làm sạch và lưu trữ chuẩn hóa hơn.
+- Logic đồng bộ chạy ổn định và chính xác kể cả khi file Excel báo lỗi chứa dòng trùng lặp hoặc viết hoa/thường khác biệt.
+
+### Kiểm tra
+- Viết script test trong `scratch/test_deduplication.py` tạo cơ sở dữ liệu mẫu chứa các bản ghi lỗi trùng lặp khác nhau về khoảng trắng, xuống dòng, chữ hoa thường và trạng thái. Chạy thành công xác nhận các bản ghi trùng bị xóa hoàn toàn, bản ghi giữ lại được chuyển đổi trạng thái chính xác và thông tin ghi chú được bảo toàn.
+- Chạy biên dịch kiểm tra lỗi cú pháp (compile check) thành công.
+
 ## 2026-06-22 - buinguyenhong (Tính năng: Tách biệt sửa/duyệt ca FAIL và nâng cấp xuất Excel ca FAIL)
 
 ### Mục tiêu

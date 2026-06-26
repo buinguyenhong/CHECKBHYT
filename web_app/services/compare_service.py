@@ -1,8 +1,72 @@
 import pandas as pd
 import datetime
+import re
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from models import Record, RecordLog
 from services.his_service import chuan_hoa_ma_lk
+
+def clean_error_desc(text: str) -> str:
+    """Chuẩn hóa chuỗi mô tả lỗi: xóa khoảng trắng thừa, newline, tab và chuyển thành chuỗi sạch."""
+    if not text:
+        return ""
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
+def deduplicate_database_records(db: Session):
+    """
+    Quét và loại bỏ các bản ghi trùng lặp (trùng ma_lk, maloi, motaloi sau khi chuẩn hóa)
+    trong bảng records. Giữ lại bản ghi tốt nhất và xóa các bản ghi trùng khác.
+    """
+    try:
+        # Lấy tất cả records nhóm LOI
+        records = db.query(Record).filter(Record.type_group == "LOI").all()
+        
+        # Nhóm theo (ma_lk, normalized_maloi, normalized_motaloi)
+        grouped = {}
+        for rec in records:
+            ma_lk = chuan_hoa_ma_lk(rec.ma_lk).upper()
+            maloi = str(rec.maloi or "").strip().upper()
+            motaloi = clean_error_desc(str(rec.motaloi or "")).lower()
+            
+            key = (ma_lk, maloi, motaloi)
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(rec)
+        
+        deleted_count = 0
+        modified_count = 0
+        for key, rec_list in grouped.items():
+            if len(rec_list) > 1:
+                # Sắp xếp ưu tiên: PENDING trước, rồi đến ngày cập nhật mới nhất
+                rec_list.sort(key=lambda r: (1 if r.status == "PENDING" else 0, r.updated_at or datetime.datetime.min), reverse=True)
+                
+                keep_rec = rec_list[0]
+                for dup_rec in rec_list[1:]:
+                    if dup_rec.note and not keep_rec.note:
+                        keep_rec.note = dup_rec.note
+                    db.delete(dup_rec)
+                    deleted_count += 1
+            else:
+                keep_rec = rec_list[0]
+                
+            # Chuẩn hóa thông tin bản ghi được giữ lại
+            normalized_maloi = key[1]
+            normalized_motaloi = clean_error_desc(keep_rec.motaloi or "")
+            normalized_ma_lk = keep_rec.ma_lk.upper()
+            
+            if keep_rec.maloi != normalized_maloi or keep_rec.motaloi != normalized_motaloi or keep_rec.ma_lk != normalized_ma_lk:
+                keep_rec.maloi = normalized_maloi
+                keep_rec.motaloi = normalized_motaloi
+                keep_rec.ma_lk = normalized_ma_lk
+                modified_count += 1
+                    
+        if deleted_count > 0 or modified_count > 0:
+            db.commit()
+            print(f"[DEDUPLICATE] Da tu dong xoa {deleted_count} ban ghi va chuan hoa {modified_count} ban ghi trong DB.")
+    except Exception as e:
+        print(f"[DEDUPLICATE] Loi khi don dep trung lap: {str(e)}")
+        db.rollback()
 
 def process_comparison(
     db: Session,
@@ -15,27 +79,37 @@ def process_comparison(
     Thực hiện đối soát giữa SQL HIS, danh sách gửi BHYT và file báo cáo lỗi.
     Áp dụng các quy tắc tự động duyệt và kế thừa ghi chú xử lý.
     """
+    # Tự động dọn dẹp các bản ghi trùng lặp trong DB trước khi chạy đối soát mới
+    deduplicate_database_records(db)
+
     if df_sql.empty:
         return {"total": 0, "loi": 0, "fail": 0, "sent": 0}
 
     # 1. Chuyển tập hợp danh sách đã gửi thành set để tìm kiếm nhanh O(1)
     sent_keys = set()
     if not df_listbh.empty:
-        sent_keys = set(df_listbh["MA_LK"].dropna().astype(str).map(chuan_hoa_ma_lk))
+        sent_keys = set(df_listbh["MA_LK"].dropna().astype(str).map(lambda x: chuan_hoa_ma_lk(x).upper()))
 
-    # 2. Xây dựng bản đồ lỗi (ma_lk -> DANH SÁCH các dòng lỗi chi tiết)
+    # 2. Xây dựng bản đồ lỗi (ma_lk -> DANH SÁCH các dòng lỗi chi tiết đã lọc trùng)
     error_map = {}
     if not df_hsloi.empty:
         for _, row in df_hsloi.iterrows():
-            lk = chuan_hoa_ma_lk(row["MA_LK"])
+            lk = chuan_hoa_ma_lk(row["MA_LK"]).upper()
             if lk:
+                maloi = str(row.get("MALOI", "")).strip().upper()
+                motaloi = clean_error_desc(str(row.get("MOTALOI", "")))
+                ngay_ra = row.get("Ngày ra", None) if not pd.isna(row.get("Ngày ra")) else None
+                
                 if lk not in error_map:
                     error_map[lk] = []
-                error_map[lk].append({
-                    "maloi": str(row.get("MALOI", "")).strip(),
-                    "motaloi": str(row.get("MOTALOI", "")).strip(),
-                    "ngay_ra": row.get("Ngày ra", None) if not pd.isna(row.get("Ngày ra")) else None
-                })
+                
+                # Tránh trùng lặp ngay trong danh sách đầu vào từ file Excel của cùng 1 hồ sơ
+                if not any(item["maloi"] == maloi and item["motaloi"].lower() == motaloi.lower() for item in error_map[lk]):
+                    error_map[lk].append({
+                        "maloi": maloi,
+                        "motaloi": motaloi,
+                        "ngay_ra": ngay_ra
+                    })
 
     stats = {"total": len(df_sql), "loi": 0, "fail": 0, "sent": 0}
 
@@ -46,7 +120,7 @@ def process_comparison(
 
     # 3. Quét từng hồ sơ trong CSDL HIS
     for _, row in df_sql.iterrows():
-        ma_lk = chuan_hoa_ma_lk(row["MA_LK"])
+        ma_lk = chuan_hoa_ma_lk(row["MA_LK"]).upper()
         if not ma_lk:
             continue
 
@@ -159,6 +233,12 @@ def process_comparison(
                     )
                     db.add(log)
 
+                # Load tất cả bản ghi LOI đã có của ma_lk này để so khớp mềm dẻo trên bộ nhớ (tránh trùng do hoa thường/khoảng trắng)
+                existing_loi_records = db.query(Record).filter(
+                    Record.ma_lk == ma_lk,
+                    Record.type_group == "LOI"
+                ).all()
+
                 for err_detail in error_map[ma_lk]:
                     maloi = err_detail["maloi"]
                     motaloi = err_detail["motaloi"]
@@ -184,12 +264,17 @@ def process_comparison(
                         db.flush()
                         known_defs.add((maloi, kw))
 
-                    # B. Tìm hoặc tạo Record cho dòng lỗi cụ thể này
-                    existing_record = db.query(Record).filter(
-                        Record.ma_lk == ma_lk,
-                        Record.maloi == maloi,
-                        Record.motaloi == motaloi
-                    ).first()
+                    # B. Tìm hoặc tạo Record cho dòng lỗi cụ thể này bằng cách so khớp mềm trên bộ nhớ
+                    existing_record = None
+                    for rec in existing_loi_records:
+                        rec_maloi = str(rec.maloi or "").strip().upper()
+                        rec_motaloi = clean_error_desc(str(rec.motaloi or ""))
+                        if rec_maloi == maloi and rec_motaloi.lower() == motaloi.lower():
+                            existing_record = rec
+                            # Cập nhật và chuẩn hóa luôn thông tin lỗi trong DB
+                            rec.maloi = maloi
+                            rec.motaloi = motaloi
+                            break
                     
                     if existing_record:
                         existing_record.ho_ten = ho_ten
@@ -229,6 +314,9 @@ def process_comparison(
                         )
                         db.add(new_rec)
                         db.flush()
+                        
+                        # Thêm bản ghi mới vào existing_loi_records để tránh tạo trùng nếu lặp lại
+                        existing_loi_records.append(new_rec)
                         
                         log_entry = RecordLog(
                             record_id=new_rec.id,
