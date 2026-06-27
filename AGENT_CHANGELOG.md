@@ -58,16 +58,20 @@ Nguyên tắc:
 ## 2026-06-27 - Antigravity (Tính năng: Thêm khoảng thời gian vào tên file Excel xuất ra)
 
 ### Mục tiêu
-- Khi xuất báo cáo danh sách lỗi (`LOI`) hoặc danh sách fail (`FAIL`), tự động thêm thông tin khoảng thời gian đối soát (từ ngày... đến ngày...) vào tên file tải xuống (ví dụ: `DANH_SACH_KEM_LOI_0106_2706.xlsx`), giúp người dùng dễ nhận biết và quản lý.
+- Khi xuất báo cáo danh sách lỗi (`LOI`) hoặc danh sách fail (`FAIL`), tự động thêm thông tin khoảng thời gian đối soát (từ ngày... đến ngày...) vào tên file tải xuống (ví dụ: `DANH_SACH_KEM_LOI_0106_2706.xlsx`), đồng bộ giữa mốc thời gian chọn ở mục đối soát dữ liệu trên UI và tên file xuất ra.
 
 ### Thay đổi
+- `web_app/templates/admin.html`:
+  - Cập nhật hàm `exportLoiData()` truyền thêm `from_date` và `to_date` lấy từ ô nhập liệu `sync_from` và `sync_to` tương tự ca FAIL.
+  - Cập nhật nút Tải file danh sách kèm lỗi gọi `exportLoiData()` thay vì `exportData()`.
 - `web_app/main.py`:
-  - Cập nhật API `export_department_loi`, `export_fail_list`, và `export_loi_list`: Trích xuất ngày bắt đầu và ngày kết thúc từ tham số đầu vào hoặc tự động quét từ danh sách ca bệnh thực tế được xuất ra. Sinh tên file chứa suffix định dạng `_DDMM_DDMM` (ví dụ: `_0106_2706`).
+  - Cập nhật API `export_loi_list` nhận tham số `from_date` và `to_date` để lọc và định dạng tên file.
+  - Cập nhật API `export_department_loi` sử dụng mốc thời gian tĩnh nguyên tháng được chọn thay vì quét động danh sách records để tên file ổn định (ví dụ chọn tháng 6 sẽ ra `0106_3006` cố định).
 - `main.py` (Desktop GUI client):
   - Cập nhật hàm `export_fail` và `export_loi` tự động quét danh sách để định dạng tên file lưu mặc định trong Save File Dialog chứa suffix khoảng thời gian.
 
 ### Nghiệp vụ ảnh hưởng
-- Người dùng tải báo cáo về có tên file trực quan chứa mốc thời gian cụ thể của dữ liệu thực tế.
+- Người dùng tải báo cáo về có tên file trực quan chứa đúng mốc thời gian đã chọn đối soát ở giao diện Admin (ví dụ: `DANH_SACH_KEM_LOI_0106_2606.xlsx`), tránh bị lệch ngày khi ngày ra viện của ca đầu tiên không trùng ngày bắt đầu đối soát.
 
 ### Kiểm tra
 - Chạy biên dịch `py_compile` thành công cho các file Python.

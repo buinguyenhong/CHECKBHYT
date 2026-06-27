@@ -1290,7 +1290,7 @@
                 <div class="upload-card">
                     <h3>Danh sách KÈM LỖI</h3>
                     <p>Danh sách mã lỗi được phân theo Khoa phòng</p>
-                    <button class="btn btn-success" onclick="exportData('/api/export/loi')">Tải file DANH_SACH_KEM_LOI.xlsx</button>
+                    <button class="btn btn-success" onclick="exportLoiData()">Tải file DANH_SACH_KEM_LOI.xlsx</button>
                 </div>
             </div>
         </div>
@@ -2490,6 +2490,19 @@
         const fromDate = document.getElementById('sync_from').value;
         const toDate = document.getElementById('sync_to').value;
         let url = `/api/export/fail`;
+        const params = [];
+        if (fromDate) params.push(`from_date=${fromDate}`);
+        if (toDate) params.push(`to_date=${toDate}`);
+        if (params.length > 0) {
+            url += `?` + params.join('&');
+        }
+        window.open(url, '_blank');
+    }
+
+    function exportLoiData() {
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+        let url = `/api/export/loi`;
         const params = [];
         if (fromDate) params.push(`from_date=${fromDate}`);
         if (toDate) params.push(`to_date=${toDate}`);

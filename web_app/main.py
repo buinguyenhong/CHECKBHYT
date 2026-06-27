@@ -1327,16 +1327,9 @@ def export_department_loi(
         df_thau_thuoc = pd.DataFrame(columns=df.columns)
         df_chung = df
 
-    date_suffix = ""
-    if records:
-        dates = [r.ngay_ra_vien for r in records if r.ngay_ra_vien]
-        if dates:
-            min_d = min(dates)
-            max_d = max(dates)
-            date_suffix = f"_{min_d.strftime('%d%m')}_{max_d.strftime('%d%m')}"
-            
-    if not date_suffix:
-        date_suffix = f"_{year}{mon:02d}"
+    # Tính toán ngày bắt đầu và ngày kết thúc thực tế của tháng để hiển thị trên tên file (ví dụ: _0106_3006)
+    end_of_month = month_end - datetime.timedelta(days=1)
+    date_suffix = f"_{month_start.strftime('%d%m')}_{end_of_month.strftime('%d%m')}"
 
     dept_safe = user.department_name.replace(" ", "_").replace("/", "_")
     filename = f"LOI_BHYT_{dept_safe}{date_suffix}.xlsx"
