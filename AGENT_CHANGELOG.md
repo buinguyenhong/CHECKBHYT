@@ -55,6 +55,21 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-27 - Antigravity (Sửa lỗi: Xuất Excel danh sách FAIL chỉ xuất ca chưa xử lý)
+
+### Mục tiêu
+- Sửa lỗi khi xuất file Excel danh sách FAIL, hệ thống xuất ra tất cả các ca FAIL lịch sử (bao gồm cả các ca đã xử lý thành công `RESOLVED` trong cơ sở dữ liệu lên tới hơn 17.000 dòng), thay vì chỉ xuất 160 ca chưa xử lý khớp với số liệu hiển thị trên màn hình.
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật API `export_fail_list` (`GET /api/export/fail`): Đổi giá trị mặc định của tham số `include_resolved` từ `True` thành `False`. Điều này đảm bảo khi người dùng click xuất dữ liệu từ giao diện, API chỉ lấy các ca FAIL đang chờ xử lý (`status != "RESOLVED"`).
+
+### Nghiệp vụ ảnh hưởng
+- File Excel danh sách FAIL xuất ra khớp hoàn toàn với số lượng hiển thị thực tế trên màn hình dashboard của Admin (chỉ chứa các ca FAIL chưa xử lý).
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công cho `web_app/main.py`.
+
 ## 2026-06-27 - Antigravity (Tính năng: Hiển thị mã lỗi trực quan/mô tả ở giao diện khoa phòng)
 
 ### Mục tiêu

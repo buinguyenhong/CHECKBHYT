@@ -1694,7 +1694,7 @@ def export_sql_list(
 def export_fail_list(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-    include_resolved: bool = True,
+    include_resolved: bool = False,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
