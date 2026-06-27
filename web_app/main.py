@@ -1176,21 +1176,42 @@ def get_department_records(
     
     # Làm giàu dữ liệu hướng dẫn sửa lỗi từ danh mục
     from models import ErrorDefinition
+    import re
     defs = db.query(ErrorDefinition).all()
     
+    result = []
     for r in records:
-        r.root_cause = "Chưa rõ nguyên nhân (Hệ thống tự động quét)"
-        r.resolution = "Chờ phòng IT bổ sung hướng dẫn chi tiết"
-        r.requires_his_reset = False
+        item = {
+            "id": r.id,
+            "ma_lk": r.ma_lk,
+            "ho_ten": r.ho_ten,
+            "ma_the": r.ma_the,
+            "ten_khoa": r.ten_khoa,
+            "ma_y_te": r.ma_y_te,
+            "ngay_ra_vien": r.ngay_ra_vien,
+            "ngay_ra": r.ngay_ra,
+            "maloi": r.maloi,
+            "motaloi": r.motaloi,
+            "status": r.status,
+            "note": r.note,
+            "loai_ca": resolve_loai_ca(r),
+            "root_cause": "Chưa rõ nguyên nhân (Hệ thống tự động quét)",
+            "resolution": "Chờ phòng IT bổ sung hướng dẫn chi tiết",
+            "requires_his_reset": False
+        }
         
+        r_clean = re.sub(r'[^A-Z0-9]', '', str(r.maloi or "").upper())
         for d in defs:
-            if d.error_code == r.maloi:
+            d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code).upper())
+            if d_clean == r_clean:
                 if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
-                    r.root_cause = d.root_cause
-                    r.resolution = d.resolution
-                    r.requires_his_reset = d.requires_his_reset
+                    item["root_cause"] = d.root_cause
+                    item["resolution"] = d.resolution
+                    item["requires_his_reset"] = d.requires_his_reset
+                    item["maloi"] = d.error_code
                     break
-    return records
+        result.append(item)
+    return result
 
 
 @app.get("/api/records/dept/stats")

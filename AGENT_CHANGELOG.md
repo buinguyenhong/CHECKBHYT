@@ -55,6 +55,21 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-27 - Antigravity (Tính năng: Hiển thị mã lỗi trực quan/mô tả ở giao diện khoa phòng)
+
+### Mục tiêu
+- Hiển thị mã lỗi ở cột "Mã lỗi" trên giao diện xem danh sách lỗi của khoa phòng một cách trực quan, ngắn gọn kèm tên XML tương ứng (ví dụ: `XML 7 (Giấy ra viện)` thay vì mã thô `XML7`), giúp bác sĩ/điều dưỡng dễ nhận diện lỗi.
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật API `get_department_records` (`GET /api/records/dept`): Sử dụng so khớp alphanumeric linh hoạt giữa mã lỗi thô trong record và danh mục hướng dẫn. Khi khớp thành công, cập nhật thuộc tính `maloi` trả về bằng mô tả lỗi chi tiết từ danh mục (ví dụ `XML 7 (Giấy ra viện)`). Trả về danh sách dạng dictionary để đảm bảo an toàn, không thay đổi dữ liệu thô trong cơ sở dữ liệu.
+
+### Nghiệp vụ ảnh hưởng
+- Người dùng ở giao diện khoa phòng nhìn thấy mã lỗi chi tiết và trực quan trực tiếp trên cột mã lỗi, đồng bộ với hướng dẫn sửa lỗi.
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công cho `web_app/main.py`.
+
 ## 2026-06-27 - Antigravity (Tính năng: Thêm khoảng thời gian vào tên file Excel xuất ra)
 
 ### Mục tiêu
