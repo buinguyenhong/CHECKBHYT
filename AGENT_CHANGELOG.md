@@ -55,6 +55,23 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-27 - Antigravity (Tính năng: Thêm khoảng thời gian vào tên file Excel xuất ra)
+
+### Mục tiêu
+- Khi xuất báo cáo danh sách lỗi (`LOI`) hoặc danh sách fail (`FAIL`), tự động thêm thông tin khoảng thời gian đối soát (từ ngày... đến ngày...) vào tên file tải xuống (ví dụ: `DANH_SACH_KEM_LOI_0106_2706.xlsx`), giúp người dùng dễ nhận biết và quản lý.
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật API `export_department_loi`, `export_fail_list`, và `export_loi_list`: Trích xuất ngày bắt đầu và ngày kết thúc từ tham số đầu vào hoặc tự động quét từ danh sách ca bệnh thực tế được xuất ra. Sinh tên file chứa suffix định dạng `_DDMM_DDMM` (ví dụ: `_0106_2706`).
+- `main.py` (Desktop GUI client):
+  - Cập nhật hàm `export_fail` và `export_loi` tự động quét danh sách để định dạng tên file lưu mặc định trong Save File Dialog chứa suffix khoảng thời gian.
+
+### Nghiệp vụ ảnh hưởng
+- Người dùng tải báo cáo về có tên file trực quan chứa mốc thời gian cụ thể của dữ liệu thực tế.
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công cho các file Python.
+
 ## 2026-06-27 - Antigravity (Tính năng: Tách biệt lỗi thầu thuốc sang sheet Excel riêng khi xuất danh sách lỗi)
 
 ### Mục tiêu

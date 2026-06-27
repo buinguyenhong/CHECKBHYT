@@ -1226,7 +1226,18 @@ class MainWindow(QMainWindow):
         if self.df_fail.empty:
             canh_bao(self, "Không có dữ liệu", "Chưa có danh sách FAIL.")
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Lưu danh sách FAIL", "DANH_SACH_FAIL.xlsx", "Excel Files (*.xlsx)")
+
+        date_suffix = ""
+        date_col = next((c for c in self.df_fail.columns if str(c).upper() in ("NGAY_RA_VIEN", "NGÀY RA VIỆN")), None)
+        if date_col:
+            dates = pd.to_datetime(self.df_fail[date_col], errors='coerce').dropna()
+            if not dates.empty:
+                min_d = dates.min().date()
+                max_d = dates.max().date()
+                date_suffix = f"_{min_d.strftime('%d%m')}_{max_d.strftime('%d%m')}"
+
+        default_name = f"DANH_SACH_FAIL{date_suffix}.xlsx"
+        path, _ = QFileDialog.getSaveFileName(self, "Lưu danh sách FAIL", default_name, "Excel Files (*.xlsx)")
         if not path:
             return
         if not path.lower().endswith(".xlsx"):
@@ -1240,7 +1251,18 @@ class MainWindow(QMainWindow):
         if self.df_loi_merged.empty:
             canh_bao(self, "Không có dữ liệu", "Chưa có danh sách ghép lỗi.")
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Lưu danh sách kèm lỗi", "DANH_SACH_KEM_LOI.xlsx", "Excel Files (*.xlsx)")
+
+        date_suffix = ""
+        date_col = next((c for c in self.df_loi_merged.columns if str(c).upper() in ("NGAY_RA_VIEN", "NGÀY RA VIỆN")), None)
+        if date_col:
+            dates = pd.to_datetime(self.df_loi_merged[date_col], errors='coerce').dropna()
+            if not dates.empty:
+                min_d = dates.min().date()
+                max_d = dates.max().date()
+                date_suffix = f"_{min_d.strftime('%d%m')}_{max_d.strftime('%d%m')}"
+
+        default_name = f"DANH_SACH_KEM_LOI{date_suffix}.xlsx"
+        path, _ = QFileDialog.getSaveFileName(self, "Lưu danh sách kèm lỗi", default_name, "Excel Files (*.xlsx)")
         if not path:
             return
         if not path.lower().endswith(".xlsx"):

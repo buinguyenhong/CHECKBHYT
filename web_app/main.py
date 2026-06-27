@@ -1327,8 +1327,19 @@ def export_department_loi(
         df_thau_thuoc = pd.DataFrame(columns=df.columns)
         df_chung = df
 
+    date_suffix = ""
+    if records:
+        dates = [r.ngay_ra_vien for r in records if r.ngay_ra_vien]
+        if dates:
+            min_d = min(dates)
+            max_d = max(dates)
+            date_suffix = f"_{min_d.strftime('%d%m')}_{max_d.strftime('%d%m')}"
+            
+    if not date_suffix:
+        date_suffix = f"_{year}{mon:02d}"
+
     dept_safe = user.department_name.replace(" ", "_").replace("/", "_")
-    filename = f"LOI_BHYT_{dept_safe}_{year}{mon:02d}.xlsx"
+    filename = f"LOI_BHYT_{dept_safe}{date_suffix}.xlsx"
     out_path = os.path.join(UPLOAD_DIR, filename)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df_chung.to_excel(writer, sheet_name="Lỗi chung", index=False)
@@ -1706,21 +1717,62 @@ def export_fail_list(
         })
         
     df = pd.DataFrame(data)
-    out_path = os.path.join(UPLOAD_DIR, "DANH_SACH_FAIL_export.xlsx")
+    date_suffix = ""
+    # Trích xuất suffix ngày bắt đầu - ngày kết thúc
+    fd_parsed = None
+    td_parsed = None
+    if from_date:
+        fd_iso = normalize_date_to_iso(from_date)
+        if fd_iso:
+            try:
+                fd_parsed = datetime.datetime.strptime(fd_iso, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+    if to_date:
+        td_iso = normalize_date_to_iso(to_date)
+        if td_iso:
+            try:
+                td_parsed = datetime.datetime.strptime(td_iso, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+                
+    if fd_parsed and td_parsed:
+        date_suffix = f"_{fd_parsed.strftime('%d%m')}_{td_parsed.strftime('%d%m')}"
+    elif records:
+        dates = [r.ngay_ra_vien for r in records if r.ngay_ra_vien]
+        if dates:
+            min_d = min(dates)
+            max_d = max(dates)
+            date_suffix = f"_{min_d.strftime('%d%m')}_{max_d.strftime('%d%m')}"
+
+    filename = f"DANH_SACH_FAIL{date_suffix}.xlsx"
+    out_path = os.path.join(UPLOAD_DIR, f"DANH_SACH_FAIL{date_suffix}_export.xlsx")
     df.to_excel(out_path, index=False)
-    return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="DANH_SACH_FAIL.xlsx")
+    return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
 
 
 @app.get("/api/export/loi")
 def export_loi_list(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Xuất file Excel danh sách các ca bị LỖI kèm thông tin bệnh án"""
-    records = db.query(Record).filter(
+    query = db.query(Record).filter(
         Record.type_group == "LOI",
         Record.status != "RESOLVED"
-    ).all()
+    )
+    
+    if from_date or to_date:
+        fd = normalize_date_to_iso(from_date)
+        if fd:
+            query = query.filter(Record.ngay_ra_vien >= fd)
+        td = normalize_date_to_iso(to_date)
+        if td:
+            query = query.filter(Record.ngay_ra_vien <= td)
+            
+    records = query.order_by(Record.ngay_ra_vien.asc()).all()
     
     data = []
     for r in records:
@@ -1750,12 +1802,40 @@ def export_loi_list(
         df_thau_thuoc = pd.DataFrame(columns=df.columns)
         df_chung = df
 
-    out_path = os.path.join(UPLOAD_DIR, "DANH_SACH_KEM_LOI_export.xlsx")
+    date_suffix = ""
+    fd_parsed = None
+    td_parsed = None
+    if from_date:
+        fd_iso = normalize_date_to_iso(from_date)
+        if fd_iso:
+            try:
+                fd_parsed = datetime.datetime.strptime(fd_iso, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+    if to_date:
+        td_iso = normalize_date_to_iso(to_date)
+        if td_iso:
+            try:
+                td_parsed = datetime.datetime.strptime(td_iso, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+                
+    if fd_parsed and td_parsed:
+        date_suffix = f"_{fd_parsed.strftime('%d%m')}_{td_parsed.strftime('%d%m')}"
+    elif records:
+        dates = [r.ngay_ra_vien for r in records if r.ngay_ra_vien]
+        if dates:
+            min_d = min(dates)
+            max_d = max(dates)
+            date_suffix = f"_{min_d.strftime('%d%m')}_{max_d.strftime('%d%m')}"
+
+    filename = f"DANH_SACH_KEM_LOI{date_suffix}.xlsx"
+    out_path = os.path.join(UPLOAD_DIR, f"DANH_SACH_KEM_LOI{date_suffix}_export.xlsx")
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df_chung.to_excel(writer, sheet_name="Lỗi chung", index=False)
         df_thau_thuoc.to_excel(writer, sheet_name="Lỗi thầu thuốc", index=False)
 
-    return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="DANH_SACH_KEM_LOI.xlsx")
+    return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
 
 
 # ==========================================
