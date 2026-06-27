@@ -1316,10 +1316,24 @@ def export_department_loi(
         })
 
     df = pd.DataFrame(data)
+    if not df.empty:
+        mask_thau_thuoc = (
+            df["Mã lỗi"].astype(str).str.upper().str.contains("TT_THAU|MA_THUOC", na=False) |
+            df["Mô tả lỗi"].astype(str).str.upper().str.contains("TT_THAU|MA_THUOC", na=False)
+        )
+        df_thau_thuoc = df[mask_thau_thuoc]
+        df_chung = df[~mask_thau_thuoc]
+    else:
+        df_thau_thuoc = pd.DataFrame(columns=df.columns)
+        df_chung = df
+
     dept_safe = user.department_name.replace(" ", "_").replace("/", "_")
     filename = f"LOI_BHYT_{dept_safe}_{year}{mon:02d}.xlsx"
     out_path = os.path.join(UPLOAD_DIR, filename)
-    df.to_excel(out_path, index=False)
+    with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+        df_chung.to_excel(writer, sheet_name="Lỗi chung", index=False)
+        df_thau_thuoc.to_excel(writer, sheet_name="Lỗi thầu thuốc", index=False)
+
     return FileResponse(
         out_path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1725,8 +1739,22 @@ def export_loi_list(
         })
         
     df = pd.DataFrame(data)
+    if not df.empty:
+        mask_thau_thuoc = (
+            df["MALOI"].astype(str).str.upper().str.contains("TT_THAU|MA_THUOC", na=False) |
+            df["MOTALOI"].astype(str).str.upper().str.contains("TT_THAU|MA_THUOC", na=False)
+        )
+        df_thau_thuoc = df[mask_thau_thuoc]
+        df_chung = df[~mask_thau_thuoc]
+    else:
+        df_thau_thuoc = pd.DataFrame(columns=df.columns)
+        df_chung = df
+
     out_path = os.path.join(UPLOAD_DIR, "DANH_SACH_KEM_LOI_export.xlsx")
-    df.to_excel(out_path, index=False)
+    with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+        df_chung.to_excel(writer, sheet_name="Lỗi chung", index=False)
+        df_thau_thuoc.to_excel(writer, sheet_name="Lỗi thầu thuốc", index=False)
+
     return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="DANH_SACH_KEM_LOI.xlsx")
 
 

@@ -1245,7 +1245,28 @@ class MainWindow(QMainWindow):
             return
         if not path.lower().endswith(".xlsx"):
             path += ".xlsx"
-        self.df_loi_merged.to_excel(path, index=False)
+        df = self.df_loi_merged
+        if not df.empty:
+            # Tìm kiếm linh hoạt tên cột mã lỗi và mô tả lỗi
+            maloi_col = next((c for c in df.columns if str(c).upper() in ("MALOI", "MÃ LỖI")), None)
+            motaloi_col = next((c for c in df.columns if str(c).upper() in ("MOTALOI", "MÔ TẢ LỖI")), None)
+            
+            mask_thau_thuoc = pd.Series(False, index=df.index)
+            if maloi_col:
+                mask_thau_thuoc |= df[maloi_col].astype(str).str.upper().str.contains("TT_THAU|MA_THUOC", na=False)
+            if motaloi_col:
+                mask_thau_thuoc |= df[motaloi_col].astype(str).str.upper().str.contains("TT_THAU|MA_THUOC", na=False)
+                
+            df_thau_thuoc = df[mask_thau_thuoc]
+            df_chung = df[~mask_thau_thuoc]
+        else:
+            df_thau_thuoc = pd.DataFrame(columns=df.columns)
+            df_chung = df
+            
+        with pd.ExcelWriter(path, engine="openpyxl") as writer:
+            df_chung.to_excel(writer, sheet_name="Lỗi chung", index=False)
+            df_thau_thuoc.to_excel(writer, sheet_name="Lỗi thầu thuốc", index=False)
+            
         thong_bao(self, "Đã lưu", f"Đã lưu:\n{path}")
 
 

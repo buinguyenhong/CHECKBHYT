@@ -55,6 +55,23 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-27 - Antigravity (Tính năng: Tách biệt lỗi thầu thuốc sang sheet Excel riêng khi xuất danh sách lỗi)
+
+### Mục tiêu
+- Khi xuất báo cáo/danh sách lỗi BHYT, tự động tách các lỗi liên quan đến Thông tin thầu (`TT_THAU`) và Mã thuốc (`MA_THUOC`) sang một sheet riêng biệt tên là "Lỗi thầu thuốc", các lỗi còn lại nằm ở sheet "Lỗi chung". Điều này giúp bộ phận Dược và quản lý danh mục xử lý lỗi nhanh hơn.
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật API `export_department_loi` (`GET /api/export/dept/loi`) và API `export_loi_list` (`GET /api/export/loi`): sử dụng `pd.ExcelWriter` phân tách dòng dữ liệu dựa trên từ khóa `TT_THAU` hoặc `MA_THUOC` trong cột mã lỗi hoặc mô tả lỗi, ghi vào hai sheet riêng biệt ("Lỗi chung" và "Lỗi thầu thuốc").
+- `main.py` (Desktop GUI client):
+  - Cập nhật hàm `export_loi` thực hiện phân tách lỗi thầu/thuốc tương tự thông qua kiểm tra linh hoạt tên cột.
+
+### Nghiệp vụ ảnh hưởng
+- File Excel báo cáo lỗi xuất ra từ hệ thống (cả giao diện khoa phòng và giao diện admin) sẽ có 2 sheet giúp phân luồng xử lý lỗi khoa lâm sàng và khoa dược/vật tư y tế rõ ràng.
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công cho `web_app/main.py` và `main.py`.
+
 ## 2026-06-27 - Antigravity (Tính năng: Bổ sung danh mục hướng dẫn xử lý lỗi và Tối ưu hóa so khớp mã lỗi)
 
 ### Mục tiêu
