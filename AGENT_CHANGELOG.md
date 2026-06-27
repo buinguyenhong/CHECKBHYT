@@ -55,6 +55,30 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-27 - Antigravity (Tính năng: Bổ sung danh mục hướng dẫn xử lý lỗi và Tối ưu hóa so khớp mã lỗi)
+
+### Mục tiêu
+- Bổ sung các mẫu lỗi thường gặp và hướng dẫn xử lý chi tiết (14 lỗi nghiệp vụ) từ tài liệu người dùng cung cấp vào danh mục lỗi mẫu (`ErrorDefinition`).
+- Chuẩn hóa định dạng cột mã lỗi (`error_code`) dưới dạng mô tả ngắn gọn trực quan (ví dụ: `XML 7 (Giấy ra viện)`, `XML 3 (Dịch vụ kỹ thuật)`).
+- Tối ưu hóa logic so khớp mã lỗi ở Backend (bulk unlock, preview, auto-collect) để hoạt động chính xác với định dạng mã lỗi descriptive mới.
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật danh sách lỗi mẫu `sample_errors` bổ sung đầy đủ các lỗi về logic thời gian, liên kết dữ liệu, tài chính danh mục và bỏ trống các trường bắt buộc.
+  - Viết lại hàm khởi tạo danh mục lỗi thành dạng **idempotent seed**: tự động rà soát, đồng bộ và cập nhật mô tả/thông tin hướng dẫn cho danh sách lỗi cũ, đồng thời chèn mới nếu chưa có.
+  - Sửa lỗi import thiếu `SessionLocal` ở block dọn dẹp dữ liệu trùng lặp trên startup.
+  - Cập nhật hàm `bulk_unlock` và `dept_unlock_preview` thực hiện so khớp mã lỗi mềm dẻo (loại bỏ khoảng trắng, ký tự đặc biệt và chữ hoa/thường) giữa `Record.maloi` (ví dụ `XML7`) và `ErrorDefinition.error_code` (ví dụ `XML 7 (Giấy ra viện)`).
+- `web_app/services/compare_service.py`:
+  - Cập nhật hàm `process_comparison` tại luồng tự động thu thập mẫu lỗi mới (auto-collect): thực hiện so khớp mềm dẻo mã lỗi đầu vào với danh sách `ErrorDefinition` trong DB để tránh chèn trùng lặp hướng dẫn lỗi.
+
+### Nghiệp vụ ảnh hưởng
+- Người dùng lâm sàng và IT xem danh mục hướng dẫn lỗi chi tiết hơn với định dạng mã lỗi rõ ràng (có chú thích loại file XML tương ứng).
+- Chức năng "Trả hồ sơ khoa" (bulk unlock) tự động nhận dạng chính xác các ca lỗi nội trú cần mở khóa theo danh mục hướng dẫn mới cập nhật.
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công.
+- Thực hiện chạy thử tiến trình khởi động WebApp để xác nhận danh mục lỗi mẫu được seed thành công 17 lỗi và định dạng chuẩn hóa khớp chính xác.
+
 ## 2026-06-26 - Antigravity (Sửa lỗi: Loại bỏ lỗi trùng lặp khi đối soát BHYT)
 
 ### Mục tiêu

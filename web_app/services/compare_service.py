@@ -252,7 +252,16 @@ def process_comparison(
                         if k in motaloi:
                             kw = k
                             break
-                    if (maloi, kw) not in known_defs and (maloi or kw):
+                    
+                    is_known = False
+                    maloi_clean = re.sub(r'[^A-Z0-9]', '', maloi.upper())
+                    for ed_code, ed_kw in known_defs:
+                        ed_clean = re.sub(r'[^A-Z0-9]', '', str(ed_code or "").upper())
+                        if (ed_clean == maloi_clean or ed_clean.startswith(maloi_clean)) and ed_kw == kw:
+                            is_known = True
+                            break
+                            
+                    if not is_known and (maloi or kw):
                         new_def = ErrorDefinition(
                             error_code=maloi,
                             keyword=kw,

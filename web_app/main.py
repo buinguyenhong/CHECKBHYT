@@ -218,6 +218,7 @@ Base.metadata.create_all(bind=engine)
 # Tự động dọn dẹp các bản ghi trùng lặp trong DB khi khởi chạy WebApp
 try:
     from services.compare_service import deduplicate_database_records
+    from database import SessionLocal
     db_clean = SessionLocal()
     try:
         deduplicate_database_records(db_clean)
@@ -300,20 +301,136 @@ try:
         db.commit()
         print("[*] Da khoi tao cau hinh CSDL HIS mac dinh.")
 
-    # Seed danh mục lỗi mẫu
+    # Seed danh mục lỗi mẫu (bổ sung & cập nhật định dạng)
     from models import ErrorDefinition
-    err_count = db.query(ErrorDefinition).count()
-    if err_count == 0:
-        sample_errors = [
-            ErrorDefinition(error_code="XML3", keyword="DIEN_BIEN_LS", root_cause="Khoa lâm sàng quên nhập diễn biến bệnh án lúc cho ra viện", resolution="Mở bệnh án HIS -> Tab Khám bệnh -> Điền đầy đủ Diễn biến lâm sàng rồi bấm Lưu", requires_his_reset=True),
-            ErrorDefinition(error_code="XML3", keyword="TOMTAT_KQ", root_cause="Thiếu tóm tắt kết quả cận lâm sàng quan trọng", resolution="Nhập đầy đủ thông tin tóm tắt kết quả cận lâm sàng trên phần mềm HIS rồi cho ra viện lại", requires_his_reset=True),
-            ErrorDefinition(error_code="XML8", keyword="MA_TTDV", root_cause="Thiếu mã tương đương dịch vụ kỹ thuật hoặc thuốc", resolution="Liên hệ phòng IT để cập nhật danh mục tương đương hoặc ánh xạ mã dịch vụ kỹ thuật", requires_his_reset=False),
-            ErrorDefinition(error_code="XML5", keyword="NGAY_TH_YL", root_cause="Ngày thực hiện y lệnh bị trống hoặc sai định dạng", resolution="Sửa lại ngày thực hiện y lệnh trên HIS cho khớp với ngày ra viện", requires_his_reset=True),
-            ErrorDefinition(error_code="XML1", keyword="XML1", root_cause="Thông tin XML1 (Tổng hợp) chưa chuẩn xác, sai lệch số tiền hoặc thẻ BHYT", resolution="Kiểm tra lại thẻ BHYT của bệnh nhân hoặc tính toán lại chi phí trên HIS trước khi phê duyệt gửi cổng", requires_his_reset=False)
-        ]
-        db.add_all(sample_errors)
-        db.commit()
-        print("[*] Da khoi tao danh muc huong dan loi mau.")
+    import re
+    
+    sample_errors = [
+        ErrorDefinition(
+            error_code="XML 5 (Diễn biến LS)", 
+            keyword="DIEN_BIEN_LS", 
+            root_cause="Bác sĩ hoặc điều dưỡng quên ghi chép diễn biến bệnh / phiếu chăm sóc hàng ngày", 
+            resolution="Mở bệnh án HIS -> Tab Khám bệnh -> Điền đầy đủ Diễn biến lâm sàng rồi bấm Lưu", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 8 (Tóm tắt HSBA)", 
+            keyword="TOMTAT_KQ", 
+            root_cause="Thiếu tóm tắt kết quả cận lâm sàng quan trọng", 
+            resolution="Nhập đầy đủ thông tin tóm tắt kết quả cận lâm sàng trên phần mềm HIS rồi cho ra viện lại", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 8 (Tóm tắt HSBA)", 
+            keyword="MA_TTDV", 
+            root_cause="Thiếu mã tương đương dịch vụ kỹ thuật hoặc thuốc", 
+            resolution="Liên hệ phòng IT để cập nhật danh mục tương đương hoặc ánh xạ mã dịch vụ kỹ thuật", 
+            requires_his_reset=False
+        ),
+        ErrorDefinition(
+            error_code="XML 3 (Dịch vụ kỹ thuật)", 
+            keyword="NGAY_TH_YL", 
+            root_cause="Ngày thực hiện y lệnh bị trống hoặc sai định dạng", 
+            resolution="Sửa lại ngày thực hiện y lệnh trên HIS cho khớp với ngày ra viện", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 1 (Tổng hợp KBCB)", 
+            keyword="XML1", 
+            root_cause="Thông tin XML1 (Tổng hợp) chưa chuẩn xác, sai lệch số tiền hoặc thẻ BHYT", 
+            resolution="Kiểm tra lại thẻ BHYT của bệnh nhân hoặc tính toán lại chi phí trên HIS trước khi phê duyệt gửi cổng", 
+            requires_his_reset=False
+        ),
+        ErrorDefinition(
+            error_code="XML 3 (Dịch vụ kỹ thuật)", 
+            keyword="NGAY_YL", 
+            root_cause="Giờ cấp y lệnh (NGAY_YL ở XML3) nằm trước giờ vào viện (NGAY_VAO ở XML1, XML8), thường do gộp chi phí ngoại trú vào nội trú", 
+            resolution="Điều chỉnh lại trường NGAY_VAO lùi về đúng thời điểm đón tiếp ở phòng khám. Đảm bảo: NGAY_VAO <= NGAY_YL <= NGAY_VAO_NOI_TRU", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 4 (Cận lâm sàng)", 
+            keyword="NGAY_KQ", 
+            root_cause="Khai báo kết quả cận lâm sàng (GIA_TRI) nhưng bỏ trống ngày kết quả (NGAY_KQ)", 
+            resolution="Bắt buộc điền NGAY_KQ nếu đã có kết quả. Nếu phải chờ nuôi cấy lâu ngày, có thể để trống khi gửi thông tuyến nhưng bắt buộc nhập bổ sung trên cổng trước khi đề nghị giám định", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 2 (Chi tiết thuốc)", 
+            keyword="MA_DICH_VU", 
+            root_cause="Khai báo thuốc/máu ở XML 2 có kèm dịch vụ (ví dụ: 2.6.NAT hoặc thuốc cản quang), nhưng mã dịch vụ này không có mặt trong XML 3", 
+            resolution="Bổ dung dịch vụ kỹ thuật tương ứng vào XML 3, đảm bảo mã bên XML 2 và XML 3 khớp nhau từng ký tự", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 1 (Tổng hợp KBCB)", 
+            keyword="MA_LOAI_KCB", 
+            root_cause="Mã loại KCB là nội trú (3, 4) nhưng hồ sơ thiếu file Giấy ra viện (XML 7) hoặc Tóm tắt HSBA (XML 8)", 
+            resolution="Lập và trích xuất thêm XML 7 và XML 8. Nếu bệnh nhân thực tế là ngoại trú, hãy sửa MA_LOAI_KCB về 01 hoặc 02", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 2 (Chi tiết thuốc)", 
+            keyword="T_BNCCT", 
+            root_cause="Chênh lệch tiền cùng chi trả (T_BNCCT, T_BHTT) do sai số làm tròn khi nhân tỷ lệ % giữa HIS và Cổng giám định", 
+            resolution="Sửa trực tiếp số tiền ở dòng bị báo lỗi theo đúng con số mà hệ thống giám định gợi ý (thường lệch 0.01 đồng). Đảm bảo T_BNCCT + T_BHTT = THANH_TIEN_BH", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 3 (Dịch vụ kỹ thuật)", 
+            keyword="TT_THAU", 
+            root_cause="Nhóm Vật tư y tế (MA_NHOM = 10 ở XML 3) bắt buộc phải có thông tin thầu", 
+            resolution="Nhập chuẩn 4 định dạng thầu theo quy định (Số quyết định;Gói thầu;Nhóm thầu;Năm;Đơn vị đấu thầu)", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 7 (Giấy ra viện)", 
+            keyword="NGAY_CT", 
+            root_cause="Thiếu ngày ký chứng từ trên Giấy ra viện", 
+            resolution="Cập nhật ngày chứng từ (NGAY_CT) trên Giấy ra viện bắt buộc phải trùng với ngày ra viện (NGAY_RA)", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 7 (Giấy ra viện)", 
+            keyword="MA_DINH_CHI_THAI", 
+            root_cause="Ghi nhận có đình chỉ thai (MA_DINH_CHI_THAI = 1) nhưng để trống tuần tuổi thai hoặc nguyên nhân", 
+            resolution="Bắt buộc nhập tuần tuổi thai (TUOI_THAI từ 1 đến 42 tuần) và nguyên nhân đình chỉ (NGUYENNHAN_DINHCHI)", 
+            requires_his_reset=True
+        ),
+        ErrorDefinition(
+            error_code="XML 11 (Giấy nghỉ việc BHXH)", 
+            keyword="SO_NGAY_NGHI", 
+            root_cause="Khai báo số ngày nghỉ không khớp công thức (DEN_NGAY - TU_NGAY + 1) hoặc cấp quá 30 ngày/lần", 
+            resolution="Cân chỉnh lại ngày bắt đầu (TU_NGAY) trùng ngày đến khám, ngày kết thúc và tổng số ngày cho khớp logic toán học", 
+            requires_his_reset=True
+        )
+    ]
+
+    all_existing = db.query(ErrorDefinition).all()
+    for sample in sample_errors:
+        sample_clean = re.sub(r'[^A-Z0-9]', '', sample.error_code.upper())
+        
+        # Tìm xem từ khóa này đã có trong danh mục chưa
+        existing = None
+        for ed in all_existing:
+            ed_clean = re.sub(r'[^A-Z0-9]', '', str(ed.error_code or "").upper())
+            if ed_clean.startswith(sample_clean) or sample_clean.startswith(ed_clean):
+                if ed.keyword == sample.keyword:
+                    existing = ed
+                    break
+        
+        if existing:
+            # Cập nhật thông tin mới
+            existing.error_code = sample.error_code
+            existing.root_cause = sample.root_cause
+            existing.resolution = sample.resolution
+            existing.requires_his_reset = sample.requires_his_reset
+        else:
+            # Thêm mới nếu chưa có
+            db.add(sample)
+            
+    db.commit()
+    print("[*] Da dong bo va khoi tao danh muc huong dan loi theo quy dinh moi.")
 finally:
     db.close()
 
@@ -621,11 +738,13 @@ def bulk_unlock_department_records(
         Record.status != "RESOLVED"
     ).all()
 
-    # 3. Lọc theo ErrorDefinition: chỉ lấy ca khớp mã lỗi + keyword
+    # 3. Lọc theo ErrorDefinition: chỉ lấy ca khớp mã lỗi + keyword (so khớp mềm dẻo)
     matched_records = []
     for r in dept_records:
+        r_clean = re.sub(r'[^A-Z0-9]', '', str(r.maloi or "").upper())
         for d in reset_defs:
-            if d.error_code == r.maloi:
+            d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code or "").upper())
+            if d_clean == r_clean or d_clean.startswith(r_clean):
                 if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
                     matched_records.append(r)
                     break
@@ -715,8 +834,10 @@ def preview_department_unlock(
     matched = []
     for r in dept_records:
         requires_reset = False
+        r_clean = re.sub(r'[^A-Z0-9]', '', str(r.maloi or "").upper())
         for d in reset_defs:
-            if d.error_code == r.maloi:
+            d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code or "").upper())
+            if d_clean == r_clean or d_clean.startswith(r_clean):
                 if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
                     requires_reset = True
                     break
