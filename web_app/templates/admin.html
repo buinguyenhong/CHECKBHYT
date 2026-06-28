@@ -1399,6 +1399,12 @@
                     <button class="btn btn-secondary" onclick="triggerXmlScan()">Phân tích XML ngay</button>
                     <button class="btn btn-success" onclick="downloadXmlReport()">Tải file TongHopLoi.xlsx</button>
                 </div>
+                
+                <!-- PROGRESS BAR THEO DÕI QUÁ TRÌNH KIỂM TRA XML -->
+                <div id="xmlProgressContainer" style="display: none; margin-top: 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; position: relative; height: 26px; width: 100%;">
+                    <div id="xmlProgressBar" style="background: linear-gradient(90deg, var(--primary), var(--primary-hover)); height: 100%; width: 0%; transition: width 0.2s ease;"></div>
+                    <span id="xmlProgressText" style="position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 13px; font-weight: bold; line-height: 24px; color: var(--text-main); text-shadow: 0 1px 2px rgba(0,0,0,0.8);">0% (Đang tải...)</span>
+                </div>
             </div>
             <div class="grid-form" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
                 <div class="kpi-card" style="border-left: 4px solid var(--primary); padding: 12px;">
@@ -2838,21 +2844,73 @@
         }
     }
 
+    let xmlProgressInterval = null;
+
+    function startXmlProgressPolling() {
+        document.getElementById('xmlProgressContainer').style.display = 'block';
+        if (xmlProgressInterval) clearInterval(xmlProgressInterval);
+        
+        xmlProgressInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/admin/xml-validator/progress');
+                if (res.ok) {
+                    const data = await res.json();
+                    const percent = data.percent || 0;
+                    const message = data.message || '';
+                    const status = data.status || 'idle';
+                    
+                    document.getElementById('xmlProgressBar').style.width = percent + '%';
+                    document.getElementById('xmlProgressText').innerText = `${percent}% - ${message}`;
+                    
+                    if (status === 'completed' || status === 'error' || status === 'idle') {
+                        clearInterval(xmlProgressInterval);
+                        xmlProgressInterval = null;
+                        
+                        if (status === 'completed') {
+                            // Tải lại kết quả hiển thị bảng lỗi
+                            fetchXmlValidatorResults(true); 
+                        }
+                        
+                        setTimeout(() => {
+                            document.getElementById('xmlProgressContainer').style.display = 'none';
+                        }, 4000);
+                    }
+                }
+            } catch (e) {
+                console.error("Lỗi khi check tiến trình XML:", e);
+            }
+        }, 500);
+    }
+
     async function triggerXmlScan() {
         try {
             const res = await fetch('/api/admin/xml-validator/trigger', { method: 'POST' });
             if (res.ok) {
-                alert("Đã bắt đầu tiến trình phân tích XML chạy ngầm. Vui lòng chờ vài giây rồi chuyển lại tab để xem kết quả.");
-                setTimeout(fetchXmlValidatorResults, 3000);
+                startXmlProgressPolling();
             }
         } catch (e) {
             alert("Lỗi khi gửi yêu cầu phân tích.");
         }
     }
 
-    async function fetchXmlValidatorResults() {
+    async function fetchXmlValidatorResults(skipProgressCheck = false) {
         await checkXmlWatcherStatus();
         await loadXmlConfig();
+        
+        // Nếu không bỏ qua, check xem tiến trình có đang quét ngầm không
+        if (!skipProgressCheck) {
+            try {
+                const resProg = await fetch('/api/admin/xml-validator/progress');
+                if (resProg.ok) {
+                    const prog = await resProg.json();
+                    if (prog.status === 'scanning') {
+                        startXmlProgressPolling();
+                        return;
+                    }
+                }
+            } catch (e) {}
+        }
+        
         try {
             const res = await fetch('/api/admin/xml-validator/results');
             if (res.ok) {

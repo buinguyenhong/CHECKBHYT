@@ -52,7 +52,7 @@ def get_xml_type_and_ma_lk(filepath):
     except Exception as e:
         return None, "", None, str(e)
 
-def group_xml_files(directory):
+def group_xml_files(directory, progress_callback=None):
     """
     Quét thư mục, phân tích tất cả các file XML và nhóm theo MA_LK.
     Trả về dict: { ma_lk: { 'XML1': [info], 'XML2': [info], ... } } và danh sách file lỗi định dạng.
@@ -63,10 +63,13 @@ def group_xml_files(directory):
     if not os.path.exists(directory):
         return grouped, invalid_files
         
-    for filename in os.listdir(directory):
-        if not filename.lower().endswith(".xml"):
-            continue
-            
+    filenames = [f for f in os.listdir(directory) if f.lower().endswith(".xml")]
+    total = len(filenames)
+    
+    if progress_callback and total > 0:
+        progress_callback(0, total, "Đang bắt đầu quét danh sách tệp tin...")
+        
+    for idx, filename in enumerate(filenames):
         filepath = os.path.join(directory, filename)
         xml_type, ma_lk, tree, err = get_xml_type_and_ma_lk(filepath)
         
@@ -96,4 +99,7 @@ def group_xml_files(directory):
             grouped[ma_lk][xml_type] = []
         grouped[ma_lk][xml_type].append(info)
         
+        if progress_callback:
+            progress_callback(idx + 1, total, f"Đang đọc tệp tin: {filename}")
+            
     return grouped, invalid_files

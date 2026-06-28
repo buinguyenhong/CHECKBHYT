@@ -1910,6 +1910,10 @@ def get_main_validator_config(user: User = Depends(require_admin)):
 def update_main_validator_config(new_config: dict, user: User = Depends(require_admin)):
     return call_validator_api("/api/validator/config", method="POST", data=new_config)
 
+@app.get("/api/admin/xml-validator/progress")
+def get_main_validator_progress(user: User = Depends(require_admin)):
+    return call_validator_api("/api/validator/progress")
+
 @app.get("/api/admin/xml-validator/results")
 def get_xml_validator_results(user: User = Depends(require_admin)):
     output_dir = get_validator_output_dir()

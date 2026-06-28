@@ -44,23 +44,72 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+PROGRESS = {
+    "status": "idle",
+    "total_files": 0,
+    "processed_files": 0,
+    "percent": 0,
+    "message": ""
+}
+
+def update_progress(processed, total, msg=""):
+    global PROGRESS
+    PROGRESS["total_files"] = total
+    PROGRESS["processed_files"] = processed
+    # Tải tệp tin chiếm 60% tổng tiến trình, kiểm tra quy tắc chiếm 30%, kết xuất chiếm 10%
+    PROGRESS["percent"] = int((processed / total) * 100) if total > 0 else 0
+    PROGRESS["message"] = msg
+
 def perform_validation_scan():
     """
     Thực hiện quét thư mục Input, chạy các quy tắc và ghi kết quả vào Output.
     """
+    global PROGRESS
     try:
+        PROGRESS["status"] = "scanning"
+        update_progress(0, 0, "Khởi động tiến trình quét...")
         print(f"[*] Bắt đầu quét và phân tích XML trong thư mục: {input_dir}")
-        grouped_data, invalid_files = group_xml_files(input_dir)
+        
+        if not os.path.exists(input_dir):
+            PROGRESS["status"] = "idle"
+            update_progress(0, 0, "Thư mục đầu vào không tồn tại.")
+            return {"success": False, "error": "Thư mục đầu vào không tồn tại."}
+            
+        def progress_cb(idx, total, filename_msg):
+            # Scale đến 60%
+            pct = int((idx / total) * 60) if total > 0 else 0
+            PROGRESS["total_files"] = total
+            PROGRESS["processed_files"] = idx
+            PROGRESS["percent"] = pct
+            PROGRESS["message"] = f"[{idx}/{total}] {filename_msg}"
+            
+        grouped_data, invalid_files = group_xml_files(input_dir, progress_callback=progress_cb)
+        
+        PROGRESS["percent"] = 60
+        PROGRESS["message"] = "Đang áp dụng 26 quy tắc kiểm tra cấu trúc BHYT..."
         
         rule_errors = []
         engine = XMLRuleEngine()
+        total_p = len(grouped_data)
         
-        for ma_lk, xmls in grouped_data.items():
+        for idx, (ma_lk, xmls) in enumerate(grouped_data.items()):
             errors = engine.check_rules(ma_lk, xmls)
             rule_errors.extend(errors)
+            # Scale kiểm tra quy tắc từ 60% đến 90%
+            pct_rules = 60 + int((idx / total_p) * 30) if total_p > 0 else 90
+            PROGRESS["percent"] = pct_rules
+            PROGRESS["message"] = f"Đang đối chiếu quy tắc cho bệnh nhân: {ma_lk} ({idx}/{total_p})"
             
+        PROGRESS["percent"] = 90
+        PROGRESS["message"] = "Đang khởi tạo tệp báo cáo Excel và JSON..."
+        
         excel_path, json_path = generate_reports(grouped_data, rule_errors, invalid_files, output_dir)
         print(f"[*] Quét hoàn tất. Báo cáo ghi nhận tại {excel_path} và {json_path}")
+        
+        PROGRESS["status"] = "completed"
+        PROGRESS["percent"] = 100
+        PROGRESS["message"] = f"Hoàn tất! Quét xong {total_p} bệnh nhân. Tìm thấy {len(rule_errors) + len(invalid_files)} lỗi."
+        
         return {
             "success": True,
             "patients_scanned": len(grouped_data),
@@ -69,6 +118,9 @@ def perform_validation_scan():
         }
     except Exception as e:
         print(f"[!] Lỗi khi quét XML: {str(e)}")
+        PROGRESS["status"] = "error"
+        PROGRESS["percent"] = 0
+        PROGRESS["message"] = f"Gặp sự cố lỗi: {str(e)}"
         return {"success": False, "error": str(e)}
 
 watcher = XMLWatcher(input_dir, perform_validation_scan)
@@ -101,6 +153,13 @@ def get_status():
         "input_dir": input_dir,
         "output_dir": output_dir
     }
+
+@app.get("/api/validator/progress")
+def get_progress():
+    """
+    Lấy tiến độ đọc và xử lý XML hiện tại.
+    """
+    return PROGRESS
 
 @app.post("/api/validator/watcher/toggle")
 def toggle_watcher(enable: bool):
