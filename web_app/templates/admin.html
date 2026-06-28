@@ -1426,6 +1426,21 @@
             </div>
         </div>
         
+        <!-- TẢI LÊN FILE XML TRỰC TIẾP -->
+        <div class="panel" style="margin-top: 20px;">
+            <div class="panel-header">
+                <h2>Tải lên &amp; Kiểm tra XML trực tiếp (Không cần Watcher)</h2>
+            </div>
+            <div style="margin-top: 15px;">
+                <div id="xmlDragDropZone" style="border: 2px dashed var(--primary); border-radius: 8px; padding: 30px; text-align: center; background: rgba(59, 130, 246, 0.02); cursor: pointer; transition: all 0.2s ease;" onclick="document.getElementById('xmlFileInput').click()">
+                    <span style="font-size: 2.5rem; display: block; margin-bottom: 10px;">📂</span>
+                    <span style="font-weight: bold; color: var(--text-main); display: block;">Kéo &amp; thả các file XML vào đây hoặc nhấp để chọn file</span>
+                    <span style="font-size: 12px; color: var(--text-secondary); display: block; margin-top: 5px;">Hỗ trợ chọn nhiều file XML cùng lúc. Hệ thống sẽ tự động dọn dẹp thư mục Input cũ trước khi lưu và phân tích.</span>
+                    <input type="file" id="xmlFileInput" multiple accept=".xml" style="display: none;" onchange="handleXmlFilesUpload(this.files)">
+                </div>
+            </div>
+        </div>
+        
         <!-- CẤU HÌNH ĐƯỜNG DẪN THƯ MỤC XML -->
         <div class="panel" style="margin-top: 20px;">
             <div class="panel-header">
@@ -2882,6 +2897,79 @@
         }, 500);
     }
 
+    async function handleXmlFilesUpload(files) {
+        if (!files || files.length === 0) return;
+        
+        // Hiển thị thanh tiến trình lập tức
+        const container = document.getElementById('xmlProgressContainer');
+        const bar = document.getElementById('xmlProgressBar');
+        const text = document.getElementById('xmlProgressText');
+        if (container) container.style.display = 'block';
+        if (bar) bar.style.width = '10%';
+        if (text) text.innerText = '10% (Đang chuẩn bị tệp tin tải lên...)';
+        
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+        
+        try {
+            if (bar) bar.style.width = '30%';
+            if (text) text.innerText = '30% (Đang tải các tệp XML lên máy chủ...)';
+            
+            const res = await fetch('/api/admin/xml-validator/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (res.ok) {
+                if (bar) bar.style.width = '60%';
+                if (text) text.innerText = '60% (Tải lên thành công! Đang kích hoạt phân tích...)';
+                // Bắt đầu theo dõi tiến độ quét bằng cơ chế polling đã có
+                startXmlProgressPolling();
+            } else {
+                const err = await res.json();
+                alert("Lỗi tải lên: " + (err.detail || "Không rõ nguyên nhân"));
+                if (container) container.style.display = 'none';
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Lỗi kết nối khi tải tệp lên.");
+            if (container) container.style.display = 'none';
+        }
+        
+        // Reset ô chọn file
+        document.getElementById('xmlFileInput').value = '';
+    }
+
+    // Thiết lập sự kiện kéo thả Drag & Drop
+    function setupXmlDragDrop() {
+        const dropZone = document.getElementById('xmlDragDropZone');
+        if (!dropZone) return;
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.style.background = 'rgba(59, 130, 246, 0.1)';
+                dropZone.style.borderColor = 'var(--primary-hover)';
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.style.background = 'rgba(59, 130, 246, 0.02)';
+                dropZone.style.borderColor = 'var(--primary)';
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleXmlFilesUpload(files);
+        }, false);
+    }
+
     async function triggerXmlScan() {
         try {
             const res = await fetch('/api/admin/xml-validator/trigger', { method: 'POST' });
@@ -3020,6 +3108,7 @@
     checkSyncStatusOnLoad();
     checkXmlWatcherStatus();
     loadXmlConfig();
+    setupXmlDragDrop();
 </script>
 </body>
 </html>

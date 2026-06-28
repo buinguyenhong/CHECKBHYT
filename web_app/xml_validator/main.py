@@ -68,7 +68,7 @@ def perform_validation_scan():
     try:
         PROGRESS["status"] = "scanning"
         update_progress(0, 0, "Khởi động tiến trình quét...")
-        print(f"[*] Bắt đầu quét và phân tích XML trong thư mục: {input_dir}")
+        print(f"[*] Starting XML scan in dir: {input_dir}")
         
         if not os.path.exists(input_dir):
             PROGRESS["status"] = "idle"
@@ -104,7 +104,7 @@ def perform_validation_scan():
         PROGRESS["message"] = "Đang khởi tạo tệp báo cáo Excel và JSON..."
         
         excel_path, json_path = generate_reports(grouped_data, rule_errors, invalid_files, output_dir)
-        print(f"[*] Quét hoàn tất. Báo cáo ghi nhận tại {excel_path} và {json_path}")
+        print(f"[*] Scan complete. Report saved to {excel_path} and {json_path}")
         
         PROGRESS["status"] = "completed"
         PROGRESS["percent"] = 100
@@ -117,7 +117,7 @@ def perform_validation_scan():
             "invalid_files_count": len(invalid_files)
         }
     except Exception as e:
-        print(f"[!] Lỗi khi quét XML: {str(e)}")
+        print(f"[!] Scan error: {str(e)}")
         PROGRESS["status"] = "error"
         PROGRESS["percent"] = 0
         PROGRESS["message"] = f"Gặp sự cố lỗi: {str(e)}"

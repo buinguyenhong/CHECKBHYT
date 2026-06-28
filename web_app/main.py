@@ -1873,6 +1873,20 @@ def get_validator_output_dir():
         pass
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", "Output"))
 
+def get_validator_input_dir():
+    try:
+        config_path = os.path.join(os.path.dirname(__file__), "xml_validator", "config.json")
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                in_dir = cfg.get("input_dir", "Input")
+                if not os.path.isabs(in_dir):
+                    return os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", in_dir))
+                return in_dir
+    except Exception:
+        pass
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", "Input"))
+
 def call_validator_api(path: str, method: str = "GET", params: dict = None, data: dict = None):
     url = f"http://127.0.0.1:8001{path}"
     if params:
@@ -1925,6 +1939,41 @@ def get_xml_validator_results(user: User = Depends(require_admin)):
             return json.load(f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Không thể đọc kết quả: {str(e)}")
+
+@app.post("/api/admin/xml-validator/upload")
+async def upload_xml_files(files: list[UploadFile] = File(...), user: User = Depends(require_admin)):
+    input_dir = get_validator_input_dir()
+    os.makedirs(input_dir, exist_ok=True)
+    
+    # Xóa toàn bộ file XML cũ trong thư mục Input để tránh nhiễu dữ liệu cũ
+    try:
+        for f_name in os.listdir(input_dir):
+            if f_name.lower().endswith(".xml"):
+                os.remove(os.path.join(input_dir, f_name))
+    except Exception as e:
+        print(f"Error clearing input dir: {str(e)}")
+        
+    # Lưu các file XML mới
+    saved_count = 0
+    for file in files:
+        if not file.filename.lower().endswith(".xml"):
+            continue
+        file_path = os.path.join(input_dir, os.path.basename(file.filename))
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        saved_count += 1
+        
+    if saved_count == 0:
+        raise HTTPException(status_code=400, detail="Không có tệp XML hợp lệ nào được tải lên.")
+        
+    # Kích hoạt quét đối soát ngay lập tức
+    try:
+        trigger_main_validator(user)
+    except Exception as e:
+        print(f"Error triggering scan: {str(e)}")
+        
+    return {"status": "success", "message": f"Tải lên thành công {saved_count} tệp và kích hoạt quét đối soát."}
 
 @app.get("/api/admin/xml-validator/download")
 def download_xml_validator_report(user: User = Depends(require_admin)):
