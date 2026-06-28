@@ -2094,14 +2094,22 @@ def start_validator_service():
             
         print("[*] Spawning XML Validator Service in the background...")
         python_exe = sys.executable
-        script_path = os.path.join(os.path.dirname(__file__), "xml_validator", "main.py")
+        script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator"))
         
         flags = 0x08000000 if sys.platform == "win32" else 0
         
+        # Mở file ghi nhật ký debug cho validator
+        log_path = os.path.join(script_dir, "validator.log")
+        log_file = open(log_path, "a", encoding="utf-8")
+        import datetime
+        log_file.write(f"\n--- VALIDATOR START: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        log_file.flush()
+        
         validator_process = subprocess.Popen(
-            [python_exe, script_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            [python_exe, "main.py"],
+            cwd=script_dir,
+            stdout=log_file,
+            stderr=log_file,
             creationflags=flags
         )
         print("[*] Spawned XML Validator Service process successfully.")

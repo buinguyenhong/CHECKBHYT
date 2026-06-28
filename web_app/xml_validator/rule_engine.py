@@ -195,19 +195,31 @@ class XMLRuleEngine:
 
         # A14: XML0 - MA_DICH_VU không được để trống (kiểm tra XML3)
         for xml3 in xml3_list:
-            ma_dv = self.get_nodes(xml3["tree"], "MA_DICH_VU")
-            for idx, node in enumerate(ma_dv):
-                if not node.text or not node.text.strip():
-                    add_error("A14", "XML3", f"MA_DICH_VU[{idx}]", "MA_DICH_VU không được để trống")
+            records = self.get_nodes(xml3["tree"], "CHI_TIET_DVKT")
+            for idx, rec in enumerate(records):
+                ma_nhom_nodes = rec.xpath(".//*[local-name()='MA_NHOM']")
+                ma_nhom = ma_nhom_nodes[0].text.strip() if ma_nhom_nodes and ma_nhom_nodes[0].text else ""
+                
+                # Nếu là vật tư y tế (nhóm 10, 11) thì không bắt buộc MA_DICH_VU
+                if ma_nhom in ["10", "11"]:
+                    continue
+                    
+                ma_dv_nodes = rec.xpath(".//*[local-name()='MA_DICH_VU']")
+                if not ma_dv_nodes or not ma_dv_nodes[0].text or not ma_dv_nodes[0].text.strip():
+                    add_error("A14", "XML3", f"MA_DICH_VU[{idx}]", "MA_DICH_VU không được để trống đối với dịch vụ kỹ thuật")
 
         # A15: XML0 - MA_VAT_TU không được để trống (kiểm tra XML3)
         for xml3 in xml3_list:
-            ma_vt = self.get_nodes(xml3["tree"], "MA_VAT_TU")
-            for idx, node in enumerate(ma_vt):
-                # Lưu ý: MA_VAT_TU có thể chỉ bắt buộc khi MA_NHOM là nhóm VTYT, ở đây check rỗng thô
-                if node.text is not None and not node.text.strip():
-                    # Chỉ kiểm tra nếu thẻ tồn tại nhưng rỗng
-                    add_error("A15", "XML3", f"MA_VAT_TU[{idx}]", "MA_VAT_TU không được để trống")
+            records = self.get_nodes(xml3["tree"], "CHI_TIET_DVKT")
+            for idx, rec in enumerate(records):
+                ma_nhom_nodes = rec.xpath(".//*[local-name()='MA_NHOM']")
+                ma_nhom = ma_nhom_nodes[0].text.strip() if ma_nhom_nodes and ma_nhom_nodes[0].text else ""
+                
+                # Chỉ kiểm tra khi là vật tư y tế (nhóm 10, 11)
+                if ma_nhom in ["10", "11"]:
+                    ma_vt_nodes = rec.xpath(".//*[local-name()='MA_VAT_TU']")
+                    if not ma_vt_nodes or not ma_vt_nodes[0].text or not ma_vt_nodes[0].text.strip():
+                        add_error("A15", "XML3", f"MA_VAT_TU[{idx}]", "MA_VAT_TU không được để trống đối với vật tư y tế")
 
         # A16: XML0 - MA_THUOC không được để trống (kiểm tra XML2)
         for xml2 in xml2_list:
