@@ -175,11 +175,11 @@ def toggle_watcher(enable: bool):
 @app.get("/api/validator/config")
 def get_config():
     """
-    Lấy cấu hình thư mục từ config.json.
+    Lấy cấu hình thư mục từ config.json (đường dẫn tuyệt đối đang sử dụng).
     """
     return {
-        "input_dir": config.get("input_dir", "Input"),
-        "output_dir": config.get("output_dir", "Output"),
+        "input_dir": input_dir,
+        "output_dir": output_dir,
         "api_port": config.get("api_port", 8001)
     }
 
