@@ -9,3 +9,5 @@ uvicorn
 jinja2
 python-multipart
 sqlalchemy
+watchdog
+lxml
