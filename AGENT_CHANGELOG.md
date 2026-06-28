@@ -55,6 +55,18 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-28 - Antigravity (Tài liệu: Thêm đặc tả kỹ thuật mô-đun kiểm tra lỗi hồ sơ XML BHYT)
+
+### Mục tiêu
+- Tích hợp tài liệu đặc tả kỹ thuật `xml_validation_tool_spec.md` (bao gồm nguyên tắc thiết kế, luồng xử lý, danh mục 26 quy tắc kiểm tra cấu trúc/logic liên kết XML BHYT và mô tả tích hợp) vào thư mục gốc của dự án.
+
+### Thay đổi
+- `xml_validation_tool_spec.md`:
+  - [NEW] Thêm file mới ghi nhận toàn bộ đặc tả chi tiết cho mô-đun kiểm tra XML BHYT độc lập.
+
+### Nghiệp vụ ảnh hưởng
+- Không ảnh hưởng trực tiếp đến nghiệp vụ chạy hiện tại. Đây là tài liệu phục vụ cho công tác mở rộng tính năng và phát triển mô-đun phân tích XML mới.
+
 ## 2026-06-27 - Antigravity (Sửa lỗi: Xuất Excel danh sách FAIL chỉ xuất ca chưa xử lý)
 
 ### Mục tiêu
