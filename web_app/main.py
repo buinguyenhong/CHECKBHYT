@@ -2122,72 +2122,88 @@ async def auto_sync_scheduler():
         await asyncio.sleep(30)  # Kế hoạch quét kiểm tra mỗi 30 giây
 
 
-import subprocess
-import sys
+import threading
 import socket
+import sys
+import importlib.util
 
-validator_process = None
+_validator_thread = None
+
+def _is_port_open(port: int, timeout: float = 0.5) -> bool:
+    """Kiểm tra xem một cổng có đang mở không."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    result = s.connect_ex(('127.0.0.1', port))
+    s.close()
+    return result == 0
 
 def start_validator_service():
-    global validator_process
-    try:
-        # Kiểm tra xem cổng 8001 đã có tiến trình nào nghe chưa
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.5)
-        res = s.connect_ex(('127.0.0.1', 8001))
-        s.close()
-        
-        if res == 0:
-            print("[*] XML Validator Service is already running on port 8001.")
-            return
-            
-        print("[*] Spawning XML Validator Service in the background...")
-        python_exe = sys.executable
+    """Chạy XML Validator (FastAPI cổng 8001) trong thread daemon của cùng process."""
+    global _validator_thread
+
+    # Nếu cổng 8001 đã mở sẵn -> không làm gì
+    if _is_port_open(8001):
+        print("[*] XML Validator already running on port 8001.")
+        return
+
+    print("[*] Starting XML Validator Service on port 8001 (in-process thread)...")
+
+    def run_validator():
         script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator"))
-        
-        flags = 0x08000000 if sys.platform == "win32" else 0
-        
-        # Mở file ghi nhật ký debug cho validator
-        log_path = os.path.join(script_dir, "validator.log")
-        log_file = open(log_path, "a", encoding="utf-8")
-        import datetime
-        log_file.write(f"\n--- VALIDATOR START: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
-        log_file.flush()
-        
-        validator_process = subprocess.Popen(
-            [python_exe, "main.py"],
-            cwd=script_dir,
-            stdout=log_file,
-            stderr=log_file,
-            creationflags=flags
-        )
-        print("[*] Spawned XML Validator Service process successfully.")
-    except Exception as e:
-        print(f"[!] Error starting XML Validator Service: {str(e)}")
+
+        # Thêm thư mục xml_validator vào sys.path để import được các module của nó
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+
+        try:
+            # Import validator app module
+            spec = importlib.util.spec_from_file_location(
+                "xml_validator_app",
+                os.path.join(script_dir, "main.py")
+            )
+            validator_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(validator_mod)
+            validator_app = validator_mod.app
+
+            import uvicorn
+            config = uvicorn.Config(
+                validator_app,
+                host="127.0.0.1",
+                port=8001,
+                log_level="warning"
+            )
+            server = uvicorn.Server(config)
+            server.run()
+        except Exception as e:
+            print(f"[!] Validator thread error: {e}")
+
+    _validator_thread = threading.Thread(target=run_validator, daemon=True, name="XMLValidatorThread")
+    _validator_thread.start()
+
+    # Chờ tối đa 10 giây để validator sẵn sàng
+    import time
+    for i in range(20):
+        time.sleep(0.5)
+        if _is_port_open(8001, timeout=0.3):
+            print(f"[*] XML Validator ready on port 8001 (after {(i+1)*0.5:.1f}s).")
+            return
+
+    print("[!] XML Validator did NOT become ready within 10s.")
 
 def stop_validator_service():
-    global validator_process
-    if validator_process:
-        print("[*] Terminating XML Validator Service subprocess...")
-        try:
-            validator_process.terminate()
-            validator_process.wait(timeout=2)
-        except Exception:
-            try:
-                validator_process.kill()
-            except Exception:
-                pass
-        validator_process = None
-        print("[*] Terminated XML Validator Service.")
-
+    """Dừng validator thread (vì là daemon nên tự thoát khi process chính thoát)."""
+    print("[*] XML Validator thread will stop with main process (daemon).")
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(auto_sync_scheduler())
-    # Tự động khởi chạy Validator Service
+    # Khởi chạy Validator Service
     start_validator_service()
 
 @app.on_event("shutdown")
 def shutdown_event():
-    # Tự động dọn dẹp tiến trình Validator Service khi dừng app chính
     stop_validator_service()
+
+
+
+
