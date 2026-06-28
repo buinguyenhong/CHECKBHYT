@@ -55,11 +55,12 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-06-28 - Antigravity (Tính năng: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT, Cấu hình trực quan, Thanh tiến trình & Tự động chạy nền)
+## 2026-06-28 - Antigravity (Tính năng & Sửa lỗi: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT, Cấu hình trực quan, Thanh tiến trình & Sửa lỗi khởi động trên Windows)
 
 ### Mục tiêu
 - Triển khai và tích hợp hoàn chỉnh mô-đun **XML Validator Tool** độc lập phục vụ công tác giám sát tự động (watchdog folder monitor) và REST API (FastAPI) kiểm tra 26 quy tắc lỗi cấu trúc, thời gian, và liên kết chéo của hồ sơ XML BHYT. 
 - Tích hợp bảng điều khiển và bảng thống kê kết quả trực tiếp lên giao diện Admin của Web-App chính, bổ sung **phần cài đặt thư mục cấu hình (Input/Output)** trực quan ngay trên UI để quản trị viên dễ dàng chỉnh sửa mà không cần can thiệp tệp cấu hình thủ công. Đồng thời, cấu hình tự động phân giải và hiển thị đường dẫn tuyệt đối đầy đủ đang sử dụng trực tiếp trên 2 ô nhập liệu khi tải trang giúp tăng tính tường minh.
+- **Sửa lỗi khởi động hệ thống (Hotfix UnicodeEncodeError):** Khắc phục triệt để lỗi sập máy chủ uvicorn khi chạy qua công cụ LaunchWebBHYT với quyền Administrator trên Windows. Nguyên nhân là do các câu lệnh log ra màn hình console bằng tiếng Việt gây lỗi mã hóa ký tự CP1252 (UnicodeEncodeError) trên console Windows khi luồng đầu ra bị ghi đè/piped vào file log. Toàn bộ log console khởi tạo của tiến trình ngầm đã được đổi sang định dạng ASCII để tương thích tuyệt đối với mọi bảng mã console Windows.
 - Tích hợp **thanh tiến trình thời gian thực (Progress Bar)** hiển thị tiến độ đọc file XML và kiểm tra quy tắc nghiệp vụ BHYT trực tiếp trên giao diện Admin giúp tăng tương tác và nâng cao trải nghiệm người dùng.
 - Tự động hóa tiến trình: Hệ thống chính tự động kích hoạt tiến trình XML Validator (FastAPI cổng 8001) chạy ngầm dưới dạng **subprocess** độc lập khi ứng dụng chính khởi động, và tự động tắt dọn dẹp khi đóng ứng dụng chính để người dùng không cần phải bật 2 server thủ công.
 

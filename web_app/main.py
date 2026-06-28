@@ -2089,27 +2089,29 @@ def start_validator_service():
         s.close()
         
         if res == 0:
-            print("[*] XML Validator Service đã hoạt động sẵn trên cổng 8001.")
+            print("[*] XML Validator Service is already running on port 8001.")
             return
             
-        print("[*] Đang tự động khởi chạy XML Validator Service trong nền...")
+        print("[*] Spawning XML Validator Service in the background...")
         python_exe = sys.executable
         script_path = os.path.join(os.path.dirname(__file__), "xml_validator", "main.py")
+        
+        flags = 0x08000000 if sys.platform == "win32" else 0
         
         validator_process = subprocess.Popen(
             [python_exe, script_path],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+            creationflags=flags
         )
-        print("[*] Đã kích hoạt tiến trình XML Validator Service ngầm thành công.")
+        print("[*] Spawned XML Validator Service process successfully.")
     except Exception as e:
-        print(f"[!] Lỗi khi tự động khởi chạy XML Validator: {str(e)}")
+        print(f"[!] Error starting XML Validator Service: {str(e)}")
 
 def stop_validator_service():
     global validator_process
     if validator_process:
-        print("[*] Đang dừng tiến trình XML Validator Service ngầm...")
+        print("[*] Terminating XML Validator Service subprocess...")
         try:
             validator_process.terminate()
             validator_process.wait(timeout=2)
@@ -2119,7 +2121,7 @@ def stop_validator_service():
             except Exception:
                 pass
         validator_process = None
-        print("[*] Đã dừng tiến trình XML Validator.")
+        print("[*] Terminated XML Validator Service.")
 
 
 @app.on_event("startup")
