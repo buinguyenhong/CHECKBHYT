@@ -1859,7 +1859,19 @@ import json
 import urllib.request
 import urllib.parse
 
-VALIDATOR_OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", "Output"))
+def get_validator_output_dir():
+    try:
+        config_path = os.path.join(os.path.dirname(__file__), "xml_validator", "config.json")
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                out_dir = cfg.get("output_dir", "Output")
+                if not os.path.isabs(out_dir):
+                    return os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", out_dir))
+                return out_dir
+    except Exception:
+        pass
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", "Output"))
 
 def call_validator_api(path: str, method: str = "GET", params: dict = None, data: dict = None):
     url = f"http://127.0.0.1:8001{path}"
@@ -1867,7 +1879,7 @@ def call_validator_api(path: str, method: str = "GET", params: dict = None, data
         url += "?" + urllib.parse.urlencode(params)
     
     req = urllib.request.Request(url, method=method)
-    if data:
+    if data is not None:
         req.add_header('Content-Type', 'application/json')
         json_data = json.dumps(data).encode('utf-8')
         req.data = json_data
@@ -1890,9 +1902,18 @@ def toggle_main_validator(enable: bool, user: User = Depends(require_admin)):
 def trigger_main_validator(user: User = Depends(require_admin)):
     return call_validator_api("/api/validator/scan", method="POST")
 
+@app.get("/api/admin/xml-validator/config")
+def get_main_validator_config(user: User = Depends(require_admin)):
+    return call_validator_api("/api/validator/config")
+
+@app.post("/api/admin/xml-validator/config")
+def update_main_validator_config(new_config: dict, user: User = Depends(require_admin)):
+    return call_validator_api("/api/validator/config", method="POST", data=new_config)
+
 @app.get("/api/admin/xml-validator/results")
 def get_xml_validator_results(user: User = Depends(require_admin)):
-    json_path = os.path.join(VALIDATOR_OUTPUT_DIR, "ket_qua.json")
+    output_dir = get_validator_output_dir()
+    json_path = os.path.join(output_dir, "ket_qua.json")
     if not os.path.exists(json_path):
         return {"summary": {"total_patients": 0, "total_files": 0, "error_patients": 0, "error_count": 0, "scan_time": "Chưa quét"}, "errors": []}
     try:
@@ -1903,7 +1924,8 @@ def get_xml_validator_results(user: User = Depends(require_admin)):
 
 @app.get("/api/admin/xml-validator/download")
 def download_xml_validator_report(user: User = Depends(require_admin)):
-    excel_path = os.path.join(VALIDATOR_OUTPUT_DIR, "TongHopLoi.xlsx")
+    output_dir = get_validator_output_dir()
+    excel_path = os.path.join(output_dir, "TongHopLoi.xlsx")
     if not os.path.exists(excel_path):
         raise HTTPException(status_code=404, detail="Chưa có file báo cáo lỗi Excel. Vui lòng chạy phân tích trước.")
     return FileResponse(

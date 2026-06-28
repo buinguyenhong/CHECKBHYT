@@ -55,10 +55,11 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-06-28 - Antigravity (Tính năng: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT)
+## 2026-06-28 - Antigravity (Tính năng: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT & Cấu hình thư mục trực quan)
 
 ### Mục tiêu
-- Triển khai và tích hợp hoàn chỉnh mô-đun **XML Validator Tool** độc lập phục vụ công tác giám sát tự động (watchdog folder monitor) và REST API (FastAPI) kiểm tra 26 quy tắc lỗi cấu trúc, thời gian, và liên kết chéo của hồ sơ XML BHYT. Tích hợp bảng điều khiển và bảng thống kê kết quả trực tiếp lên giao diện Admin của Web-App chính.
+- Triển khai và tích hợp hoàn chỉnh mô-đun **XML Validator Tool** độc lập phục vụ công tác giám sát tự động (watchdog folder monitor) và REST API (FastAPI) kiểm tra 26 quy tắc lỗi cấu trúc, thời gian, và liên kết chéo của hồ sơ XML BHYT. 
+- Tích hợp bảng điều khiển và bảng thống kê kết quả trực tiếp lên giao diện Admin của Web-App chính, bổ sung **phần cài đặt thư mục cấu hình (Input/Output)** trực quan ngay trên UI để quản trị viên dễ dàng chỉnh sửa mà không cần can thiệp tệp cấu hình thủ công.
 
 ### Thay đổi
 - `web_app/xml_validator/` [NEW]:

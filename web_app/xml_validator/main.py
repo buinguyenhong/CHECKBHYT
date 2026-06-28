@@ -113,5 +113,51 @@ def toggle_watcher(enable: bool):
         watcher.stop()
     return {"watcher_running": watcher.get_status()}
 
+@app.get("/api/validator/config")
+def get_config():
+    """
+    Lấy cấu hình thư mục từ config.json.
+    """
+    return {
+        "input_dir": config.get("input_dir", "Input"),
+        "output_dir": config.get("output_dir", "Output"),
+        "api_port": config.get("api_port", 8001)
+    }
+
+@app.post("/api/validator/config")
+def update_config(new_config: dict):
+    """
+    Cập nhật cấu hình thư mục, ghi vào config.json và reload watcher.
+    """
+    global input_dir, output_dir, watcher
+    
+    config["input_dir"] = new_config.get("input_dir", config.get("input_dir", "Input"))
+    config["output_dir"] = new_config.get("output_dir", config.get("output_dir", "Output"))
+    
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+        
+    # Phân giải lại các đường dẫn tuyệt đối
+    input_dir = os.path.abspath(os.path.join(BASE_DIR, config.get("input_dir", "Input")))
+    output_dir = os.path.abspath(os.path.join(BASE_DIR, config.get("output_dir", "Output")))
+    
+    os.makedirs(input_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Restart Watcher với thư mục input mới
+    was_running = watcher.get_status()
+    watcher.stop()
+    watcher.watch_dir = input_dir
+    
+    if was_running:
+        watcher.start()
+        
+    return {
+        "status": "success",
+        "input_dir": input_dir,
+        "output_dir": output_dir,
+        "watcher_running": watcher.get_status()
+    }
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=api_port)
