@@ -36,3 +36,8 @@ Thumbs.db
 *.db
 uploaded_files/
 web_app/uploaded_files/
+
+# XML Validator runtime data (Input/Output folders contain patient data, not code)
+web_app/xml_validator/Input/
+web_app/xml_validator/Output/
+web_app/xml_validator/validator.log
