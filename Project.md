@@ -76,14 +76,18 @@ File quan trọng:
 - `requirements.txt`: danh sách thư viện.
 - `INSTALL_WEB.md`: hướng dẫn triển khai webapp.
 - `web_app/run.py`: entry point chạy server LAN.
-- `web_app/main.py`: FastAPI app, routes, API, scheduler, seed dữ liệu mặc định.
+- `web_app/main.py`: FastAPI app, routes, API, scheduler, seed dữ liệu mặc định, tích hợp trực tiếp XML Validator chạy nền qua BackgroundTasks.
 - `web_app/database.py`: SQLite engine/session.
 - `web_app/models.py`: models dữ liệu nội bộ.
 - `web_app/auth.py`: đăng nhập và phân quyền.
 - `web_app/services/his_service.py`: kết nối SQL HIS, cache, chuẩn hóa SQL, sinh reset SQL.
 - `web_app/services/excel_service.py`: đọc `listbh.xlsx`, `HoSoLoiChiTiet.xlsx`.
 - `web_app/services/compare_service.py`: logic đối soát và lưu trạng thái.
-- `web_app/templates/admin.html`: giao diện phòng IT.
+- `web_app/xml_validator/`: thư mục chứa mô-đun đối soát và kiểm tra cấu trúc hồ sơ XML BHYT (in-process).
+  - `xml_parser.py`: Đọc tệp XML, giải mã Container XML ký số và gom nhóm theo MA_LK.
+  - `rule_engine.py`: Chứa 26 quy tắc nghiệp vụ BHYT kiểm tra lỗi.
+  - `report_generator.py`: Sinh báo cáo tổng hợp lỗi Excel và JSON kết quả.
+- `web_app/templates/admin.html`: giao diện phòng IT (bao gồm Tab 8 kiểm tra XML BHYT).
 - `web_app/templates/department.html`: giao diện khoa lâm sàng.
 - `web_app/templates/login.html`: đăng nhập.
 

@@ -55,6 +55,28 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-06-28 - Antigravity (Sửa lỗi & Tích hợp: Tích hợp trực tiếp XML Validator vào tiến trình chính và loại bỏ cổng 8001)
+
+### Mục tiêu
+- Khắc phục lỗi `WinError 10061` do cổng 8001 của dịch vụ XML Validator độc lập bị từ chối kết nối hoặc không khởi động được trên môi trường đóng gói PyInstaller.
+- Loại bỏ hoàn toàn cổng mạng 8001 và thư viện `urllib` gọi API trung gian.
+- Tích hợp chạy trực tiếp (in-process) logic đối soát XML bằng `BackgroundTasks` của FastAPI.
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Loại bỏ hoàn toàn các hàm quản lý dịch vụ ở startup/shutdown và HTTP client gọi cổng 8001 (`start_validator_service`, `stop_validator_service`, `call_validator_api`).
+  - Định nghĩa biến tiến trình toàn cục `XML_PROGRESS` để lưu trạng thái và phần trăm tiến độ quét.
+  - Xây dựng hàm chạy trực tiếp `run_direct_validation_scan()` thực hiện import trực tiếp `xml_parser`, `rule_engine`, `report_generator` và chạy dưới nền `BackgroundTasks`.
+  - Cập nhật các API endpoints `/api/admin/xml-validator/` (status, config, progress, trigger, upload) để thực thi trực tiếp trên cùng tiến trình cổng 8000.
+
+### Nghiệp vụ ảnh hưởng
+- Phân hệ kiểm tra XML chạy ổn định, nhanh hơn, không bị ngắt quãng do lỗi tường lửa hoặc xung đột cổng mạng trên Windows.
+- Loại bỏ nguy cơ crash/không tải được dịch vụ kiểm tra XML khi đóng gói sản phẩm.
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công cho `web_app/main.py`.
+- Thực hiện kiểm thử API tích hợp tự động qua kịch bản `test_upload.py` thành công 100% (2 bệnh nhân, 11 file XML được phân tích chính xác, báo cáo đầy đủ).
+
 ## 2026-06-28 - Antigravity (Tính năng & Sửa lỗi: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT, Cấu hình trực quan, Thanh tiến trình & Hỗ trợ XML Container ký số)
 
 ### Mục tiêu

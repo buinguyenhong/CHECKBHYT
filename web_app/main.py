@@ -1887,46 +1887,122 @@ def get_validator_input_dir():
         pass
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", "Input"))
 
-def call_validator_api(path: str, method: str = "GET", params: dict = None, data: dict = None):
-    url = f"http://127.0.0.1:8001{path}"
-    if params:
-        url += "?" + urllib.parse.urlencode(params)
-    
-    req = urllib.request.Request(url, method=method)
-    if data is not None:
-        req.add_header('Content-Type', 'application/json')
-        json_data = json.dumps(data).encode('utf-8')
-        req.data = json_data
-        
+XML_PROGRESS = {
+    "status": "idle",
+    "total_files": 0,
+    "processed_files": 0,
+    "percent": 0,
+    "message": ""
+}
+
+def run_direct_validation_scan():
+    global XML_PROGRESS
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            return json.loads(response.read().decode('utf-8'))
+        XML_PROGRESS["status"] = "scanning"
+        XML_PROGRESS["percent"] = 0
+        XML_PROGRESS["message"] = "Bắt đầu quét và phân tích XML..."
+        
+        input_dir = get_validator_input_dir()
+        output_dir = get_validator_output_dir()
+        
+        os.makedirs(input_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+        
+        def progress_cb(idx, total, filename_msg):
+            pct = int((idx / total) * 60) if total > 0 else 0
+            XML_PROGRESS["total_files"] = total
+            XML_PROGRESS["processed_files"] = idx
+            XML_PROGRESS["percent"] = pct
+            XML_PROGRESS["message"] = f"[{idx}/{total}] Đang đọc {filename_msg}..."
+            
+        from xml_validator.xml_parser import group_xml_files
+        grouped_data, invalid_files = group_xml_files(input_dir, progress_callback=progress_cb)
+        
+        XML_PROGRESS["percent"] = 60
+        XML_PROGRESS["message"] = "Đang áp dụng 26 quy tắc kiểm tra lỗi BHYT..."
+        
+        from xml_validator.rule_engine import XMLRuleEngine
+        engine = XMLRuleEngine()
+        rule_errors = []
+        total_p = len(grouped_data)
+        
+        for idx, (ma_lk, xmls) in enumerate(grouped_data.items()):
+            errors = engine.check_rules(ma_lk, xmls)
+            rule_errors.extend(errors)
+            pct_rules = 60 + int(((idx + 1) / total_p) * 30) if total_p > 0 else 90
+            XML_PROGRESS["percent"] = pct_rules
+            XML_PROGRESS["message"] = f"Đang đối chiếu quy tắc cho bệnh nhân: {ma_lk} ({idx+1}/{total_p})"
+            
+        XML_PROGRESS["percent"] = 90
+        XML_PROGRESS["message"] = "Đang khởi tạo tệp báo cáo Excel và JSON..."
+        
+        from xml_validator.report_generator import generate_reports
+        excel_path, json_path = generate_reports(grouped_data, rule_errors, invalid_files, output_dir)
+        
+        XML_PROGRESS["status"] = "completed"
+        XML_PROGRESS["percent"] = 100
+        XML_PROGRESS["message"] = f"Hoàn tất! Quét xong {total_p} bệnh nhân. Tìm thấy {len(rule_errors) + len(invalid_files)} lỗi."
+        
     except Exception as e:
-        return {"error": str(e), "watcher_running": False}
+        print(f"[!] Direct scan error: {e}")
+        XML_PROGRESS["status"] = "error"
+        XML_PROGRESS["percent"] = 0
+        XML_PROGRESS["message"] = f"Gặp sự cố lỗi: {str(e)}"
 
 @app.get("/api/admin/xml-validator/status")
 def get_main_validator_status(user: User = Depends(require_admin)):
-    return call_validator_api("/api/validator/status")
+    return {
+        "watcher_running": False,
+        "input_dir": get_validator_input_dir(),
+        "output_dir": get_validator_output_dir()
+    }
 
 @app.post("/api/admin/xml-validator/toggle")
 def toggle_main_validator(enable: bool, user: User = Depends(require_admin)):
-    return call_validator_api("/api/validator/watcher/toggle", method="POST", params={"enable": enable})
+    return {"watcher_running": False, "message": "Tính năng Watcher đã được vô hiệu hóa để chạy trực tiếp."}
 
 @app.post("/api/admin/xml-validator/trigger")
-def trigger_main_validator(user: User = Depends(require_admin)):
-    return call_validator_api("/api/validator/scan", method="POST")
+def trigger_main_validator(background_tasks: BackgroundTasks, user: User = Depends(require_admin)):
+    global XML_PROGRESS
+    if XML_PROGRESS["status"] == "scanning":
+        return {"status": "scanning", "message": "Tiến trình quét đang chạy."}
+    
+    background_tasks.add_task(run_direct_validation_scan)
+    return {"status": "scanning", "message": "Đã kích hoạt tiến trình quét đối soát trực tiếp."}
 
 @app.get("/api/admin/xml-validator/config")
 def get_main_validator_config(user: User = Depends(require_admin)):
-    return call_validator_api("/api/validator/config")
+    return {
+        "input_dir": get_validator_input_dir(),
+        "output_dir": get_validator_output_dir(),
+        "api_port": 8000
+    }
 
 @app.post("/api/admin/xml-validator/config")
 def update_main_validator_config(new_config: dict, user: User = Depends(require_admin)):
-    return call_validator_api("/api/validator/config", method="POST", data=new_config)
+    config_path = os.path.join(os.path.dirname(__file__), "xml_validator", "config.json")
+    try:
+        cfg = {}
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        cfg["input_dir"] = new_config.get("input_dir", cfg.get("input_dir", "Input"))
+        cfg["output_dir"] = new_config.get("output_dir", cfg.get("output_dir", "Output"))
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể cập nhật cấu hình: {str(e)}")
+    return {
+        "status": "success",
+        "input_dir": get_validator_input_dir(),
+        "output_dir": get_validator_output_dir(),
+        "watcher_running": False
+    }
 
 @app.get("/api/admin/xml-validator/progress")
 def get_main_validator_progress(user: User = Depends(require_admin)):
-    return call_validator_api("/api/validator/progress")
+    global XML_PROGRESS
+    return XML_PROGRESS
 
 @app.get("/api/admin/xml-validator/results")
 def get_xml_validator_results(user: User = Depends(require_admin)):
@@ -1941,7 +2017,7 @@ def get_xml_validator_results(user: User = Depends(require_admin)):
         raise HTTPException(status_code=500, detail=f"Không thể đọc kết quả: {str(e)}")
 
 @app.post("/api/admin/xml-validator/upload")
-async def upload_xml_files(files: list[UploadFile] = File(...), user: User = Depends(require_admin)):
+async def upload_xml_files(background_tasks: BackgroundTasks, files: list[UploadFile] = File(...), user: User = Depends(require_admin)):
     input_dir = get_validator_input_dir()
     os.makedirs(input_dir, exist_ok=True)
     
@@ -1968,10 +2044,9 @@ async def upload_xml_files(files: list[UploadFile] = File(...), user: User = Dep
         raise HTTPException(status_code=400, detail="Không có tệp XML hợp lệ nào được tải lên.")
         
     # Kích hoạt quét đối soát ngay lập tức
-    try:
-        trigger_main_validator(user)
-    except Exception as e:
-        print(f"Error triggering scan: {str(e)}")
+    global XML_PROGRESS
+    if XML_PROGRESS["status"] != "scanning":
+        background_tasks.add_task(run_direct_validation_scan)
         
     return {"status": "success", "message": f"Tải lên thành công {saved_count} tệp và kích hoạt quét đối soát."}
 
@@ -2122,87 +2197,9 @@ async def auto_sync_scheduler():
         await asyncio.sleep(30)  # Kế hoạch quét kiểm tra mỗi 30 giây
 
 
-import threading
-import socket
-import sys
-import importlib.util
-
-_validator_thread = None
-
-def _is_port_open(port: int, timeout: float = 0.5) -> bool:
-    """Kiểm tra xem một cổng có đang mở không."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(timeout)
-    result = s.connect_ex(('127.0.0.1', port))
-    s.close()
-    return result == 0
-
-def start_validator_service():
-    """Chạy XML Validator (FastAPI cổng 8001) trong thread daemon của cùng process."""
-    global _validator_thread
-
-    # Nếu cổng 8001 đã mở sẵn -> không làm gì
-    if _is_port_open(8001):
-        print("[*] XML Validator already running on port 8001.")
-        return
-
-    print("[*] Starting XML Validator Service on port 8001 (in-process thread)...")
-
-    def run_validator():
-        script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator"))
-
-        # Thêm thư mục xml_validator vào sys.path để import được các module của nó
-        if script_dir not in sys.path:
-            sys.path.insert(0, script_dir)
-
-        try:
-            # Import validator app module
-            spec = importlib.util.spec_from_file_location(
-                "xml_validator_app",
-                os.path.join(script_dir, "main.py")
-            )
-            validator_mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(validator_mod)
-            validator_app = validator_mod.app
-
-            import uvicorn
-            config = uvicorn.Config(
-                validator_app,
-                host="127.0.0.1",
-                port=8001,
-                log_level="warning"
-            )
-            server = uvicorn.Server(config)
-            server.run()
-        except Exception as e:
-            print(f"[!] Validator thread error: {e}")
-
-    _validator_thread = threading.Thread(target=run_validator, daemon=True, name="XMLValidatorThread")
-    _validator_thread.start()
-
-    # Chờ tối đa 10 giây để validator sẵn sàng
-    import time
-    for i in range(20):
-        time.sleep(0.5)
-        if _is_port_open(8001, timeout=0.3):
-            print(f"[*] XML Validator ready on port 8001 (after {(i+1)*0.5:.1f}s).")
-            return
-
-    print("[!] XML Validator did NOT become ready within 10s.")
-
-def stop_validator_service():
-    """Dừng validator thread (vì là daemon nên tự thoát khi process chính thoát)."""
-    print("[*] XML Validator thread will stop with main process (daemon).")
-
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(auto_sync_scheduler())
-    # Khởi chạy Validator Service
-    start_validator_service()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    stop_validator_service()
 
 
 
