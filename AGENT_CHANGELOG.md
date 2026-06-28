@@ -55,12 +55,13 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-06-28 - Antigravity (Tính năng: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT, Cấu hình trực quan & Thanh tiến trình thời gian thực)
+## 2026-06-28 - Antigravity (Tính năng: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT, Cấu hình trực quan, Thanh tiến trình & Tự động chạy nền)
 
 ### Mục tiêu
 - Triển khai và tích hợp hoàn chỉnh mô-đun **XML Validator Tool** độc lập phục vụ công tác giám sát tự động (watchdog folder monitor) và REST API (FastAPI) kiểm tra 26 quy tắc lỗi cấu trúc, thời gian, và liên kết chéo của hồ sơ XML BHYT. 
 - Tích hợp bảng điều khiển và bảng thống kê kết quả trực tiếp lên giao diện Admin của Web-App chính, bổ sung **phần cài đặt thư mục cấu hình (Input/Output)** trực quan ngay trên UI để quản trị viên dễ dàng chỉnh sửa mà không cần can thiệp tệp cấu hình thủ công.
 - Tích hợp **thanh tiến trình thời gian thực (Progress Bar)** hiển thị tiến độ đọc file XML và kiểm tra quy tắc nghiệp vụ BHYT trực tiếp trên giao diện Admin giúp tăng tương tác và nâng cao trải nghiệm người dùng.
+- Tự động hóa tiến trình: Hệ thống chính tự động kích hoạt tiến trình XML Validator (FastAPI cổng 8001) chạy ngầm dưới dạng **subprocess** độc lập khi ứng dụng chính khởi động, và tự động tắt dọn dẹp khi đóng ứng dụng chính để người dùng không cần phải bật 2 server thủ công.
 
 ### Thay đổi
 - `web_app/xml_validator/` [NEW]:

@@ -2073,6 +2073,62 @@ async def auto_sync_scheduler():
         await asyncio.sleep(30)  # Kế hoạch quét kiểm tra mỗi 30 giây
 
 
+import subprocess
+import sys
+import socket
+
+validator_process = None
+
+def start_validator_service():
+    global validator_process
+    try:
+        # Kiểm tra xem cổng 8001 đã có tiến trình nào nghe chưa
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        res = s.connect_ex(('127.0.0.1', 8001))
+        s.close()
+        
+        if res == 0:
+            print("[*] XML Validator Service đã hoạt động sẵn trên cổng 8001.")
+            return
+            
+        print("[*] Đang tự động khởi chạy XML Validator Service trong nền...")
+        python_exe = sys.executable
+        script_path = os.path.join(os.path.dirname(__file__), "xml_validator", "main.py")
+        
+        validator_process = subprocess.Popen(
+            [python_exe, script_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        )
+        print("[*] Đã kích hoạt tiến trình XML Validator Service ngầm thành công.")
+    except Exception as e:
+        print(f"[!] Lỗi khi tự động khởi chạy XML Validator: {str(e)}")
+
+def stop_validator_service():
+    global validator_process
+    if validator_process:
+        print("[*] Đang dừng tiến trình XML Validator Service ngầm...")
+        try:
+            validator_process.terminate()
+            validator_process.wait(timeout=2)
+        except Exception:
+            try:
+                validator_process.kill()
+            except Exception:
+                pass
+        validator_process = None
+        print("[*] Đã dừng tiến trình XML Validator.")
+
+
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(auto_sync_scheduler())
+    # Tự động khởi chạy Validator Service
+    start_validator_service()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    # Tự động dọn dẹp tiến trình Validator Service khi dừng app chính
+    stop_validator_service()
