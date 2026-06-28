@@ -894,6 +894,7 @@
         <button class="tab-btn" onclick="switchTab('users')">5. Quản lý Khoa Phòng</button>
         <button class="tab-btn" onclick="switchTab('reports')">6. Xuất báo cáo</button>
         <button class="tab-btn" onclick="switchTab('error-defs')">7. Hướng dẫn Lỗi</button>
+        <button class="tab-btn" onclick="switchTab('xml-validator')">8. Kiểm tra XML</button>
     </div>
 
     <!-- TAB 1: SYNC & COMPARE -->
@@ -1386,6 +1387,65 @@
             </div>
         </div>
     </div>
+
+    <!-- TAB 8: XML VALIDATOR -->
+    <div id="tab_xml-validator" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Công cụ Kiểm tra Lỗi Hồ sơ XML BHYT (XML Validator)</h2>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <div id="xmlWatcherStatus" style="font-weight: 600; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem;">Watcher: Đang lấy trạng thái...</div>
+                    <button class="btn btn-primary" id="btnToggleXmlWatcher" onclick="toggleXmlWatcher()">Bật/Tắt Watcher</button>
+                    <button class="btn btn-secondary" onclick="triggerXmlScan()">Phân tích XML ngay</button>
+                    <button class="btn btn-success" onclick="downloadXmlReport()">Tải file TongHopLoi.xlsx</button>
+                </div>
+            </div>
+            <div class="grid-form" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                <div class="kpi-card" style="border-left: 4px solid var(--primary); padding: 12px;">
+                    <div class="kpi-label">Tổng hồ sơ (MA_LK)</div>
+                    <div class="kpi-val" id="xmlKpiPatients" style="font-size: 1.5rem;">0</div>
+                </div>
+                <div class="kpi-card" style="border-left: 4px solid var(--success); padding: 12px;">
+                    <div class="kpi-label">Tổng số tệp XML</div>
+                    <div class="kpi-val" id="xmlKpiFiles" style="font-size: 1.5rem;">0</div>
+                </div>
+                <div class="kpi-card" style="border-left: 4px solid #f87171; padding: 12px;">
+                    <div class="kpi-label">Hồ sơ có lỗi</div>
+                    <div class="kpi-val" id="xmlKpiErrorPatients" style="font-size: 1.5rem;">0</div>
+                </div>
+                <div class="kpi-card" style="border-left: 4px solid #f43f5e; padding: 12px;">
+                    <div class="kpi-label">Tổng số lỗi phát hiện</div>
+                    <div class="kpi-val" id="xmlKpiErrors" style="font-size: 1.5rem;">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top: 20px;">
+            <div class="panel-header">
+                <h2>Danh sách Lỗi cấu trúc/logic XML phát hiện</h2>
+                <input type="text" id="searchXmlError" placeholder="Tìm theo MA_LK hoặc Tên bệnh nhân..." class="form-control" style="width: 250px;" onkeyup="filterXmlErrorsTable()">
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>MA_LK</th>
+                            <th>Họ tên</th>
+                            <th>Mã thẻ BHYT</th>
+                            <th>Tên khoa</th>
+                            <th>XML lỗi</th>
+                            <th>Mã quy tắc</th>
+                            <th>Thẻ lỗi</th>
+                            <th>Chi tiết lỗi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="xmlErrorsBody">
+                        <tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">Chưa có dữ liệu phân tích. Hãy bấm "Phân tích XML ngay" hoặc xuất file XML vào thư mục Input.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal cập nhật ghi chú IT -->
@@ -1514,6 +1574,7 @@
         if (tabId === 'users') { fetchUsers(); }
         if (tabId === 'reports') { fetchDeptReport(); }
         if (tabId === 'error-defs') { fetchErrorDefinitions(); }
+        if (tabId === 'xml-validator') { fetchXmlValidatorResults(); }
     }
 
     function toggleAuthFields() {
@@ -2719,10 +2780,125 @@
         }
     };
 
+    // XML Validator functions
+    let xmlWatcherActive = false;
+    let xmlErrorsData = [];
+
+    async function checkXmlWatcherStatus() {
+        try {
+            const res = await fetch('/api/admin/xml-validator/status');
+            if (res.ok) {
+                const data = await res.json();
+                const statusLabel = document.getElementById('xmlWatcherStatus');
+                xmlWatcherActive = data.watcher_running;
+                if (xmlWatcherActive) {
+                    statusLabel.innerText = "Watcher: ĐANG HOẠT ĐỘNG (Autodetect)";
+                    statusLabel.style.background = "var(--success)";
+                    statusLabel.style.color = "white";
+                } else {
+                    statusLabel.innerText = "Watcher: ĐANG TẮT";
+                    statusLabel.style.background = "#ef4444";
+                    statusLabel.style.color = "white";
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function toggleXmlWatcher() {
+        try {
+            const enable = !xmlWatcherActive;
+            const res = await fetch(`/api/admin/xml-validator/toggle?enable=${enable}`, { method: 'POST' });
+            if (res.ok) {
+                await checkXmlWatcherStatus();
+            }
+        } catch (e) {
+            alert("Lỗi khi thay đổi trạng thái Watcher.");
+        }
+    }
+
+    async function triggerXmlScan() {
+        try {
+            const res = await fetch('/api/admin/xml-validator/trigger', { method: 'POST' });
+            if (res.ok) {
+                alert("Đã bắt đầu tiến trình phân tích XML chạy ngầm. Vui lòng chờ vài giây rồi chuyển lại tab để xem kết quả.");
+                setTimeout(fetchXmlValidatorResults, 3000);
+            }
+        } catch (e) {
+            alert("Lỗi khi gửi yêu cầu phân tích.");
+        }
+    }
+
+    async function fetchXmlValidatorResults() {
+        await checkXmlWatcherStatus();
+        try {
+            const res = await fetch('/api/admin/xml-validator/results');
+            if (res.ok) {
+                const data = await res.json();
+                xmlErrorsData = data.errors || [];
+                
+                // Cập nhật KPIs
+                const sum = data.summary || {};
+                document.getElementById('xmlKpiPatients').innerText = sum.total_patients || 0;
+                document.getElementById('xmlKpiFiles').innerText = sum.total_files || 0;
+                document.getElementById('xmlKpiErrorPatients').innerText = sum.error_patients || 0;
+                document.getElementById('xmlKpiErrors').innerText = sum.error_count || 0;
+                
+                renderXmlErrorsTable(xmlErrorsData);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function renderXmlErrorsTable(errors) {
+        const tbody = document.getElementById('xmlErrorsBody');
+        tbody.innerHTML = '';
+        if (errors.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không phát hiện thấy lỗi hồ sơ XML nào.</td></tr>`;
+            return;
+        }
+        errors.forEach(e => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span style="font-weight:600;">${e.ma_lk || ''}</span></td>
+                <td>${e.ho_ten || ''}</td>
+                <td>${e.ma_the || ''}</td>
+                <td>${e.ten_khoa || ''}</td>
+                <td><span class="badge" style="background:#475569; color:white; padding:2px 6px; border-radius:4px; font-size:0.8rem;">${e.xml_type || ''}</span></td>
+                <td><span style="color:#ef4444; font-weight:700;">${e.rule_id || ''}</span></td>
+                <td><code>${e.tag_name || ''}</code></td>
+                <td style="color:#f87171;">${e.message || ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function filterXmlErrorsTable() {
+        const query = document.getElementById('searchXmlError').value.toLowerCase().trim();
+        if (query === "") {
+            renderXmlErrorsTable(xmlErrorsData);
+            return;
+        }
+        const filtered = xmlErrorsData.filter(e => 
+            (e.ma_lk && e.ma_lk.toLowerCase().includes(query)) ||
+            (e.ho_ten && e.ho_ten.toLowerCase().includes(query)) ||
+            (e.ten_khoa && e.ten_khoa.toLowerCase().includes(query)) ||
+            (e.message && e.message.toLowerCase().includes(query))
+        );
+        renderXmlErrorsTable(filtered);
+    }
+
+    function downloadXmlReport() {
+        window.open('/api/admin/xml-validator/download', '_blank');
+    }
+
     // Initialize
     loadConfig();
     toggleUserDept();
     checkSyncStatusOnLoad();
+    checkXmlWatcherStatus();
 </script>
 </body>
 </html>

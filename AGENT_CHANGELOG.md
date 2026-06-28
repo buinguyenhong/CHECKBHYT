@@ -55,17 +55,25 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-06-28 - Antigravity (Tài liệu: Thêm đặc tả kỹ thuật mô-đun kiểm tra lỗi hồ sơ XML BHYT)
+## 2026-06-28 - Antigravity (Tính năng: Triển khai và Tích hợp Mô-đun kiểm tra lỗi XML BHYT)
 
 ### Mục tiêu
-- Tích hợp tài liệu đặc tả kỹ thuật `xml_validation_tool_spec.md` (bao gồm nguyên tắc thiết kế, luồng xử lý, danh mục 26 quy tắc kiểm tra cấu trúc/logic liên kết XML BHYT và mô tả tích hợp) vào thư mục gốc của dự án.
+- Triển khai và tích hợp hoàn chỉnh mô-đun **XML Validator Tool** độc lập phục vụ công tác giám sát tự động (watchdog folder monitor) và REST API (FastAPI) kiểm tra 26 quy tắc lỗi cấu trúc, thời gian, và liên kết chéo của hồ sơ XML BHYT. Tích hợp bảng điều khiển và bảng thống kê kết quả trực tiếp lên giao diện Admin của Web-App chính.
 
 ### Thay đổi
-- `xml_validation_tool_spec.md`:
-  - [NEW] Thêm file mới ghi nhận toàn bộ đặc tả chi tiết cho mô-đun kiểm tra XML BHYT độc lập.
+- `web_app/xml_validator/` [NEW]:
+  - Triển khai `xml_parser.py` (quét và nhận dạng các tệp XML1->XML13, gom nhóm theo bệnh nhân `MA_LK`).
+  - Triển khai `rule_engine.py` (lập trình logic kiểm tra 26 quy tắc BHYT).
+  - Triển khai `report_generator.py` (tạo tệp Excel `TongHopLoi.xlsx` và JSON `ket_qua.json`).
+  - Triển khai `watcher.py` (theo dõi tự động thư mục Input bằng watchdog có debounce trì hoãn chống nhiễu).
+  - Triển khai `main.py` (REST API Server cho mô-đun độc lập tại cổng 8001).
+- `web_app/main.py` [MODIFY]:
+  - Bổ sung proxy endpoints giao tiếp HTTP Client (`urllib.request`) để tắt/bật watcher, gọi quét tay, trả về JSON lỗi và cho phép download file báo cáo Excel.
+- `web_app/templates/admin.html` [MODIFY]:
+  - Bổ sung Tab 8 "Kiểm tra XML" cùng với các nút hành động, thẻ KPI, bảng hiển thị kết quả lỗi và JS điều khiển tương ứng.
 
 ### Nghiệp vụ ảnh hưởng
-- Không ảnh hưởng trực tiếp đến nghiệp vụ chạy hiện tại. Đây là tài liệu phục vụ cho công tác mở rộng tính năng và phát triển mô-đun phân tích XML mới.
+- Người dùng Admin có thêm phân hệ kiểm tra lỗi hồ sơ XML BHYT chuyên sâu độc lập hoạt động tự động trong nền mà không ảnh hưởng tới luồng đối soát HIS/cổng BHYT chính của Web-App.
 
 ## 2026-06-27 - Antigravity (Sửa lỗi: Xuất Excel danh sách FAIL chỉ xuất ca chưa xử lý)
 

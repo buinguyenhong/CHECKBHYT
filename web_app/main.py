@@ -1853,6 +1853,67 @@ def export_loi_list(
 
 
 # ==========================================
+# API: XML VALIDATOR INTEGRATION
+# ==========================================
+import json
+import urllib.request
+import urllib.parse
+
+VALIDATOR_OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "xml_validator", "Output"))
+
+def call_validator_api(path: str, method: str = "GET", params: dict = None, data: dict = None):
+    url = f"http://127.0.0.1:8001{path}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    
+    req = urllib.request.Request(url, method=method)
+    if data:
+        req.add_header('Content-Type', 'application/json')
+        json_data = json.dumps(data).encode('utf-8')
+        req.data = json_data
+        
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        return {"error": str(e), "watcher_running": False}
+
+@app.get("/api/admin/xml-validator/status")
+def get_main_validator_status(user: User = Depends(require_admin)):
+    return call_validator_api("/api/validator/status")
+
+@app.post("/api/admin/xml-validator/toggle")
+def toggle_main_validator(enable: bool, user: User = Depends(require_admin)):
+    return call_validator_api("/api/validator/watcher/toggle", method="POST", params={"enable": enable})
+
+@app.post("/api/admin/xml-validator/trigger")
+def trigger_main_validator(user: User = Depends(require_admin)):
+    return call_validator_api("/api/validator/scan", method="POST")
+
+@app.get("/api/admin/xml-validator/results")
+def get_xml_validator_results(user: User = Depends(require_admin)):
+    json_path = os.path.join(VALIDATOR_OUTPUT_DIR, "ket_qua.json")
+    if not os.path.exists(json_path):
+        return {"summary": {"total_patients": 0, "total_files": 0, "error_patients": 0, "error_count": 0, "scan_time": "Chưa quét"}, "errors": []}
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể đọc kết quả: {str(e)}")
+
+@app.get("/api/admin/xml-validator/download")
+def download_xml_validator_report(user: User = Depends(require_admin)):
+    excel_path = os.path.join(VALIDATOR_OUTPUT_DIR, "TongHopLoi.xlsx")
+    if not os.path.exists(excel_path):
+        raise HTTPException(status_code=404, detail="Chưa có file báo cáo lỗi Excel. Vui lòng chạy phân tích trước.")
+    return FileResponse(
+        excel_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="TongHopLoi.xlsx"
+    )
+
+
+# ==========================================
 # API: USERS / DEPARTMENTS MANAGEMENT
 # ==========================================
 

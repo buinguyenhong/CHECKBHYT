@@ -1,0 +1,6 @@
+watchdog
+lxml
+pandas
+openpyxl
+fastapi
+uvicorn
