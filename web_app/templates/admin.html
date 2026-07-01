@@ -2426,14 +2426,50 @@
         }
     }
 
+    // Helper function for robust clipboard copying in HTTP LAN environments
+    function copyTextToClipboard(text) {
+        return new Promise((resolve, reject) => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(resolve).catch(reject);
+            } else {
+                try {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = text;
+                    textArea.style.position = "fixed";
+                    textArea.style.top = "0";
+                    textArea.style.left = "0";
+                    textArea.style.width = "2em";
+                    textArea.style.height = "2em";
+                    textArea.style.padding = "0";
+                    textArea.style.border = "none";
+                    textArea.style.outline = "none";
+                    textArea.style.boxShadow = "none";
+                    textArea.style.background = "transparent";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    if (successful) {
+                        resolve();
+                    } else {
+                        reject(new Error("document.execCommand('copy') failed"));
+                    }
+                } catch (err) {
+                    reject(err);
+                }
+            }
+        });
+    }
+
     // Helper functions for hisUnlockModal
     function openHisUnlockModal(sql, title) {
         document.getElementById('hisUnlockModalTitle').innerText = title || "Mở khóa bệnh án / Reset HIS";
         document.getElementById('hisUnlockSqlText').value = sql;
         document.getElementById('hisUnlockModal').style.display = 'flex';
         
-        // Auto copy to clipboard
-        navigator.clipboard.writeText(sql).then(() => {
+        // Auto copy to clipboard safely in HTTP / LAN contexts
+        copyTextToClipboard(sql).then(() => {
             logToConsole(`Đã tự động copy câu lệnh SQL vào Clipboard! ✅`);
         }).catch(err => {
             console.error('Không thể auto-copy: ', err);
@@ -2446,7 +2482,7 @@
 
     function copyHisUnlockSql() {
         const sql = document.getElementById('hisUnlockSqlText').value;
-        navigator.clipboard.writeText(sql).then(() => {
+        copyTextToClipboard(sql).then(() => {
             alert("Đã copy câu lệnh SQL thành công!");
         }).catch(err => {
             alert("Lỗi copy: " + err);

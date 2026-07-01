@@ -190,7 +190,7 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         SYNC_PROGRESS["logs"].append("Đang đối soát 2 chiều, kế thừa ghi chú và tự động duyệt...")
         
         ngay_doi_soat = datetime.date.today()
-        stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat)
+        stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat, include_errors=include_errors)
         save_last_kpis(db, stats, df_listbh, ngay_doi_soat)
         
         if SYNC_PROGRESS.get("should_stop"):
@@ -1062,7 +1062,7 @@ def compare_records(
 
         # 4. Thực hiện đối soát thông minh
         ngay_doi_soat = datetime.date.today()
-        stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat)
+        stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat, include_errors=include_errors)
         save_last_kpis(db, stats, df_listbh, ngay_doi_soat)
         
         return stats
@@ -2179,7 +2179,7 @@ async def auto_sync_scheduler():
                                 # File lỗi chi tiết chỉ được dùng khi IT chủ động import/chạy lại.
                                 df_hsloi = pd.DataFrame()
                                     
-                                stats = compare_service.process_comparison(temp_db, df_sql, df_listbh, df_hsloi, now.date())
+                                stats = compare_service.process_comparison(temp_db, df_sql, df_listbh, df_hsloi, now.date(), include_errors=False)
                                 save_last_kpis(temp_db, stats, df_listbh, now.date())
                                 print("[*] [Scheduler] Dong bo tu dong HIS thanh cong.")
                             except Exception as ex:

@@ -73,7 +73,8 @@ def process_comparison(
     df_sql: pd.DataFrame,
     df_listbh: pd.DataFrame,
     df_hsloi: pd.DataFrame,
-    ngay_doi_soat: datetime.date
+    ngay_doi_soat: datetime.date,
+    include_errors: bool = False
 ) -> dict:
     """
     Thực hiện đối soát giữa SQL HIS, danh sách gửi BHYT và file báo cáo lỗi.
@@ -163,10 +164,33 @@ def process_comparison(
                 type_group = "FAIL"
                 stats["fail"] += 1
                 
+                # Biến cờ đánh dấu nếu ca này từng có lỗi cũ được sửa
+                had_previous_active_errors = False
+                
+                if include_errors:
+                    existing_loi_records = db.query(Record).filter(
+                        Record.ma_lk == ma_lk,
+                        Record.type_group == "LOI",
+                        Record.status != "RESOLVED"
+                    ).all()
+                    if existing_loi_records:
+                        had_previous_active_errors = True
+                        for loi_rec in existing_loi_records:
+                            loi_rec.status = "RESOLVED"
+                            log = RecordLog(
+                                record_id=loi_rec.id,
+                                username="system",
+                                action="CHANGE_STATUS",
+                                note="He thong tu dong dong nhom LOI: Ho so khong con trong danh sach loi chi tiet BHYT o lan doi soat nay"
+                            )
+                            db.add(log)
+                
                 existing_record = db.query(Record).filter(
                     Record.ma_lk == ma_lk,
                     Record.type_group == "FAIL"
                 ).first()
+                
+                note_val = "trễ hạn - đã sửa lỗi" if had_previous_active_errors else ""
                 
                 if existing_record:
                     existing_record.ho_ten = ho_ten
@@ -176,6 +200,8 @@ def process_comparison(
                     existing_record.ngay_ra_vien = ngay_ra_vien
                     existing_record.loai_ca = loai_ca
                     existing_record.ngay_doi_soat = ngay_doi_soat
+                    if note_val:
+                        existing_record.note = note_val
                     
                     # Nếu ca FAIL này trước đó đã gửi thành công nay bị mở lại
                     if existing_record.status == "RESOLVED":
@@ -202,7 +228,7 @@ def process_comparison(
                         maloi="",
                         motaloi="",
                         ngay_ra=None,
-                        note=""
+                        note=note_val
                     )
                     db.add(new_rec)
                     db.flush()
@@ -211,7 +237,7 @@ def process_comparison(
                         record_id=new_rec.id,
                         username="system",
                         action="CREATE",
-                        note=f"Khoi tao doi soat ngay {ngay_doi_soat.strftime('%d/%m/%Y')}. Nhom: FAIL"
+                        note=f"Khoi tao doi soat ngay {ngay_doi_soat.strftime('%d/%m/%Y')}. Nhom: FAIL" + (f" ({note_val})" if note_val else "")
                     )
                     db.add(log_entry)
             else:
@@ -232,12 +258,37 @@ def process_comparison(
                         note="He thong tu dong dong nhom FAIL: Ho so da co trong danh sach loi chi tiet BHYT"
                     )
                     db.add(log)
-
+ 
                 # Load tất cả bản ghi LOI đã có của ma_lk này để so khớp mềm dẻo trên bộ nhớ (tránh trùng do hoa thường/khoảng trắng)
                 existing_loi_records = db.query(Record).filter(
                     Record.ma_lk == ma_lk,
                     Record.type_group == "LOI"
                 ).all()
+ 
+                if include_errors:
+                    # Tự động đóng các bản ghi lỗi cũ không còn xuất hiện trong danh sách lỗi mới
+                    for rec in existing_loi_records:
+                        if rec.status != "RESOLVED":
+                            rec_maloi = str(rec.maloi or "").strip().upper()
+                            rec_motaloi = clean_error_desc(str(rec.motaloi or ""))
+                            
+                            found_in_new = False
+                            for err_detail in error_map[ma_lk]:
+                                new_maloi = err_detail["maloi"]
+                                new_motaloi = err_detail["motaloi"]
+                                if rec_maloi == new_maloi and rec_motaloi.lower() == new_motaloi.lower():
+                                    found_in_new = True
+                                    break
+                            
+                            if not found_in_new:
+                                rec.status = "RESOLVED"
+                                log = RecordLog(
+                                    record_id=rec.id,
+                                    username="system",
+                                    action="CHANGE_STATUS",
+                                    note="He thong tu dong dong: Loi nay khong con trong danh sach loi chi tiet BHYT moi"
+                                )
+                                db.add(log)
 
                 for err_detail in error_map[ma_lk]:
                     maloi = err_detail["maloi"]

@@ -55,6 +55,32 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-01 - Antigravity (Sửa lỗi sao chép SQL & Nâng cấp logic Đối soát lỗi chi tiết BHYT)
+
+### Mục tiêu
+- Sửa lỗi báo "Lỗi kết nối" giả và nút copy câu lệnh SQL không hoạt động trên trình duyệt chạy mạng LAN (HTTP không bảo mật).
+- Nâng cấp logic đối soát: Lấy tệp báo cáo lỗi chi tiết làm chuẩn. Tự động đóng lỗi cũ và chuyển thành FAIL kèm ghi chú "trễ hạn - đã sửa lỗi" nếu ca bệnh không còn nằm trong danh sách lỗi mới và chưa gửi cổng thành công.
+
+### Thay đổi
+- `web_app/templates/admin.html` [MODIFY]:
+  - Thêm hàm `copyTextToClipboard(text)` làm fallback an toàn sử dụng `document.execCommand('copy')` cho môi trường LAN HTTP.
+  - Cập nhật hàm `openHisUnlockModal` và `copyHisUnlockSql` gọi hàm sao chép an toàn này để sửa dứt điểm lỗi báo "Lỗi kết nối" giả và nút copy không hoạt động.
+- `web_app/services/compare_service.py` [MODIFY]:
+  - Bổ sung tham số `include_errors` vào hàm `process_comparison`.
+  - Thêm logic tự động duyệt đóng các lỗi cũ (LOI -> RESOLVED) cho ca bệnh khi đối soát không còn ghi nhận lỗi đó ở tệp lỗi mới.
+  - Thêm logic chuyển ca bệnh lỗi cũ đã sửa về lại danh sách `FAIL` với ghi chú **"trễ hạn - đã sửa lỗi"** nếu ca đó chưa được gửi cổng thành công.
+- `web_app/main.py` [MODIFY]:
+  - Cập nhật 3 cuộc gọi hàm `compare_service.process_comparison` để truyền thêm tham số `include_errors` phù hợp với từng luồng đối soát.
+
+### Nghiệp vụ ảnh hưởng
+- Người dùng IT sao chép các script SQL reset và SQL mở khóa bệnh án bình thường trên trình duyệt ở máy khoa phòng (LAN HTTP).
+- Tránh tình trạng hồ sơ lỗi cũ đã được sửa nhưng vẫn hiển thị cảnh báo lỗi cũ trong cơ sở dữ liệu webapp.
+- Tự động hóa việc phân loại ca bệnh từ lỗi (`LOI`) sang chưa gửi (`FAIL`) kèm ghi chú cảnh báo trễ hạn trực quan.
+
+### Kiểm tra
+- Chạy biên dịch cú pháp Python `py_compile` thành công.
+- Chạy kịch bản kiểm thử tự động `scratch/test_reconciliation.py` mô phỏng đối soát thành công 100% hai trường hợp: đóng lỗi cũ hoàn toàn và đóng một phần lỗi.
+
 ## 2026-06-28 - Antigravity (Sửa lỗi & Tích hợp: Tích hợp trực tiếp XML Validator vào tiến trình chính và loại bỏ cổng 8001)
 
 ### Mục tiêu
