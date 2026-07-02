@@ -55,6 +55,36 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-02 - Antigravity (Cập nhật quy tắc kiểm tra lỗi XML & Điều chỉnh ghi chú đối soát lỗi cũ)
+
+### Mục tiêu
+- Loại bỏ kiểm tra logic thời gian đối với `NGOAITRU_TUNGAY <= NGAY_RA` trong XML7 (Quy tắc B2).
+- Thêm quy tắc kiểm tra mới cho XML1: Nếu `LY_DO_VV` là "Người bệnh không KCB BHYT", báo lỗi " sai lý do: Người bệnh không KCB BHYT " (Quy tắc A17).
+- Thay đổi nội dung ghi chú khi chuyển các ca lỗi cũ đã sửa về lại danh sách `FAIL` (từ `"trễ hạn - đã sửa lỗi"` thành `"đã sửa lỗi cũ"`).
+
+### Thay đổi
+- `web_app/xml_validator/rule_engine.py` [MODIFY]:
+  - Comment out logic kiểm tra quy tắc `B2` (`NGOAITRU_TUNGAY <= NGAY_RA`).
+  - Thêm quy tắc `A17` kiểm tra `LY_DO_VV` trong XML1.
+- `xml_validation_tool_spec.md` [MODIFY]:
+  - Cập nhật tài liệu đặc tả: đánh dấu `B2` đã lược bỏ và bổ sung quy tắc mới `A17`.
+- `web_app/services/compare_service.py` [MODIFY]:
+  - Điều chỉnh giá trị `note_val` khi tự động chuyển trạng thái ca bệnh đã sửa lỗi cũ chưa gửi thành công về lại `FAIL` từ `"trễ hạn - đã sửa lỗi"` sang `"đã sửa lỗi cũ"`.
+- `scratch/test_reconciliation.py` [MODIFY]:
+  - Cập nhật các khẳng định kiểm thử (asserts) tương ứng với chuỗi ghi chú `"đã sửa lỗi cũ"` mới.
+
+### Nghiệp vụ ảnh hưởng
+- Không còn phát hiện các lỗi cảnh báo liên quan đến ngày bắt đầu điều trị ngoại trú lớn hơn ngày ra viện nữa.
+- Phát hiện và báo lỗi ngay lập tức đối với các hồ sơ XML1 có lý do vào viện là "Người bệnh không KCB BHYT" để người dùng kịp thời chỉnh sửa trước khi gửi cổng.
+- Chuỗi ghi chú của ca bệnh FAIL có lỗi cũ đã sửa hiển thị thân thiện hơn: `"đã sửa lỗi cũ"`.
+
+### Kiểm tra
+- Viết kịch bản kiểm tra độc lập tại `scratch/test_xml_validator.py` và chạy thành công qua system Python (`SUCCESS!`).
+- Chạy lại toàn bộ bộ kiểm thử đối soát kinh doanh tại `scratch/test_reconciliation.py` và vượt qua thành công (`All tests completed successfully!`).
+
+### Lưu ý cho phiên sau
+- Cần theo dõi xem người dùng có yêu cầu mở lại hoặc tùy biến thêm quy tắc nào khác liên quan đến lý do vào viện không.
+
 ## 2026-07-01 - Antigravity (Sửa lỗi sao chép SQL & Nâng cấp logic Đối soát lỗi chi tiết BHYT)
 
 ### Mục tiêu

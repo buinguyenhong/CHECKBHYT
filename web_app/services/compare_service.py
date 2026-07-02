@@ -190,7 +190,7 @@ def process_comparison(
                     Record.type_group == "FAIL"
                 ).first()
                 
-                note_val = "trễ hạn - đã sửa lỗi" if had_previous_active_errors else ""
+                note_val = "đã sửa lỗi cũ" if had_previous_active_errors else ""
                 
                 if existing_record:
                     existing_record.ho_ten = ho_ten

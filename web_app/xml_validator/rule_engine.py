@@ -76,6 +76,11 @@ class XMLRuleEngine:
         if not nam_qt:
             add_error("A2", "XML1", "NAM_QT", "NAM_QT không được để trống")
 
+        # A17: XML1 - LY_DO_VV check
+        ly_do_vv = self.get_tag_value(xml1_tree, "LY_DO_VV")
+        if ly_do_vv == "Người bệnh không KCB BHYT":
+            add_error("A17", "XML1", "LY_DO_VV", " sai lý do: Người bệnh không KCB BHYT ")
+
         # A3: XML2 - MA_THUOC không được để trống
         xml2_list = xml_files.get("XML2", [])
         for xml2 in xml2_list:
@@ -246,20 +251,20 @@ class XMLRuleEngine:
                 elif dt > now:
                     add_error("B1", "XML4", f"NGAY_KQ[{idx}]", "NGAY_KQ không được lớn hơn thời gian hiện tại")
 
-        # B2: XML7 - NGOAITRU_TUNGAY <= XML1 NGAY_RA
-        ngay_ra_str = self.get_tag_value(xml1_tree, "NGAY_RA")
-        ngay_ra_dt = self.parse_xml_date(ngay_ra_str)
-        
-        xml7_list = xml_files.get("XML7", [])
-        for xml7 in xml7_list:
-            tungay_nodes = self.get_nodes(xml7["tree"], "NGOAITRU_TUNGAY")
-            for idx, node in enumerate(tungay_nodes):
-                val = node.text.strip() if node.text else ""
-                if not val:
-                    continue
-                dt_tu = self.parse_xml_date(val)
-                if dt_tu and ngay_ra_dt and dt_tu > ngay_ra_dt:
-                    add_error("B2", "XML7", f"NGOAITRU_TUNGAY[{idx}]", "NGOAITRU_TUNGAY không được lớn hơn NGAY_RA")
+        # B2: XML7 - NGOAITRU_TUNGAY <= XML1 NGAY_RA (Lược bỏ theo yêu cầu: không kiểm tra)
+        # ngay_ra_str = self.get_tag_value(xml1_tree, "NGAY_RA")
+        # ngay_ra_dt = self.parse_xml_date(ngay_ra_str)
+        # 
+        # xml7_list = xml_files.get("XML7", [])
+        # for xml7 in xml7_list:
+        #     tungay_nodes = self.get_nodes(xml7["tree"], "NGOAITRU_TUNGAY")
+        #     for idx, node in enumerate(tungay_nodes):
+        #         val = node.text.strip() if node.text else ""
+        #         if not val:
+        #             continue
+        #         dt_tu = self.parse_xml_date(val)
+        #         if dt_tu and ngay_ra_dt and dt_tu > ngay_ra_dt:
+        #             add_error("B2", "XML7", f"NGOAITRU_TUNGAY[{idx}]", "NGOAITRU_TUNGAY không được lớn hơn NGAY_RA")
 
         # B3: XML3 - NGAY_YL >= XML1 NGAY_VAO
         ngay_vao_str = self.get_tag_value(xml1_tree, "NGAY_VAO")
