@@ -290,12 +290,11 @@ def process_comparison(
                                 )
                                 db.add(log)
 
+                stats["loi"] += 1
                 for err_detail in error_map[ma_lk]:
                     maloi = err_detail["maloi"]
                     motaloi = err_detail["motaloi"]
                     ngay_ra = err_detail["ngay_ra"]
-                    
-                    stats["loi"] += 1
                     
                     # A. Tự động thu thập mẫu lỗi mới chưa có trong danh mục hướng dẫn
                     kw = None

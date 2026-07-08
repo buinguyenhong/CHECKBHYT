@@ -55,6 +55,31 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-08 - Antigravity (Tính năng & Sửa lỗi: Cập nhật đếm số ca có lỗi và Lọc ca FAIL theo tháng)
+
+### Mục tiêu
+- Cập nhật số lượng lỗi hiển thị trên dashboard màn hình chính thành số lượng ca (bệnh nhân độc nhất `MA_LK`) có lỗi thay vì đếm tổng số bản ghi lỗi chi tiết trong CSDL.
+- Bổ sung bộ lọc lựa chọn tháng hoặc hiển thị tất cả cho danh sách ca FAIL, kèm việc hiển thị số lượng ca FAIL thực tế tương ứng với tháng được lọc.
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Cập nhật API `/api/records/kpi`: sử dụng `distinct()` trên `Record.ma_lk` để tính KPI `loi` là số lượng ca bệnh độc nhất có lỗi thay vì tổng số dòng ghi nhận lỗi.
+- `web_app/services/compare_service.py` [MODIFY]:
+  - Cập nhật logic tính toán `stats["loi"]` trong `process_comparison`: tăng bộ đếm `stats["loi"]` một lần cho mỗi ca bệnh (`ma_lk`) có lỗi thay vì tăng mỗi khi duyệt qua từng lỗi chi tiết của bệnh nhân đó.
+- `web_app/templates/admin.html` [MODIFY]:
+  - Bổ sung bộ chọn lọc tháng `#failMonthFilter` và thẻ đếm `#failCountText` trong panel header của Tab 2 (Danh sách ca FAIL).
+  - Khai báo danh sách lưu trữ toàn cục `allFailRecords`. Khi tải trang, hệ thống tự động bóc tách các tháng khả dụng từ danh sách ca FAIL để tạo động bộ chọn tháng.
+  - Implement hàm JS `filterFailByMonth()` lọc nhanh ca FAIL trực tiếp tại client-side và hiển thị số lượng ca FAIL tương ứng với tháng được chọn.
+  - Cập nhật hàm `exportFailData()` để tự động lọc và xuất danh sách Excel các ca FAIL đúng theo tháng đang được chọn trên bộ lọc (nếu chọn một tháng cụ thể).
+
+### Nghiệp vụ ảnh hưởng
+- Số liệu KPI "Danh sách Lỗi" trên màn hình chính chuẩn xác hơn vì phản ánh đúng số ca cần xử lý.
+- Phòng IT quản lý và phân phối mở khóa/reset các ca FAIL theo tháng dễ dàng và trực quan hơn.
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công cho `web_app/main.py` và `web_app/services/compare_service.py`.
+- Khởi chạy thử nghiệm tích hợp cục bộ thành công.
+
 ## 2026-07-02 - Antigravity (Cập nhật quy tắc kiểm tra lỗi XML & Điều chỉnh ghi chú đối soát lỗi cũ)
 
 ### Mục tiêu

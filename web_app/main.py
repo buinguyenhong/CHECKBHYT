@@ -1607,7 +1607,7 @@ def get_global_kpis(
             da_gui = base_query.filter(Record.status == "RESOLVED", Record.type_group != "LOI").count()
 
     # Dynamic active counts representing the actual current state of the database
-    loi = db.query(Record).filter(Record.type_group == "LOI", Record.status != "RESOLVED").count()
+    loi = db.query(Record.ma_lk).filter(Record.type_group == "LOI", Record.status != "RESOLVED").distinct().count()
     fail = db.query(Record).filter(Record.type_group == "FAIL", Record.status != "RESOLVED").count()
     resolved = db.query(Record).filter(Record.status == "RESOLVED").count()
 

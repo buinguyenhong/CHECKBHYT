@@ -1117,8 +1117,12 @@
     <div id="tab_fail" class="tab-pane">
         <div class="panel">
             <div class="panel-header">
-                <h2>Danh sách ca FAIL (Có trong SQL HIS nhưng chưa đẩy cổng và không có trong danh sách lỗi)</h2>
-                <div style="display:flex; gap:10px;">
+                <h2>Danh sách ca FAIL (<span id="failCountText">0</span> ca)</h2>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <label for="failMonthFilter" style="color:var(--text-secondary); font-size:14px; font-weight:bold; margin-right:4px;">Lọc theo tháng:</label>
+                    <select id="failMonthFilter" onchange="filterFailByMonth()" style="padding:6px 12px; background:var(--input-bg); border:1px solid var(--input-border); color:var(--text-main); border-radius:6px; outline:none; font-size:14px; cursor:pointer;">
+                        <option value="all">Tất cả các tháng</option>
+                    </select>
                     <button class="btn btn-success" onclick="resetSelectedFail('Ngoại trú')">Chạy Reset Ngoại trú</button>
                     <button class="btn btn-success" onclick="resetSelectedFail('Nội trú')">Chạy Reset Nội trú</button>
                     <button class="btn btn-danger" onclick="exportFailData()">Xuất Excel ca FAIL</button>
@@ -2173,6 +2177,8 @@
         }
     }
 
+    let allFailRecords = [];
+
     // Fetch Fail Records (Tab 2)
     async function fetchFailRecords() {
         try {
@@ -2181,55 +2187,108 @@
             const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
-                const tbody = document.getElementById('failBody');
-                tbody.innerHTML = '';
- 
-                if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào cần xử lý.</td></tr>`;
-                    return;
-                }
- 
-                data.forEach(r => {
-                    const tr = document.createElement('tr');
-                    const warnClass = getWarningClass(r.ngay_ra_vien);
-                    if (warnClass) {
-                        tr.className = warnClass;
-                    }
-                    
-                    let formattedDate = '';
+                allFailRecords = data;
+                
+                // Trích xuất các tháng khả dụng từ danh sách ca FAIL
+                const monthYears = new Set();
+                allFailRecords.forEach(r => {
                     if (r.ngay_ra_vien) {
-                        if (r.ngay_ra_vien.includes('-')) {
-                            const parts = r.ngay_ra_vien.split(' ')[0].split('-');
-                            if (parts.length === 3) {
-                                formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                            } else {
-                                formattedDate = r.ngay_ra_vien;
-                            }
-                        } else {
-                            formattedDate = r.ngay_ra_vien;
+                        const match = r.ngay_ra_vien.match(/^(\d{4})-(\d{2})/);
+                        if (match) {
+                            monthYears.add(`${match[1]}-${match[2]}`);
                         }
                     }
-                    tr.innerHTML = `
-                        <td><strong>${r.ma_lk}</strong></td>
-                        <td>${r.ho_ten}</td>
-                        <td><code>${r.ma_the}</code></td>
-                        <td>${r.ten_khoa}</td>
-                        <td>${formattedDate}</td>
-                        <td>${r.loai_ca}</td>
-                        <td style="font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
-                        <td>
-                            ${r.status === 'WAITING_RESEND'
-                                ? '<span class="badge badge-waiting">Chờ gửi lại</span>'
-                                : '<span class="badge badge-pending">PENDING</span>'}
-                        </td>
-                        <td>
-                            <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
                 });
+                
+                // Sắp xếp các tháng giảm dần (mới nhất lên đầu)
+                const sortedMonths = Array.from(monthYears).sort().reverse();
+                
+                // Cập nhật bộ lọc tháng
+                const monthFilter = document.getElementById('failMonthFilter');
+                const savedSelectedMonth = monthFilter ? monthFilter.value : 'all';
+                
+                let optionsHtml = '<option value="all">Tất cả các tháng</option>';
+                sortedMonths.forEach(my => {
+                    const [year, month] = my.split('-');
+                    optionsHtml += `<option value="${my}">Tháng ${month}/${year}</option>`;
+                });
+                
+                if (monthFilter) {
+                    monthFilter.innerHTML = optionsHtml;
+                    // Khôi phục giá trị đã chọn trước đó nếu giá trị đó vẫn tồn tại
+                    if (Array.from(monthFilter.options).some(o => o.value === savedSelectedMonth)) {
+                        monthFilter.value = savedSelectedMonth;
+                    } else {
+                        monthFilter.value = 'all';
+                    }
+                }
+                
+                filterFailByMonth();
             }
-        } catch {}
+        } catch (e) {
+            console.error("Lỗi fetch ca FAIL:", e);
+        }
+    }
+
+    function filterFailByMonth() {
+        const monthFilter = document.getElementById('failMonthFilter');
+        const selectedMonth = monthFilter ? monthFilter.value : 'all';
+        
+        let filtered = allFailRecords;
+        if (selectedMonth !== 'all') {
+            filtered = allFailRecords.filter(r => r.ngay_ra_vien && r.ngay_ra_vien.startsWith(selectedMonth));
+        }
+        
+        // Cập nhật số lượng hiển thị
+        document.getElementById('failCountText').innerText = filtered.length;
+        
+        const tbody = document.getElementById('failBody');
+        tbody.innerHTML = '';
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào cần xử lý trong khoảng thời gian này.</td></tr>`;
+            return;
+        }
+
+        filtered.forEach(r => {
+            const tr = document.createElement('tr');
+            const warnClass = getWarningClass(r.ngay_ra_vien);
+            if (warnClass) {
+                tr.className = warnClass;
+            }
+            
+            let formattedDate = '';
+            if (r.ngay_ra_vien) {
+                if (r.ngay_ra_vien.includes('-')) {
+                    const parts = r.ngay_ra_vien.split(' ')[0].split('-');
+                    if (parts.length === 3) {
+                        formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    } else {
+                        formattedDate = r.ngay_ra_vien;
+                    }
+                } else {
+                    formattedDate = r.ngay_ra_vien;
+                }
+            }
+            tr.innerHTML = `
+                <td><strong>${r.ma_lk}</strong></td>
+                <td>${r.ho_ten}</td>
+                <td><code>${r.ma_the}</code></td>
+                <td>${r.ten_khoa}</td>
+                <td>${formattedDate}</td>
+                <td>${r.loai_ca}</td>
+                <td style="font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
+                <td>
+                    ${r.status === 'WAITING_RESEND'
+                        ? '<span class="badge badge-waiting">Chờ gửi lại</span>'
+                        : '<span class="badge badge-pending">PENDING</span>'}
+                </td>
+                <td>
+                    <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
     }
 
     // ========== TAB 4: TRẢ HỒ SƠ KHOA ==========
@@ -2625,12 +2684,23 @@
     }
 
     function exportFailData() {
-        const fromDate = document.getElementById('sync_from').value;
-        const toDate = document.getElementById('sync_to').value;
+        const monthFilter = document.getElementById('failMonthFilter');
+        const selectedMonth = monthFilter ? monthFilter.value : 'all';
+        
         let url = `/api/export/fail`;
         const params = [];
-        if (fromDate) params.push(`from_date=${fromDate}`);
-        if (toDate) params.push(`to_date=${toDate}`);
+        
+        if (selectedMonth !== 'all') {
+            const [year, month] = selectedMonth.split('-');
+            params.push(`from_date=${year}-${month}-01`);
+            params.push(`to_date=${year}-${month}-31`);
+        } else {
+            const fromDate = document.getElementById('sync_from').value;
+            const toDate = document.getElementById('sync_to').value;
+            if (fromDate) params.push(`from_date=${fromDate}`);
+            if (toDate) params.push(`to_date=${toDate}`);
+        }
+        
         if (params.length > 0) {
             url += `?` + params.join('&');
         }
