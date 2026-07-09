@@ -1126,7 +1126,14 @@
             </div>
             
             <!-- Search bar -->
-            <div style="display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px 16px; border-radius:8px; margin-bottom:15px;">
+            <div style="display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px 16px; border-radius:8px; margin-bottom:15px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label style="font-size:13px; color:var(--text-secondary); white-space:nowrap;">Khoa phòng:</label>
+                    <select id="loi_filter_dept" class="form-control" style="width:180px; padding:6px 10px;" onchange="filterLoiTable()">
+                        <option value="All">Tất cả các khoa</option>
+                    </select>
+                </div>
+                
                 <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
                     <label style="font-size:13px; color:var(--text-secondary); white-space:nowrap;">Tìm kiếm nhanh:</label>
                     <input type="text" id="loi_search" class="form-control" style="width:220px; padding:6px 12px;" placeholder="Mã LK, Họ tên, Khoa, Mã lỗi..." oninput="filterLoiTable()">
@@ -2264,6 +2271,32 @@
                 allLoiRecords = data;
                 document.getElementById('loiCountText').innerText = data.length;
                 
+                // Populate departments dropdown dynamically
+                const depts = new Set();
+                data.forEach(r => {
+                    if (r.ten_khoa) {
+                        depts.add(r.ten_khoa);
+                    }
+                });
+                
+                const sortedDepts = Array.from(depts).sort();
+                const deptSelect = document.getElementById('loi_filter_dept');
+                const savedSelectedDept = deptSelect ? deptSelect.value : 'All';
+                
+                let optionsHtml = '<option value="All">Tất cả các khoa</option>';
+                sortedDepts.forEach(d => {
+                    optionsHtml += `<option value="${d}">${d}</option>`;
+                });
+                
+                if (deptSelect) {
+                    deptSelect.innerHTML = optionsHtml;
+                    if (Array.from(deptSelect.options).some(o => o.value === savedSelectedDept)) {
+                        deptSelect.value = savedSelectedDept;
+                    } else {
+                        deptSelect.value = 'All';
+                    }
+                }
+
                 tbody.innerHTML = '';
                 if (data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">Không có hồ sơ lỗi nào cần xử lý trong khoảng thời gian này.</td></tr>';
@@ -2335,6 +2368,7 @@
 
     function filterLoiTable() {
         const query = document.getElementById('loi_search').value.toLowerCase().trim();
+        const selectedDept = document.getElementById('loi_filter_dept')?.value || 'All';
         const rows = document.querySelectorAll('#loiBody tr');
         let visibleCount = 0;
         
@@ -2344,16 +2378,20 @@
             const maLk = row.cells[1].textContent.toLowerCase();
             const hoTen = row.cells[2].textContent.toLowerCase();
             const maThe = row.cells[3].textContent.toLowerCase();
-            const tenKhoa = row.cells[5].textContent.toLowerCase();
+            const tenKhoaRaw = row.cells[5].textContent;
+            const tenKhoa = tenKhoaRaw.toLowerCase();
             const maLoi = row.cells[7].textContent.toLowerCase();
             const moTaLoi = row.cells[8].textContent.toLowerCase();
             
-            const match = maLk.includes(query) || hoTen.includes(query) || maThe.includes(query) || tenKhoa.includes(query) || maLoi.includes(query) || moTaLoi.includes(query);
-            row.style.display = match ? '' : 'none';
-            if (match) visibleCount++;
+            const matchesQuery = maLk.includes(query) || hoTen.includes(query) || maThe.includes(query) || tenKhoa.includes(query) || maLoi.includes(query) || moTaLoi.includes(query);
+            const matchesDept = (selectedDept === 'All') || (tenKhoaRaw === selectedDept);
+            
+            const visible = matchesQuery && matchesDept;
+            row.style.display = visible ? '' : 'none';
+            if (visible) visibleCount++;
         });
         
-        if (query !== "") {
+        if (query !== "" || selectedDept !== "All") {
             document.getElementById('loiCountText').innerText = `${visibleCount} (lọc từ ${rows.length})`;
         } else {
             const actualRows = Array.from(rows).filter(r => r.cells.length >= 14);
