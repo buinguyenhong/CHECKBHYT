@@ -2194,8 +2194,15 @@
                 // Trực tiếp trigger tìm kiếm nhanh nếu ô tìm kiếm có sẵn văn bản
                 filterSqlTable();
             } else {
-                const err = await res.json();
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--danger);">Lỗi: ${err.detail || 'Không thể tải dữ liệu'}</td></tr>`;
+                const text = await res.text();
+                let detail = "Không thể tải dữ liệu";
+                try {
+                    const err = JSON.parse(text);
+                    detail = err.detail || detail;
+                } catch (jsonErr) {
+                    detail = text || detail;
+                }
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--danger);">Lỗi: ${detail}</td></tr>`;
             }
         } catch (e) {
             console.error("Lỗi fetchSqlData:", e);
@@ -2310,7 +2317,15 @@
                     tbody.appendChild(tr);
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--danger);">Không thể tải danh sách dữ liệu lỗi.</td></tr>';
+                const text = await res.text();
+                let detail = "Không thể tải danh sách dữ liệu lỗi.";
+                try {
+                    const err = JSON.parse(text);
+                    detail = err.detail || detail;
+                } catch (jsonErr) {
+                    detail = text || detail;
+                }
+                tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--danger);">Lỗi: ${detail}</td></tr>`;
             }
         } catch (e) {
             console.error("Lỗi fetchLoiRecords:", e);

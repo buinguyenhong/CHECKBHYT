@@ -1442,6 +1442,11 @@ def get_admin_sql_records(
         df["Ngày ra viện"] = pd.to_datetime(df["Ngày ra viện"], errors="coerce")
         df = df.sort_values(by="Ngày ra viện", ascending=True)
         
+        def safe_str(val) -> str:
+            if val is None or pd.isna(val):
+                return ""
+            return str(val).encode('utf-8', errors='replace').decode('utf-8')
+
         records = []
         for _, r in df.iterrows():
             val = r.get("Ngày ra viện")
@@ -1453,17 +1458,18 @@ def get_admin_sql_records(
                     dt_str = str(val).split()[0]
                     
             records.append({
-                "loai_ca": r.get("Loại ca", "Ngoại trú"),
-                "ma_lk": r.get("MA_LK", ""),
-                "ho_ten": r.get("Họ tên", ""),
-                "ma_the": r.get("Mã thẻ", ""),
-                "ten_khoa": r.get("Tên khoa", ""),
-                "ma_y_te": r.get("Mã y tế", ""),
-                "ngay_ra_vien": dt_str
+                "loai_ca": safe_str(r.get("Loại ca", "Ngoại trú")),
+                "ma_lk": safe_str(r.get("MA_LK", "")),
+                "ho_ten": safe_str(r.get("Họ tên", "")),
+                "ma_the": safe_str(r.get("Mã thẻ", "")),
+                "ten_khoa": safe_str(r.get("Tên khoa", "")),
+                "ma_y_te": safe_str(r.get("Mã y tế", "")),
+                "ngay_ra_vien": safe_str(dt_str)
             })
         return records
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e).encode('utf-8', errors='replace').decode('utf-8')
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.get("/api/records/admin/loi")

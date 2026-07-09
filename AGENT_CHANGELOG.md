@@ -55,23 +55,29 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-07-09 - Antigravity (Sửa lỗi: Dữ liệu SQL HIS & Tính năng: Thêm Tab Danh sách dữ liệu lỗi)
+## 2026-07-09 - Antigravity (Sửa lỗi: Dữ liệu SQL HIS & Tính năng: Thêm Tab Danh sách dữ liệu lỗi - Hotfix)
 
 ### Mục tiêu
 - Sửa lỗi không tải được dữ liệu SQL HIS khi cột "Ngày ra viện" chứa giá trị trống hoặc lỗi định dạng dẫn đến pd.NaT.
 - Thêm tab "3. Danh sách dữ liệu lỗi" hiển thị danh sách các ca lỗi chưa xử lý theo khoảng ngày đối soát với đầy đủ chi tiết lỗi (tương tự khoa phòng).
+- Hotfix lỗi hiển thị của client-side khi gọi API và gặp lỗi server 500 (trả về trang "Internal Server Error" thô thay vì hiển thị trực quan thông điệp lỗi).
+- Bảo vệ JSON serialization khỏi lỗi encoding/surrogates trong database HIS của bệnh viện.
 
 ### Thay đổi
 - `web_app/main.py` [MODIFY]:
   - Sửa lỗi đánh giá chân lý của `pd.NaT` bằng cách thay `if val and not pd.isna(val)` thành `if pd.notna(val)` trong API `/api/records/admin/sql`.
   - Thêm endpoint `GET /api/records/admin/loi` lấy danh sách các ca lỗi chưa xử lý và làm giàu thông tin lỗi từ danh mục.
+  - Bổ sung hàm `safe_str` lọc và chuyển đổi UTF-8 an toàn tránh lỗi surrogate không hợp lệ khi serialize JSON từ dữ liệu HIS bệnh viện.
+  - Encode an toàn UTF-8 với cơ chế thay thế (replace) cho tin nhắn exception khi ném `HTTPException` 500.
 - `web_app/templates/admin.html` [MODIFY]:
   - Cập nhật thứ tự các menu tab điều hướng.
   - Thêm HTML giao diện cho tab dữ liệu lỗi.
   - Thêm logic JS `fetchLoiRecords()`, `filterLoiTable()`, và cập nhật reload trong `switchTab()`, `saveAdminNote()`, và bộ kiểm tra trạng thái đối soát.
+  - Cập nhật các hàm JS `fetchSqlData()` và `fetchLoiRecords()` để đọc response text trước khi parse JSON, tránh lỗi JSON parsing masking và hiển thị chính xác lỗi kết nối/cấu hình từ Server.
 
 ### Nghiệp vụ ảnh hưởng
 - IT Admin có thể trực tiếp theo dõi danh sách tất cả các ca lỗi của bệnh viện theo từng đợt đối soát và sửa/duyệt ghi chú nhanh chóng.
+- Hệ thống load dữ liệu SQL HIS an toàn hơn và không bị sập hay hiển thị lỗi thô không đọc được khi mất kết nối SQL Server HIS hoặc cấu hình trống.
 
 ### Kiểm tra
 - Chạy biên dịch `py_compile` thành công cho `web_app/main.py`.
