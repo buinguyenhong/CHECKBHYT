@@ -889,12 +889,13 @@
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('sync')">1. Đồng bộ & Đối soát</button>
         <button class="tab-btn" onclick="switchTab('sql_data')">2. Dữ liệu SQL HIS</button>
-        <button class="tab-btn" onclick="switchTab('fail')">3. Danh sách FAIL (IT Sửa)</button>
-        <button class="tab-btn" onclick="switchTab('review')">4. Trả hồ sơ khoa</button>
-        <button class="tab-btn" onclick="switchTab('users')">5. Quản lý Khoa Phòng</button>
-        <button class="tab-btn" onclick="switchTab('reports')">6. Xuất báo cáo</button>
-        <button class="tab-btn" onclick="switchTab('error-defs')">7. Hướng dẫn Lỗi</button>
-        <button class="tab-btn" onclick="switchTab('xml-validator')">8. Kiểm tra XML</button>
+        <button class="tab-btn" onclick="switchTab('loi')">3. Danh sách dữ liệu lỗi</button>
+        <button class="tab-btn" onclick="switchTab('fail')">4. Danh sách FAIL (IT Sửa)</button>
+        <button class="tab-btn" onclick="switchTab('review')">5. Trả hồ sơ khoa</button>
+        <button class="tab-btn" onclick="switchTab('users')">6. Quản lý Khoa Phòng</button>
+        <button class="tab-btn" onclick="switchTab('reports')">7. Xuất báo cáo</button>
+        <button class="tab-btn" onclick="switchTab('error-defs')">8. Hướng dẫn Lỗi</button>
+        <button class="tab-btn" onclick="switchTab('xml-validator')">9. Kiểm tra XML</button>
     </div>
 
     <!-- TAB 1: SYNC & COMPARE -->
@@ -1104,6 +1105,57 @@
                     <tbody id="sqlDataBody">
                         <tr>
                             <td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">
+                                Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: ERROR DATA LIST (Danh sách dữ liệu lỗi) -->
+    <div id="tab_loi" class="tab-pane">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Danh sách dữ liệu lỗi (<span id="loiCountText">0</span> ca)</h2>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button class="btn btn-danger" onclick="exportLoiData()">Xuất Excel dữ liệu lỗi</button>
+                    <button class="btn btn-primary" onclick="fetchLoiRecords()" style="padding:6px 14px; font-size:13px;">Tải lại dữ liệu</button>
+                </div>
+            </div>
+            
+            <!-- Search bar -->
+            <div style="display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px 16px; border-radius:8px; margin-bottom:15px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+                    <label style="font-size:13px; color:var(--text-secondary); white-space:nowrap;">Tìm kiếm nhanh:</label>
+                    <input type="text" id="loi_search" class="form-control" style="width:220px; padding:6px 12px;" placeholder="Mã LK, Họ tên, Khoa, Mã lỗi..." oninput="filterLoiTable()">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table" id="loiTable">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Mã liên kết</th>
+                            <th>Họ tên</th>
+                            <th>Mã thẻ</th>
+                            <th>Ngày ra viện</th>
+                            <th>Khoa phòng</th>
+                            <th>Loại ca</th>
+                            <th>Mã lỗi</th>
+                            <th>Mô tả lỗi</th>
+                            <th>Nguyên nhân</th>
+                            <th>Hướng xử lý</th>
+                            <th>Ghi chú xử lý IT</th>
+                            <th>Trạng thái</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loiBody">
+                        <tr>
+                            <td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">
                                 Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.
                             </td>
                         </tr>
@@ -1614,6 +1666,7 @@
 
         // Fetch corresponding tab data
         if (tabId === 'sql_data') fetchSqlData();
+        if (tabId === 'loi') fetchLoiRecords();
         if (tabId === 'fail') fetchFailRecords();
         if (tabId === 'review') loadUnlockDeptList();
         if (tabId === 'users') { fetchUsers(); }
@@ -1906,6 +1959,8 @@
                                 alert("Quá trình đối soát & đồng bộ dữ liệu HIS đã hoàn tất!");
                                 updateGlobalKPIs();
                                 // Reload reports and data lists
+                                if (activeTab === 'sql_data') fetchSqlData();
+                                if (activeTab === 'loi') fetchLoiRecords();
                                 if (activeTab === 'fail') fetchFailRecords();
                                 if (activeTab === 'review') loadUnlockDeptList();
                                 if (activeTab === 'reports') fetchDeptReport();
@@ -2002,6 +2057,8 @@
                                     } else {
                                         alert("Quá trình đối soát & đồng bộ dữ liệu HIS đã hoàn tất!");
                                         updateGlobalKPIs();
+                                        if (activeTab === 'sql_data') fetchSqlData();
+                                        if (activeTab === 'loi') fetchLoiRecords();
                                         if (activeTab === 'fail') fetchFailRecords();
                                         if (activeTab === 'review') loadUnlockDeptList();
                                         if (activeTab === 'reports') fetchDeptReport();
@@ -2174,6 +2231,118 @@
             // Check if there is data rows
             const actualRows = Array.from(rows).filter(r => r.cells.length >= 7);
             document.getElementById('sql_total_count').innerText = actualRows.length;
+        }
+    }
+
+    let allLoiRecords = [];
+
+    // Fetch Loi Records (Tab 3)
+    async function fetchLoiRecords() {
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+        if (!fromDate || !toDate) {
+            const tbody = document.getElementById('loiBody');
+            tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.</td></tr>';
+            return;
+        }
+
+        const url = `/api/records/admin/loi?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
+        const tbody = document.getElementById('loiBody');
+        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">Đang tải danh sách dữ liệu lỗi...</td></tr>';
+
+        try {
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                allLoiRecords = data;
+                document.getElementById('loiCountText').innerText = data.length;
+                
+                tbody.innerHTML = '';
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">Không có hồ sơ lỗi nào cần xử lý trong khoảng thời gian này.</td></tr>';
+                    return;
+                }
+                
+                let stt = 1;
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const warnClass = getWarningClass(r.ngay_ra_vien);
+                    if (warnClass) {
+                        tr.className = warnClass;
+                    }
+                    
+                    let formattedDate = '';
+                    if (r.ngay_ra_vien) {
+                        if (r.ngay_ra_vien.includes('-')) {
+                            const parts = r.ngay_ra_vien.split(' ')[0].split('-');
+                            if (parts.length === 3) {
+                                formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                            } else {
+                                formattedDate = r.ngay_ra_vien;
+                            }
+                        } else {
+                            formattedDate = r.ngay_ra_vien;
+                        }
+                    }
+                    
+                    tr.innerHTML = `
+                        <td>${stt++}</td>
+                        <td><strong>${r.ma_lk}</strong></td>
+                        <td>${r.ho_ten}</td>
+                        <td><code>${r.ma_the}</code></td>
+                        <td>${formattedDate}</td>
+                        <td>${r.ten_khoa}</td>
+                        <td>${r.loai_ca}</td>
+                        <td><span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; font-weight:bold;">${r.maloi || ''}</span></td>
+                        <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.motaloi || ''}">${r.motaloi || ''}</td>
+                        <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.root_cause || ''}">${r.root_cause || ''}</td>
+                        <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.resolution || ''}">${r.resolution || ''}</td>
+                        <td style="font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
+                        <td>
+                            ${r.status === 'WAITING_RESEND'
+                                ? '<span class="badge badge-waiting">Chờ gửi lại</span>'
+                                : '<span class="badge badge-pending">PENDING</span>'}
+                        </td>
+                        <td>
+                            <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--danger);">Không thể tải danh sách dữ liệu lỗi.</td></tr>';
+            }
+        } catch (e) {
+            console.error("Lỗi fetchLoiRecords:", e);
+            tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--danger);">Lỗi kết nối LAN: ${e.message}</td></tr>`;
+        }
+    }
+
+    function filterLoiTable() {
+        const query = document.getElementById('loi_search').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#loiBody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            if (row.cells.length < 14) return;
+            
+            const maLk = row.cells[1].textContent.toLowerCase();
+            const hoTen = row.cells[2].textContent.toLowerCase();
+            const maThe = row.cells[3].textContent.toLowerCase();
+            const tenKhoa = row.cells[5].textContent.toLowerCase();
+            const maLoi = row.cells[7].textContent.toLowerCase();
+            const moTaLoi = row.cells[8].textContent.toLowerCase();
+            
+            const match = maLk.includes(query) || hoTen.includes(query) || maThe.includes(query) || tenKhoa.includes(query) || maLoi.includes(query) || moTaLoi.includes(query);
+            row.style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        });
+        
+        if (query !== "") {
+            document.getElementById('loiCountText').innerText = `${visibleCount} (lọc từ ${rows.length})`;
+        } else {
+            const actualRows = Array.from(rows).filter(r => r.cells.length >= 14);
+            document.getElementById('loiCountText').innerText = actualRows.length;
         }
     }
 
@@ -2447,7 +2616,11 @@
 
             if (res.ok) {
                 closeAdminModal();
-                fetchFailRecords();
+                if (activeTab === 'fail') {
+                    fetchFailRecords();
+                } else if (activeTab === 'loi') {
+                    fetchLoiRecords();
+                }
                 updateGlobalKPIs();
             } else {
                 alert("Lỗi lưu trạng thái ca FAIL.");

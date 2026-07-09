@@ -55,6 +55,28 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-09 - Antigravity (Sửa lỗi: Dữ liệu SQL HIS & Tính năng: Thêm Tab Danh sách dữ liệu lỗi)
+
+### Mục tiêu
+- Sửa lỗi không tải được dữ liệu SQL HIS khi cột "Ngày ra viện" chứa giá trị trống hoặc lỗi định dạng dẫn đến pd.NaT.
+- Thêm tab "3. Danh sách dữ liệu lỗi" hiển thị danh sách các ca lỗi chưa xử lý theo khoảng ngày đối soát với đầy đủ chi tiết lỗi (tương tự khoa phòng).
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Sửa lỗi đánh giá chân lý của `pd.NaT` bằng cách thay `if val and not pd.isna(val)` thành `if pd.notna(val)` trong API `/api/records/admin/sql`.
+  - Thêm endpoint `GET /api/records/admin/loi` lấy danh sách các ca lỗi chưa xử lý và làm giàu thông tin lỗi từ danh mục.
+- `web_app/templates/admin.html` [MODIFY]:
+  - Cập nhật thứ tự các menu tab điều hướng.
+  - Thêm HTML giao diện cho tab dữ liệu lỗi.
+  - Thêm logic JS `fetchLoiRecords()`, `filterLoiTable()`, và cập nhật reload trong `switchTab()`, `saveAdminNote()`, và bộ kiểm tra trạng thái đối soát.
+
+### Nghiệp vụ ảnh hưởng
+- IT Admin có thể trực tiếp theo dõi danh sách tất cả các ca lỗi của bệnh viện theo từng đợt đối soát và sửa/duyệt ghi chú nhanh chóng.
+
+### Kiểm tra
+- Chạy biên dịch `py_compile` thành công cho `web_app/main.py`.
+- Chạy thành công bộ kiểm thử đối soát kinh doanh tại `scratch/test_reconciliation.py`.
+
 ## 2026-07-08 - Antigravity (Tính năng & Sửa lỗi: Cập nhật đếm số ca có lỗi và Lọc ca FAIL theo tháng)
 
 ### Mục tiêu

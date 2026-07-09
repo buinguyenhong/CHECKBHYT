@@ -1446,7 +1446,7 @@ def get_admin_sql_records(
         for _, r in df.iterrows():
             val = r.get("Ngày ra viện")
             dt_str = ""
-            if val and not pd.isna(val):
+            if pd.notna(val):
                 try:
                     dt_str = val.strftime("%Y-%m-%d")
                 except Exception:
@@ -1464,6 +1464,68 @@ def get_admin_sql_records(
         return records
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/records/admin/loi")
+def get_admin_loi_records(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Lấy danh sách các ca LỖI chưa xử lý theo đợt đối soát để IT theo dõi, sửa lỗi"""
+    query = db.query(Record).filter(
+        Record.type_group == "LOI",
+        Record.status != "RESOLVED"
+    )
+    
+    fd = normalize_date_to_iso(from_date)
+    if fd:
+        query = query.filter(Record.ngay_ra_vien >= fd)
+            
+    td = normalize_date_to_iso(to_date)
+    if td:
+        query = query.filter(Record.ngay_ra_vien <= td)
+        
+    records = query.order_by(Record.status.asc(), Record.ngay_ra_vien.asc()).all()
+    
+    from models import ErrorDefinition
+    import re
+    defs = db.query(ErrorDefinition).all()
+    
+    result = []
+    for r in records:
+        item = {
+            "id": r.id,
+            "ma_lk": r.ma_lk,
+            "ho_ten": r.ho_ten,
+            "ma_the": r.ma_the,
+            "ten_khoa": r.ten_khoa,
+            "ma_y_te": r.ma_y_te,
+            "ngay_ra_vien": r.ngay_ra_vien,
+            "ngay_ra": r.ngay_ra,
+            "maloi": r.maloi,
+            "motaloi": r.motaloi,
+            "status": r.status,
+            "note": r.note or "",
+            "loai_ca": resolve_loai_ca(r),
+            "root_cause": "Chưa rõ nguyên nhân (Hệ thống tự động quét)",
+            "resolution": "Chờ phòng IT bổ sung hướng dẫn chi tiết",
+            "requires_his_reset": False
+        }
+        
+        r_clean = re.sub(r'[^A-Z0-9]', '', str(r.maloi or "").upper())
+        for d in defs:
+            d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code).upper())
+            if d_clean == r_clean:
+                if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
+                    item["root_cause"] = d.root_cause
+                    item["resolution"] = d.resolution
+                    item["requires_his_reset"] = d.requires_his_reset
+                    item["maloi"] = d.error_code
+                    break
+        result.append(item)
+    return result
 
 
 @app.get("/api/records/admin/fail")
