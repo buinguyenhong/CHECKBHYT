@@ -842,6 +842,20 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--text-secondary);
         }
+        
+        /* CSS Overrides for tab_loi errors table compact view */
+        #loiTable {
+            font-size: 12.5px !important;
+        }
+        #loiTable th, #loiTable td {
+            padding: 8px 10px !important;
+            vertical-align: top;
+        }
+        #loiTable td.wrap-cell {
+            white-space: normal !important;
+            line-height: 1.45 !important;
+            word-break: break-word !important;
+        }
     </style>
 </head>
 <body>
@@ -2334,10 +2348,10 @@
                         <td>${r.ten_khoa}</td>
                         <td>${r.loai_ca}</td>
                         <td><span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; font-weight:bold;">${r.maloi || ''}</span></td>
-                        <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.motaloi || ''}">${r.motaloi || ''}</td>
-                        <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.root_cause || ''}">${r.root_cause || ''}</td>
-                        <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.resolution || ''}">${r.resolution || ''}</td>
-                        <td style="font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
+                        <td class="wrap-cell" style="max-width:260px;" title="${r.motaloi || ''}">${r.motaloi || ''}</td>
+                        <td class="wrap-cell" style="max-width:200px; color:var(--text-secondary);" title="${r.root_cause || ''}">${r.root_cause || ''}</td>
+                        <td class="wrap-cell" style="max-width:200px; color:var(--success); font-weight:500;" title="${r.resolution || ''}">${r.resolution || ''}</td>
+                        <td class="wrap-cell" style="max-width:180px; font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
                         <td>
                             ${r.status === 'WAITING_RESEND'
                                 ? '<span class="badge badge-waiting">Chờ gửi lại</span>'

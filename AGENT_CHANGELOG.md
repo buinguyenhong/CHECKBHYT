@@ -55,7 +55,7 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-07-09 - Antigravity (Sửa lỗi: Dữ liệu SQL HIS & Tính năng: Thêm Tab Danh sách dữ liệu lỗi - Hotfix & Dropdown Bộ lọc Khoa)
+## 2026-07-09 - Antigravity (Sửa lỗi: Dữ liệu SQL HIS & Tính năng: Thêm Tab Danh sách dữ liệu lỗi - Hotfix, Bộ lọc Khoa & Tinh chỉnh Bảng)
 
 ### Mục tiêu
 - Sửa lỗi không tải được dữ liệu SQL HIS khi cột "Ngày ra viện" chứa giá trị trống hoặc lỗi định dạng dẫn đến pd.NaT.
@@ -63,6 +63,7 @@ Nguyên tắc:
 - Hotfix lỗi hiển thị của client-side khi gọi API và gặp lỗi server 500 (trả về trang "Internal Server Error" thô thay vì hiển thị trực quan thông điệp lỗi).
 - Bảo vệ JSON serialization khỏi lỗi encoding/surrogates trong database HIS của bệnh viện.
 - Tích hợp thêm bộ chọn (Dropdown) lọc nhanh danh sách lỗi theo từng Khoa lâm sàng hoặc hiển thị tất cả (mặc định) cho Tab 3.
+- Cải thiện hiển thị bảng dữ liệu lỗi (Tab 3): giảm font chữ xuống 12.5px, thu gọn padding, cho phép bọc dòng (wrap text) để nhìn đầy đủ thông tin mô tả, nguyên nhân, giải pháp và ghi chú thay vì bị cắt bởi dấu chấm lửng (ellipsis).
 
 ### Thay đổi
 - `web_app/main.py` [MODIFY]:
@@ -78,6 +79,8 @@ Nguyên tắc:
   - Tích hợp Dropdown `#loi_filter_dept` vào search bar của Tab 3.
   - Nâng cấp `fetchLoiRecords()` tự động phân tích và trích xuất danh sách các khoa phòng duy nhất có lỗi tại đợt đối soát để nạp vào Dropdown động.
   - Nâng cấp `filterLoiTable()` lọc song song theo cả từ khóa tìm kiếm nhanh và khoa phòng được chọn.
+  - Thêm cấu trúc CSS thu gọn padding (8px 10px), giảm size chữ (12.5px) và định nghĩa lớp `.wrap-cell` cho bảng lỗi.
+  - Cập nhật định dạng hàng của bảng lỗi tại `fetchLoiRecords()`, đổi các cột mô tả, nguyên nhân, giải pháp, ghi chú sang lớp `.wrap-cell` với giới hạn chiều rộng cột linh hoạt và tô màu phân cấp nhẹ giúp dễ quan sát.
 
 ### Nghiệp vụ ảnh hưởng
 - IT Admin có thể trực tiếp theo dõi danh sách tất cả các ca lỗi của bệnh viện theo từng đợt đối soát và sửa/duyệt ghi chú nhanh chóng.
