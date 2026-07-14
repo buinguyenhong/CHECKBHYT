@@ -1354,7 +1354,7 @@
             <div class="panel-header">
                 <h2>Xuất báo cáo Excel kết quả đối soát</h2>
             </div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:20px;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:20px;">
                 <div class="upload-card">
                     <h3>Dữ liệu SQL HIS đã nạp</h3>
                     <p>Xuất toàn bộ tệp đối soát CSDL đã tải</p>
@@ -1369,6 +1369,16 @@
                     <h3>Danh sách KÈM LỖI</h3>
                     <p>Danh sách mã lỗi được phân theo Khoa phòng</p>
                     <button class="btn btn-success" onclick="exportLoiData()">Tải file DANH_SACH_KEM_LOI.xlsx</button>
+                </div>
+                <div class="upload-card">
+                    <h3>Báo cáo Tổng hợp Tháng</h3>
+                    <p>Số ca XML, lỗi đã xử lý và chưa xử lý theo tháng</p>
+                    <button class="btn btn-warning" onclick="exportMonthlySummary()">Tải báo cáo tổng hợp tháng</button>
+                </div>
+                <div class="upload-card">
+                    <h3>Hiệu suất theo Khoa</h3>
+                    <p>Phân tích tỷ lệ sửa lỗi theo từng khoa và tháng</p>
+                    <button class="btn" style="background-color: var(--username-color); color: #fff;" onclick="exportDeptPerformance()">Tải báo cáo hiệu suất khoa</button>
                 </div>
             </div>
         </div>
@@ -2958,6 +2968,14 @@
             url += `?` + params.join('&');
         }
         window.open(url, '_blank');
+    }
+
+    function exportMonthlySummary() {
+        window.open('/api/export/monthly_summary', '_blank');
+    }
+
+    function exportDeptPerformance() {
+        window.open('/api/export/department_performance', '_blank');
     }
 
     // Load unique department names datalist for autocomplete

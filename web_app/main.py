@@ -1920,6 +1920,193 @@ def export_loi_list(
     return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
 
 
+@app.get("/api/export/monthly_summary")
+def export_monthly_summary(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Xuất file Excel báo cáo tổng hợp số lượng ca XML và lỗi theo tháng"""
+    records = db.query(Record).all()
+    if not records:
+        df = pd.DataFrame(columns=[
+            "Tháng", "Tổng số ca XML lỗi/chưa gửi", "Số ca XML đã xử lý", 
+            "Số ca XML chưa xử lý", "Tổng số lỗi phát sinh", 
+            "Số lỗi đã xử lý", "Số lỗi chưa xử lý"
+        ])
+    else:
+        data = []
+        for r in records:
+            date_val = r.ngay_ra_vien or r.ngay_doi_soat or r.ngay_ra
+            month_str = date_val.strftime("%Y-%m") if date_val else "Không rõ"
+            data.append({
+                "ma_lk": r.ma_lk,
+                "type_group": r.type_group,
+                "status": r.status,
+                "month": month_str
+            })
+        df_rec = pd.DataFrame(data)
+        
+        # Group by month
+        months = sorted(df_rec["month"].unique())
+        
+        report_data = []
+        for m in months:
+            df_m = df_rec[df_rec["month"] == m]
+            
+            # Cases (unique ma_lk)
+            unique_cases = df_m["ma_lk"].unique()
+            total_cases = len(unique_cases)
+            
+            # A case is resolved if all its records in this month are RESOLVED
+            resolved_cases = 0
+            unresolved_cases = 0
+            for lk in unique_cases:
+                df_lk = df_m[df_m["ma_lk"] == lk]
+                if (df_lk["status"] == "RESOLVED").all():
+                    resolved_cases += 1
+                else:
+                    unresolved_cases += 1
+                    
+            # Errors (type_group == LOI)
+            df_err = df_m[df_m["type_group"] == "LOI"]
+            total_errors = len(df_err)
+            resolved_errors = len(df_err[df_err["status"] == "RESOLVED"])
+            unresolved_errors = total_errors - resolved_errors
+            
+            report_data.append({
+                "Tháng": m,
+                "Tổng số ca XML lỗi/chưa gửi": total_cases,
+                "Số ca XML đã xử lý": resolved_cases,
+                "Số ca XML chưa xử lý": unresolved_cases,
+                "Tổng số lỗi phát sinh": total_errors,
+                "Số lỗi đã xử lý": resolved_errors,
+                "Số lỗi chưa xử lý": unresolved_errors
+            })
+            
+        df = pd.DataFrame(report_data)
+        
+        # Add total row
+        total_row = {
+            "Tháng": "Tổng cộng",
+            "Tổng số ca XML lỗi/chưa gửi": df["Tổng số ca XML lỗi/chưa gửi"].sum(),
+            "Số ca XML đã xử lý": df["Số ca XML đã xử lý"].sum(),
+            "Số ca XML chưa xử lý": df["Số ca XML chưa xử lý"].sum(),
+            "Tổng số lỗi phát sinh": df["Tổng số lỗi phát sinh"].sum(),
+            "Số lỗi đã xử lý": df["Số lỗi đã xử lý"].sum(),
+            "Số lỗi chưa xử lý": df["Số lỗi chưa xử lý"].sum()
+        }
+        df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
+        
+    filename = "BAO_CAO_TONG_HOP_THANG.xlsx"
+    out_path = os.path.join(UPLOAD_DIR, filename)
+    df.to_excel(out_path, index=False)
+    
+    return FileResponse(
+        out_path, 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+        filename=filename
+    )
+
+
+@app.get("/api/export/department_performance")
+def export_department_performance(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Xuất file Excel báo cáo phân tích thực hiện sửa lỗi theo khoa phòng ban và tháng"""
+    records = db.query(Record).all()
+    if not records:
+        df = pd.DataFrame(columns=[
+            "Khoa/Phòng", "Tháng", 
+            "Tổng số lỗi phát sinh", "Số lỗi đã xử lý", "Số lỗi chưa xử lý", "Tỷ lệ sửa lỗi (%)",
+            "Tổng số ca FAIL phát sinh", "Số ca FAIL đã xử lý", "Số ca FAIL chưa xử lý", "Tỷ lệ giải quyết FAIL (%)"
+        ])
+    else:
+        data = []
+        for r in records:
+            date_val = r.ngay_ra_vien or r.ngay_doi_soat or r.ngay_ra
+            month_str = date_val.strftime("%Y-%m") if date_val else "Không rõ"
+            data.append({
+                "id": r.id,
+                "type_group": r.type_group,
+                "status": r.status,
+                "ten_khoa": r.ten_khoa or "Chưa phân khoa",
+                "month": month_str
+            })
+        df_rec = pd.DataFrame(data)
+        
+        # Group by department and month
+        grouped = df_rec.groupby(["ten_khoa", "month"])
+        
+        report_data = []
+        for (dept, month), group in grouped:
+            # Errors (LOI)
+            df_err = group[group["type_group"] == "LOI"]
+            tot_err = len(df_err)
+            res_err = len(df_err[df_err["status"] == "RESOLVED"])
+            unres_err = tot_err - res_err
+            err_rate = f"{(res_err / tot_err * 100):.1f}%" if tot_err > 0 else "0.0%"
+            
+            # Fail (FAIL)
+            df_fail = group[group["type_group"] == "FAIL"]
+            tot_fail = len(df_fail)
+            res_fail = len(df_fail[df_fail["status"] == "RESOLVED"])
+            unres_fail = tot_fail - res_fail
+            fail_rate = f"{(res_fail / tot_fail * 100):.1f}%" if tot_fail > 0 else "0.0%"
+            
+            report_data.append({
+                "Khoa/Phòng": dept,
+                "Tháng": month,
+                "Tổng số lỗi phát sinh": tot_err,
+                "Số lỗi đã xử lý": res_err,
+                "Số lỗi chưa xử lý": unres_err,
+                "Tỷ lệ sửa lỗi (%)": err_rate,
+                "Tổng số ca FAIL phát sinh": tot_fail,
+                "Số ca FAIL đã xử lý": res_fail,
+                "Số ca FAIL chưa xử lý": unres_fail,
+                "Tỷ lệ giải quyết FAIL (%)": fail_rate
+            })
+            
+        df = pd.DataFrame(report_data)
+        # Sort by Department and Month
+        df = df.sort_values(by=["Khoa/Phòng", "Tháng"])
+        
+        # Add total row
+        total_err = df["Tổng số lỗi phát sinh"].sum()
+        total_res_err = df["Số lỗi đã xử lý"].sum()
+        total_unres_err = df["Số lỗi chưa xử lý"].sum()
+        total_err_rate = f"{(total_res_err / total_err * 100):.1f}%" if total_err > 0 else "0.0%"
+        
+        total_fail = df["Tổng số ca FAIL phát sinh"].sum()
+        total_res_fail = df["Số ca FAIL đã xử lý"].sum()
+        total_unres_fail = df["Số ca FAIL chưa xử lý"].sum()
+        total_fail_rate = f"{(total_res_fail / total_fail * 100):.1f}%" if total_fail > 0 else "0.0%"
+        
+        total_row = {
+            "Khoa/Phòng": "Tổng cộng",
+            "Tháng": "-",
+            "Tổng số lỗi phát sinh": total_err,
+            "Số lỗi đã xử lý": total_res_err,
+            "Số lỗi chưa xử lý": total_unres_err,
+            "Tỷ lệ sửa lỗi (%)": total_err_rate,
+            "Tổng số ca FAIL phát sinh": total_fail,
+            "Số ca FAIL đã xử lý": total_res_fail,
+            "Số ca FAIL chưa xử lý": total_unres_fail,
+            "Tỷ lệ giải quyết FAIL (%)": total_fail_rate
+        }
+        df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
+        
+    filename = "BAO_CAO_KHOA_PHONG_THEO_THANG.xlsx"
+    out_path = os.path.join(UPLOAD_DIR, filename)
+    df.to_excel(out_path, index=False)
+    
+    return FileResponse(
+        out_path, 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+        filename=filename
+    )
+
+
 # ==========================================
 # API: XML VALIDATOR INTEGRATION
 # ==========================================

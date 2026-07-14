@@ -55,6 +55,28 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-14 13:45 - Antigravity (Tính năng: Bổ sung Báo cáo tổng hợp tháng và Báo cáo hiệu suất theo Khoa)
+
+### Mục tiêu
+- Bổ sung 2 báo cáo Excel mới tại Tab 5 (Reports & Export) của Admin:
+  1. Báo cáo tổng hợp số lượng ca XML, số lỗi đã xử lý/chưa xử lý chia theo tháng và tổng số.
+  2. Báo cáo phân tích thực hiện sửa lỗi và giải quyết ca FAIL chia theo khoa phòng ban và tháng.
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Thêm endpoint `GET /api/export/monthly_summary` gom nhóm dữ liệu theo tháng và tính toán tổng số ca XML (unique `ma_lk`), ca đã xử lý, ca chưa xử lý, tổng số lỗi, lỗi đã sửa, lỗi chưa sửa kèm dòng Tổng cộng.
+  - Thêm endpoint `GET /api/export/department_performance` gom nhóm theo khoa phòng ban và tháng để phân tích hiệu suất sửa lỗi (%), giải quyết ca FAIL (%) kèm dòng Tổng cộng.
+- `web_app/templates/admin.html` [MODIFY]:
+  - Thêm HTML hiển thị 2 Card xuất báo cáo mới vào grid của Tab 5.
+  - Thêm JS `exportMonthlySummary()` và `exportDeptPerformance()` kết nối đến các API mới.
+
+### Nghiệp vụ ảnh hưởng
+- IT Admin có thể dễ dàng tải xuống các báo cáo thống kê chu kỳ tháng và hiệu quả xử lý lỗi của từng khoa phòng ban để theo dõi tiến độ và báo cáo lãnh đạo.
+
+### Kiểm tra
+- Chạy biên dịch cú pháp Python `py_compile` thành công cho `web_app/main.py`.
+- Viết và chạy thử kịch bản `scratch/test_new_reports.py` để xác thực logic nhóm và tính toán dữ liệu SQLite thành công.
+
 ## 2026-07-09 - Antigravity (Sửa lỗi: Dữ liệu SQL HIS & Tính năng: Thêm Tab Danh sách dữ liệu lỗi - Hotfix, Bộ lọc Khoa & Tinh chỉnh Bảng)
 
 ### Mục tiêu
