@@ -1091,8 +1091,29 @@ class MainWindow(QMainWindow):
             canh_bao(self, "Thiếu listbh", "Chưa lọc listbh theo ngày.")
             return
 
-        bh_keys = set(self.df_listbh_filtered["MA_LK"].dropna().astype(str).map(chuan_hoa_ma_lk))
+        # Lọc dữ liệu database theo ngày của dữ liệu đối soát (từ ngày -> đến ngày)
+        tu = self.de_from.date().toPython()
+        den = self.de_to.date().toPython()
+
+        def to_date_only(val):
+            if pd.isna(val) or val is None:
+                return None
+            if isinstance(val, datetime):
+                return val.date()
+            from datetime import date
+            if isinstance(val, date):
+                return val
+            try:
+                return pd.to_datetime(val).date()
+            except Exception:
+                return None
+
         df = self.df_sql_list.copy()
+        df["_temp_date"] = df["Ngày ra viện"].apply(to_date_only)
+        df = df[(df["_temp_date"] >= tu) & (df["_temp_date"] <= den)].copy()
+        df = df.drop(columns=["_temp_date"])
+
+        bh_keys = set(self.df_listbh_filtered["MA_LK"].dropna().astype(str).map(chuan_hoa_ma_lk))
         df["MA_LK"] = df["MA_LK"].apply(chuan_hoa_ma_lk)
 
         df["Trạng thái"] = df["MA_LK"].apply(lambda x: "Đã gửi BH" if x in bh_keys else "FAIL")
