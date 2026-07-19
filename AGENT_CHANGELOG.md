@@ -55,6 +55,25 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-19 14:40 - Antigravity (Tối ưu hóa: Lọc số liệu KPI đầu trang theo tháng)
+
+### Mục tiêu
+- Sửa lỗi hiển thị số lượng ca FAIL (và LOI, RESOLVED) đầu trang Dashboard bị cộng dồn toàn bộ lịch sử. Chỉ hiển thị số lượng của tháng đối soát gần nhất để đảm bảo tính nhất quán của dữ liệu hiển thị.
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Cập nhật API `/api/records/kpi` (hàm `get_global_kpis`):
+    - Tự động lấy mốc ngày gần nhất của tệp đối soát (`Record.ngay_ra_vien`, `Record.ngay_doi_soat`, `Record.ngay_ra`) để làm mốc lọc tháng.
+    - Dùng `func.coalesce` để so sánh ngày ra viện/ngày đối soát/ngày ra của mỗi bản ghi với khoảng ngày đầu tháng đến cuối tháng mục tiêu.
+    - Chỉ đếm số lượng ca `LOI`, `FAIL` và `RESOLVED` trong tháng đó để phản hồi về Client.
+
+### Nghiệp vụ ảnh hưởng
+- Hàng số liệu tổng quan đầu trang hiển thị chính xác theo tháng đang đối soát, không còn bị nhảy số lượng dồn tích của các tháng cũ.
+
+### Kiểm tra
+- Chạy biên dịch cú pháp Python `py_compile` thành công cho `web_app/main.py`.
+- Viết và khởi chạy kịch bản unit test `scratch/test_kpi_monthly_filtering.py` xác minh việc lọc số liệu theo tháng thành công 100%.
+
 ## 2026-07-19 14:30 - Antigravity (Tính năng: Bổ sung bộ kiểm duyệt file đối soát đầu vào)
 
 ### Mục tiêu

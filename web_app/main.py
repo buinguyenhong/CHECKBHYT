@@ -1709,28 +1709,63 @@ def get_global_kpis(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Lấy số liệu KPI tổng quan cho Dashboard"""
+    """Lấy số liệu KPI tổng quan cho Dashboard (Lọc theo tháng đối soát gần nhất)"""
     cfg = db.query(AppConfig).first()
     tong_sql = 0
     tong_bh = 0
     da_gui = 0
     
+    # Xác định mốc ngày gần nhất để lọc theo tháng
+    last_record = db.query(Record.ngay_ra_vien, Record.ngay_doi_soat, Record.ngay_ra).order_by(Record.id.desc()).first()
+    if last_record:
+        ref_date = last_record[0] or last_record[1] or last_record[2] or datetime.date.today()
+    else:
+        ref_date = datetime.date.today()
+
+    year = ref_date.year
+    month = ref_date.month
+
+    month_start = datetime.date(year, month, 1)
+    if month == 12:
+        month_end = datetime.date(year + 1, 1, 1)
+    else:
+        month_end = datetime.date(year, month + 1, 1)
+
     if cfg and getattr(cfg, "last_sync_date", None):
         tong_sql = getattr(cfg, "last_tong_sql", 0) or 0
         tong_bh = getattr(cfg, "last_tong_bh", 0) or 0
         da_gui = getattr(cfg, "last_da_gui", 0) or 0
     else:
-        last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
         if last_record:
-            target_date = last_record.ngay_doi_soat
+            # Lấy target_date là ngay_doi_soat của bản ghi gần nhất
+            target_date = last_record[1] or datetime.date.today()
             base_query = db.query(Record).filter(Record.ngay_doi_soat == target_date)
             tong_sql = base_query.count()
             da_gui = base_query.filter(Record.status == "RESOLVED", Record.type_group != "LOI").count()
 
-    # Dynamic active counts representing the actual current state of the database
-    loi = db.query(Record.ma_lk).filter(Record.type_group == "LOI", Record.status != "RESOLVED").distinct().count()
-    fail = db.query(Record).filter(Record.type_group == "FAIL", Record.status != "RESOLVED").count()
-    resolved = db.query(Record).filter(Record.status == "RESOLVED").count()
+    from sqlalchemy import func
+    date_field = func.coalesce(Record.ngay_ra_vien, Record.ngay_doi_soat, Record.ngay_ra)
+
+    # Lọc số liệu động loi, fail, resolved thuộc khoảng ngày của tháng mục tiêu
+    loi = db.query(Record.ma_lk).filter(
+        Record.type_group == "LOI", 
+        Record.status != "RESOLVED",
+        date_field >= month_start,
+        date_field < month_end
+    ).distinct().count()
+
+    fail = db.query(Record).filter(
+        Record.type_group == "FAIL", 
+        Record.status != "RESOLVED",
+        date_field >= month_start,
+        date_field < month_end
+    ).count()
+
+    resolved = db.query(Record).filter(
+        Record.status == "RESOLVED",
+        date_field >= month_start,
+        date_field < month_end
+    ).count()
 
     return {
         "tong_sql": tong_sql,
