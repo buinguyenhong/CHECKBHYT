@@ -2084,6 +2084,8 @@ def export_monthly_summary(
 
             err_cases_val = 0
             err_resolved_val = 0
+            total_errors_val = 0
+            errors_resolved_val = 0
             fail_cases_val = 0
             fail_resolved_val = 0
 
@@ -2091,6 +2093,9 @@ def export_monthly_summary(
                 df_loi_m = df_rec_m[df_rec_m["type_group"] == "LOI"]
                 err_cases_val = len(df_loi_m["ma_lk"].unique())
                 err_resolved_val = len(df_loi_m[df_loi_m["status"] == "RESOLVED"]["ma_lk"].unique())
+
+                total_errors_val = len(df_loi_m)
+                errors_resolved_val = len(df_loi_m[df_loi_m["status"] == "RESOLVED"])
 
                 df_fail_m = df_rec_m[df_rec_m["type_group"] == "FAIL"]
                 fail_cases_val = len(df_fail_m["ma_lk"].unique())
@@ -2102,6 +2107,8 @@ def export_monthly_summary(
                     "Số ca đã gửi",
                     "Số ca lỗi",
                     "Số ca lỗi đã từng xử lý",
+                    "Tổng số lỗi phát sinh",
+                    "Số lỗi đã xử lý",
                     "Số ca fail",
                     "Số ca fail đã xử lý"
                 ],
@@ -2110,6 +2117,8 @@ def export_monthly_summary(
                     sent_cases_val,
                     err_cases_val,
                     err_resolved_val,
+                    total_errors_val,
+                    errors_resolved_val,
                     fail_cases_val,
                     fail_resolved_val
                 ]
@@ -2135,8 +2144,8 @@ def export_monthly_summary(
             df_summary.to_excel(writer, sheet_name=sheet_name, startrow=3, startcol=0, index=False)
 
             # Ghi bảng 2
-            pd.DataFrame([["2. DANH SÁCH 10 LỖI THƯỜNG GẶP NHẤT"]]).to_excel(writer, sheet_name=sheet_name, startrow=11, startcol=0, header=False, index=False)
-            top_errs.to_excel(writer, sheet_name=sheet_name, startrow=12, startcol=0, index=False)
+            pd.DataFrame([["2. DANH SÁCH 10 LỖI THƯỜNG GẶP NHẤT"]]).to_excel(writer, sheet_name=sheet_name, startrow=13, startcol=0, header=False, index=False)
+            top_errs.to_excel(writer, sheet_name=sheet_name, startrow=14, startcol=0, index=False)
 
             # Định dạng độ rộng cột tối ưu
             ws = writer.sheets[sheet_name]

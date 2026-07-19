@@ -55,6 +55,20 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-19 14:50 - Antigravity (Cải tiến: Bổ sung chỉ số lỗi vào Báo cáo tổng hợp tháng)
+
+### Mục tiêu
+- Thêm hai chỉ số "Tổng số lỗi phát sinh" và "Số lỗi đã xử lý" vào bảng số liệu tổng hợp trong từng sheet của báo cáo tổng hợp tháng nhằm đồng bộ số liệu và giúp so sánh dễ dàng với báo cáo hiệu suất khoa.
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Thêm tính toán `total_errors_val` (Tổng số dòng lỗi LOI phát sinh) và `errors_resolved_val` (Số dòng lỗi có trạng thái RESOLVED).
+  - Bổ sung 2 chỉ số này vào `summary_data` của báo cáo tổng hợp tháng.
+  - Dịch chuyển bảng 2 (Top 10 lỗi thường gặp nhất) xuống dòng 13 (startrow=13) để chừa khoảng trống cho 2 dòng mới của bảng 1.
+
+### Nghiệp vụ ảnh hưởng
+- Báo cáo tổng hợp tháng có đầy đủ cả số liệu về "Ca lỗi" (đếm theo bệnh nhân) và "Đầu mục lỗi" (đếm theo lỗi cụ thể) để đối chiếu trực tiếp với báo cáo hiệu suất khoa.
+
 ## 2026-07-19 14:40 - Antigravity (Tối ưu hóa: Lọc số liệu KPI đầu trang theo tháng)
 
 ### Mục tiêu
