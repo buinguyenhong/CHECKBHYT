@@ -155,6 +155,7 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         
         SYNC_PROGRESS["progress"] = 55
         SYNC_PROGRESS["status"] = "Đang đọc danh sách BHYT..."
+        listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
         if os.path.exists(listbh_path):
             df_listbh_raw = excel_service.load_listbh(listbh_path)
             df_listbh = excel_service.filter_listbh_by_date(df_listbh_raw, tu_date, den_date)
