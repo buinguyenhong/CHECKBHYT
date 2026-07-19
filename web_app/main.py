@@ -1698,30 +1698,28 @@ def get_department_breakdown(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Thống kê chi tiết số lỗi theo từng khoa lâm sàng"""
-    last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
+    """Thống kê chi tiết số lỗi theo từng khoa lâm sàng (Tối ưu hóa tốc độ tải)"""
+    last_record = db.query(Record.ngay_doi_soat).order_by(Record.ngay_doi_soat.desc()).first()
     if not last_record:
         return []
         
-    target_date = last_record.ngay_doi_soat
-    
-    # Query tất cả các records lỗi chưa giải quyết trong hệ thống
-    err_records = db.query(Record).filter(
+    # Query chỉ lấy 2 cột ten_khoa và status để bypass ORM object instantiation overhead
+    err_records = db.query(Record.ten_khoa, Record.status).filter(
         Record.type_group == "LOI",
         Record.status != "RESOLVED"
     ).all()
     
     # Tổng hợp bằng Python dict
     dept_map = {}
-    for r in err_records:
-        dept = r.ten_khoa or "Chưa phân khoa"
+    for r_ten_khoa, r_status in err_records:
+        dept = r_ten_khoa or "Chưa phân khoa"
         if dept not in dept_map:
             dept_map[dept] = {"ten_khoa": dept, "pending": 0, "waiting": 0, "total": 0}
         
         dept_map[dept]["total"] += 1
-        if r.status == "PENDING":
+        if r_status == "PENDING":
             dept_map[dept]["pending"] += 1
-        elif r.status in {"WAITING_REVIEW", "WAITING_RESEND"}:
+        elif r_status in {"WAITING_REVIEW", "WAITING_RESEND"}:
             dept_map[dept]["waiting"] += 1
             
     return list(dept_map.values())
@@ -1925,82 +1923,139 @@ def export_monthly_summary(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Xuất file Excel báo cáo tổng hợp số lượng ca XML và lỗi theo tháng"""
-    records = db.query(Record).all()
-    if not records:
-        df = pd.DataFrame(columns=[
-            "Tháng", "Tổng số ca XML lỗi/chưa gửi", "Số ca XML đã xử lý", 
-            "Số ca XML chưa xử lý", "Tổng số lỗi phát sinh", 
-            "Số lỗi đã xử lý", "Số lỗi chưa xử lý"
-        ])
+    """Xuất file Excel báo cáo tổng hợp số lượng ca XML và lỗi theo tháng (Tách sheet và top 10 lỗi)"""
+    # 1. Đọc listbh.xlsx nếu tồn tại để có toàn bộ danh sách đã gửi thực tế
+    listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
+    if os.path.exists(listbh_path):
+        try:
+            df_listbh = excel_service.load_listbh(listbh_path)
+            # Chuẩn hóa tháng từ cột _ngay
+            df_listbh["month"] = pd.to_datetime(df_listbh["_ngay"], errors="coerce").dt.strftime("%Y-%m")
+            df_listbh = df_listbh.dropna(subset=["month"])
+        except Exception:
+            df_listbh = pd.DataFrame(columns=["MA_LK", "_ngay", "month"])
     else:
-        data = []
-        for r in records:
-            date_val = r.ngay_ra_vien or r.ngay_doi_soat or r.ngay_ra
-            month_str = date_val.strftime("%Y-%m") if date_val else "Không rõ"
-            data.append({
-                "ma_lk": r.ma_lk,
-                "type_group": r.type_group,
-                "status": r.status,
-                "month": month_str
-            })
-        df_rec = pd.DataFrame(data)
-        
-        # Group by month
-        months = sorted(df_rec["month"].unique())
-        
-        report_data = []
-        for m in months:
-            df_m = df_rec[df_rec["month"] == m]
-            
-            # Cases (unique ma_lk)
-            unique_cases = df_m["ma_lk"].unique()
-            total_cases = len(unique_cases)
-            
-            # A case is resolved if all its records in this month are RESOLVED
-            resolved_cases = 0
-            unresolved_cases = 0
-            for lk in unique_cases:
-                df_lk = df_m[df_m["ma_lk"] == lk]
-                if (df_lk["status"] == "RESOLVED").all():
-                    resolved_cases += 1
-                else:
-                    unresolved_cases += 1
-                    
-            # Errors (type_group == LOI)
-            df_err = df_m[df_m["type_group"] == "LOI"]
-            total_errors = len(df_err)
-            resolved_errors = len(df_err[df_err["status"] == "RESOLVED"])
-            unresolved_errors = total_errors - resolved_errors
-            
-            report_data.append({
-                "Tháng": m,
-                "Tổng số ca XML lỗi/chưa gửi": total_cases,
-                "Số ca XML đã xử lý": resolved_cases,
-                "Số ca XML chưa xử lý": unresolved_cases,
-                "Tổng số lỗi phát sinh": total_errors,
-                "Số lỗi đã xử lý": resolved_errors,
-                "Số lỗi chưa xử lý": unresolved_errors
-            })
-            
-        df = pd.DataFrame(report_data)
-        
-        # Add total row
-        total_row = {
-            "Tháng": "Tổng cộng",
-            "Tổng số ca XML lỗi/chưa gửi": df["Tổng số ca XML lỗi/chưa gửi"].sum(),
-            "Số ca XML đã xử lý": df["Số ca XML đã xử lý"].sum(),
-            "Số ca XML chưa xử lý": df["Số ca XML chưa xử lý"].sum(),
-            "Tổng số lỗi phát sinh": df["Tổng số lỗi phát sinh"].sum(),
-            "Số lỗi đã xử lý": df["Số lỗi đã xử lý"].sum(),
-            "Số lỗi chưa xử lý": df["Số lỗi chưa xử lý"].sum()
-        }
-        df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
-        
+        df_listbh = pd.DataFrame(columns=["MA_LK", "_ngay", "month"])
+
+    # 2. Truy vấn danh sách records tối ưu hóa để bypass ORM overhead
+    records = db.query(
+        Record.ma_lk,
+        Record.type_group,
+        Record.status,
+        Record.ngay_ra_vien,
+        Record.ngay_doi_soat,
+        Record.ngay_ra,
+        Record.maloi,
+        Record.motaloi
+    ).all()
+
+    rec_data = []
+    for r in records:
+        date_val = r[3] or r[4] or r[5] # ngay_ra_vien, ngay_doi_soat, ngay_ra
+        month_str = date_val.strftime("%Y-%m") if date_val else "Không rõ"
+        rec_data.append({
+            "ma_lk": r[0],
+            "type_group": r[1],
+            "status": r[2],
+            "maloi": r[6] or "",
+            "motaloi": r[7] or "",
+            "month": month_str
+        })
+    df_rec = pd.DataFrame(rec_data)
+    if df_rec.empty:
+        df_rec = pd.DataFrame(columns=["ma_lk", "type_group", "status", "maloi", "motaloi", "month"])
+
+    # 3. Lấy tất cả các tháng khả dụng
+    all_months = set()
+    if not df_listbh.empty:
+        all_months.update(df_listbh["month"].unique())
+    if not df_rec.empty:
+        all_months.update(df_rec["month"].unique())
+    all_months.discard("Không rõ")
+
+    sorted_months = sorted(list(all_months), reverse=True)
+    if not sorted_months:
+        sorted_months = [datetime.date.today().strftime("%Y-%m")]
+
     filename = "BAO_CAO_TONG_HOP_THANG.xlsx"
     out_path = os.path.join(UPLOAD_DIR, filename)
-    df.to_excel(out_path, index=False)
-    
+
+    with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+        for m in sorted_months:
+            parts = m.split("-")
+            sheet_name = f"Tháng {parts[1]}-{parts[0]}" if len(parts) == 2 else f"Tháng {m}"
+
+            # A. Tính toán số liệu tổng hợp của tháng
+            sent_lks = set(df_listbh[df_listbh["month"] == m]["MA_LK"].unique()) if not df_listbh.empty else set()
+            df_rec_m = df_rec[df_rec["month"] == m] if not df_rec.empty else pd.DataFrame()
+            rec_lks = set(df_rec_m["ma_lk"].unique()) if not df_rec_m.empty else set()
+
+            total_cases_val = len(sent_lks | rec_lks)
+            sent_cases_val = len(sent_lks)
+
+            err_cases_val = 0
+            err_resolved_val = 0
+            fail_cases_val = 0
+            fail_resolved_val = 0
+
+            if not df_rec_m.empty:
+                df_loi_m = df_rec_m[df_rec_m["type_group"] == "LOI"]
+                err_cases_val = len(df_loi_m["ma_lk"].unique())
+                err_resolved_val = len(df_loi_m[df_loi_m["status"] == "RESOLVED"]["ma_lk"].unique())
+
+                df_fail_m = df_rec_m[df_rec_m["type_group"] == "FAIL"]
+                fail_cases_val = len(df_fail_m["ma_lk"].unique())
+                fail_resolved_val = len(df_fail_m[df_fail_m["status"] == "RESOLVED"]["ma_lk"].unique())
+
+            summary_data = {
+                "Chỉ số đối soát": [
+                    "Tổng số ca cần gửi",
+                    "Số ca đã gửi",
+                    "Số ca lỗi",
+                    "Số ca lỗi đã từng xử lý",
+                    "Số ca fail",
+                    "Số ca fail đã xử lý"
+                ],
+                "Số lượng": [
+                    total_cases_val,
+                    sent_cases_val,
+                    err_cases_val,
+                    err_resolved_val,
+                    fail_cases_val,
+                    fail_resolved_val
+                ]
+            }
+            df_summary = pd.DataFrame(summary_data)
+
+            # B. Tính danh sách 10 lỗi thường gặp nhất trong tháng
+            top_errs = pd.DataFrame(columns=["STT", "Mã lỗi", "Mô tả lỗi", "Số ca mắc"])
+            if not df_rec_m.empty:
+                df_loi_m = df_rec_m[df_rec_m["type_group"] == "LOI"]
+                if not df_loi_m.empty:
+                    top_errs = df_loi_m.groupby(["maloi", "motaloi"])["ma_lk"].nunique().reset_index()
+                    top_errs.columns = ["Mã lỗi", "Mô tả lỗi", "Số ca mắc"]
+                    top_errs = top_errs.sort_values(by="Số ca mắc", ascending=False).head(10)
+                    top_errs.insert(0, "STT", range(1, len(top_errs) + 1))
+
+            # Ghi tiêu đề báo cáo
+            title_df = pd.DataFrame([[f"BÁO CÁO ĐỐI SOÁT BHYT - THÁNG {parts[1]}/{parts[0]}"]], columns=["TITLE"])
+            title_df.to_excel(writer, sheet_name=sheet_name, startrow=0, startcol=0, header=False, index=False)
+
+            # Ghi bảng 1
+            pd.DataFrame([["1. SỐ LIỆU TỔNG HỢP"]]).to_excel(writer, sheet_name=sheet_name, startrow=2, startcol=0, header=False, index=False)
+            df_summary.to_excel(writer, sheet_name=sheet_name, startrow=3, startcol=0, index=False)
+
+            # Ghi bảng 2
+            pd.DataFrame([["2. DANH SÁCH 10 LỖI THƯỜNG GẶP NHẤT"]]).to_excel(writer, sheet_name=sheet_name, startrow=11, startcol=0, header=False, index=False)
+            top_errs.to_excel(writer, sheet_name=sheet_name, startrow=12, startcol=0, index=False)
+
+            # Định dạng độ rộng cột tối ưu
+            ws = writer.sheets[sheet_name]
+            ws.column_dimensions['A'].width = 30
+            ws.column_dimensions['B'].width = 20
+            ws.column_dimensions['C'].width = 65
+            ws.column_dimensions['D'].width = 20
+
     return FileResponse(
         out_path, 
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
@@ -2013,8 +2068,17 @@ def export_department_performance(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Xuất file Excel báo cáo phân tích thực hiện sửa lỗi theo khoa phòng ban và tháng"""
-    records = db.query(Record).all()
+    """Xuất file Excel báo cáo phân tích thực hiện sửa lỗi theo khoa phòng ban và tháng (Tối ưu hóa tốc độ tải)"""
+    # Chỉ select các trường cần thiết để bypass ORM instantiation overhead
+    records = db.query(
+        Record.type_group,
+        Record.status,
+        Record.ten_khoa,
+        Record.ngay_ra_vien,
+        Record.ngay_doi_soat,
+        Record.ngay_ra
+    ).all()
+
     if not records:
         df = pd.DataFrame(columns=[
             "Khoa/Phòng", "Tháng", 
@@ -2024,13 +2088,12 @@ def export_department_performance(
     else:
         data = []
         for r in records:
-            date_val = r.ngay_ra_vien or r.ngay_doi_soat or r.ngay_ra
+            date_val = r[3] or r[4] or r[5] # ngay_ra_vien, ngay_doi_soat, ngay_ra
             month_str = date_val.strftime("%Y-%m") if date_val else "Không rõ"
             data.append({
-                "id": r.id,
-                "type_group": r.type_group,
-                "status": r.status,
-                "ten_khoa": r.ten_khoa or "Chưa phân khoa",
+                "type_group": r[0],
+                "status": r[1],
+                "ten_khoa": r[2] or "Chưa phân khoa",
                 "month": month_str
             })
         df_rec = pd.DataFrame(data)

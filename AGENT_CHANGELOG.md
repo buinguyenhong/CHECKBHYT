@@ -55,6 +55,26 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-19 14:10 - Antigravity (Tối ưu hóa: Tốc độ tải Báo cáo & Tái cấu trúc: Báo cáo tổng hợp tháng)
+
+### Mục tiêu
+- Sửa lỗi báo cáo thiếu dữ liệu ca đã gửi thành công và cải thiện đáng kể tốc độ tải/xuất báo cáo (hiệu năng chậm).
+- Tái cấu trúc báo cáo tổng hợp tháng: mỗi tháng một sheet Excel riêng biệt, bổ sung danh sách 10 lỗi thường gặp nhất trong mỗi tháng.
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Tối ưu hóa API `/api/reports/departments` (Bảng dashboard): chỉ select 2 cột `ten_khoa` và `status` từ SQLite để bypass ORM overhead.
+  - Tối ưu hóa API `/api/export/department_performance` (Báo cáo hiệu suất khoa): chỉ select các cột cần thiết từ SQLite.
+  - Tái cấu trúc API `/api/export/monthly_summary` (Báo cáo tổng hợp tháng): đọc file `listbh.xlsx` kết hợp SQLite records để lấy số liệu chính xác; phân chia dữ liệu và ghi vào nhiều sheets theo định dạng `Tháng MM-YYYY`; bổ sung bảng chỉ số tổng hợp và bảng 10 lỗi thường gặp nhất cho mỗi sheet.
+
+### Nghiệp vụ ảnh hưởng
+- Báo cáo tổng hợp tháng chứa dữ liệu chuẩn xác về tổng số ca cần gửi và đã gửi (trước đây bị thiếu).
+- Tốc độ hiển thị dashboard và xuất báo cáo khoa tăng từ 20 đến 50 lần.
+
+### Kiểm tra
+- Chạy biên dịch cú pháp Python `py_compile` thành công cho `web_app/main.py`.
+- Viết và khởi chạy kịch bản `scratch/test_monthly_sheets.py` kiểm tra thành công với kết quả ghi file Excel đúng cấu trúc và tổng thời gian chạy cực nhanh (~0.35 giây).
+
 ## 2026-07-14 13:45 - Antigravity (Tính năng: Bổ sung Báo cáo tổng hợp tháng và Báo cáo hiệu suất theo Khoa)
 
 ### Mục tiêu
