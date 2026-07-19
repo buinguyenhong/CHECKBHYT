@@ -160,6 +160,9 @@ def process_comparison(
         else:
             # Chưa gửi thành công:
             if not has_error:
+                # Nếu không có tệp listbh đầu vào (hoặc rỗng), ta chưa đánh dấu FAIL lúc này, tránh sai lệch.
+                if df_listbh is None or df_listbh.empty:
+                    continue
                 # Không có lỗi chi tiết -> Bản ghi hành chính thuộc nhóm FAIL (IT xử lý)
                 type_group = "FAIL"
                 stats["fail"] += 1

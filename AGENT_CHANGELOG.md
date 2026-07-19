@@ -55,6 +55,25 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-07-19 14:30 - Antigravity (Tính năng: Bổ sung bộ kiểm duyệt file đối soát đầu vào)
+
+### Mục tiêu
+- Ngăn ngừa sai lệch số liệu ca `FAIL` khi người dùng click chạy đối soát mà quên chưa tải lên tệp `listbh.xlsx` hoặc tệp đối soát bị lệch khoảng ngày đối soát.
+
+### Thay đổi
+- `web_app/main.py` [MODIFY]:
+  - Thêm hàm helper `validate_reconciliation_files` thực hiện:
+    - Bắt buộc kiểm tra sự tồn tại của tệp `listbh.xlsx` (và cả `HoSoLoiChiTiet.xlsx` nếu chọn đối soát kèm lỗi).
+    - Kiểm tra xem tệp Excel có chứa dữ liệu nào trùng khớp với khoảng ngày đối soát `[from_date, to_date]` đã chọn hay không. Nếu không, chặn tiến trình và trả về mã lỗi HTTP 400 kèm thông điệp chi tiết về khoảng ngày của tệp hiện tại.
+  - Tích hợp gọi kiểm duyệt `validate_reconciliation_files` ở đầu hai API `/api/sync/start` (chạy nền) và `/api/records/compare` (đồng bộ).
+
+### Nghiệp vụ ảnh hưởng
+- Loại bỏ hoàn toàn rủi ro người dùng đối soát nhầm khoảng ngày hoặc thiếu file dẫn đến ghi đè toàn bộ dữ liệu CSDL thành trạng thái `FAIL`.
+
+### Kiểm tra
+- Chạy biên dịch cú pháp Python `py_compile` thành công cho `web_app/main.py`.
+- Viết và khởi chạy kịch bản unit test `scratch/test_reconciliation_validation.py` xác minh việc bắt lỗi thiếu file và lệch khoảng ngày thành công 100%.
+
 ## 2026-07-19 14:10 - Antigravity (Tối ưu hóa: Tốc độ tải Báo cáo & Tái cấu trúc: Báo cáo tổng hợp tháng)
 
 ### Mục tiêu

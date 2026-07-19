@@ -155,14 +155,16 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         
         SYNC_PROGRESS["progress"] = 55
         SYNC_PROGRESS["status"] = "Đang đọc danh sách BHYT..."
-        listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
         if os.path.exists(listbh_path):
             df_listbh_raw = excel_service.load_listbh(listbh_path)
             df_listbh = excel_service.filter_listbh_by_date(df_listbh_raw, tu_date, den_date)
-            SYNC_PROGRESS["logs"].append(f"Đọc listbh.xlsx thành công. Có {len(df_listbh)} ca trong ngày đối soát.")
+            if df_listbh.empty:
+                SYNC_PROGRESS["logs"].append("Thông báo: Tệp listbh.xlsx không chứa dữ liệu trong khoảng ngày đối soát. Chạy đối soát không có listbh (không đánh dấu ca FAIL).")
+            else:
+                SYNC_PROGRESS["logs"].append(f"Đọc listbh.xlsx thành công. Có {len(df_listbh)} ca trong ngày đối soát.")
         else:
             df_listbh = pd.DataFrame()
-            SYNC_PROGRESS["logs"].append("Cảnh báo: Không tìm thấy file listbh.xlsx. Bỏ qua so sánh đẩy cổng.")
+            SYNC_PROGRESS["logs"].append("Thông báo: Không tìm thấy file listbh.xlsx. Chạy đối soát không có listbh (không đánh dấu ca FAIL).")
             
         if SYNC_PROGRESS.get("should_stop"):
             raise ValueError("Tiến trình bị dừng bởi người dùng.")
@@ -1008,6 +1010,55 @@ async def upload_loi(
 # API: CORRELATION & COMPARE ENGINE
 # ==========================================
 
+def validate_reconciliation_files(from_date: str, to_date: str, include_errors: bool):
+    """Xác thực sự tồn tại và khoảng ngày của các file dữ liệu đầu vào (listbh.xlsx & HoSoLoiChiTiet.xlsx)"""
+    # Chuẩn hóa khoảng ngày đối soát
+    try:
+        clean_from = from_date.replace('-', '').replace('/', '')
+        clean_to = to_date.replace('-', '').replace('/', '')
+        tu_date = datetime.datetime.strptime(clean_from, "%Y%m%d").date()
+        den_date = datetime.datetime.strptime(clean_to, "%Y%m%d").date()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Khoảng ngày đối soát đầu vào không hợp lệ.")
+
+    # Nếu đối soát kèm lỗi, kiểm tra HoSoLoiChiTiet.xlsx
+    if include_errors:
+        loi_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
+        if not os.path.exists(loi_path):
+            raise HTTPException(
+                status_code=400, 
+                detail="Chưa tải lên tệp lỗi chi tiết (HoSoLoiChiTiet.xlsx). Vui lòng upload trước khi chạy đối soát kèm lỗi."
+            )
+        try:
+            df_hsloi = excel_service.load_hosoloichitiet(loi_path)
+            if df_hsloi.empty:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Tệp HoSoLoiChiTiet.xlsx đã tải lên trống hoặc không chứa dữ liệu hợp lệ."
+                )
+            
+            # Lọc theo khoảng ngày nếu file lỗi có cột "Ngày ra"
+            if "Ngày ra" in df_hsloi.columns:
+                mask = (df_hsloi["Ngày ra"] >= tu_date) & (df_hsloi["Ngày ra"] <= den_date)
+                df_hsloi_filtered = df_hsloi.loc[mask]
+                if df_hsloi_filtered.empty:
+                    dates = df_hsloi["Ngày ra"].dropna()
+                    if not dates.empty:
+                        min_d = min(dates).strftime("%d/%m/%Y")
+                        max_d = max(dates).strftime("%d/%m/%Y")
+                        range_hint = f"Tệp lỗi chỉ chứa dữ liệu từ ngày {min_d} đến {max_d}."
+                    else:
+                        range_hint = "Tệp lỗi không chứa cột ngày tháng hợp lệ."
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Tệp HoSoLoiChiTiet.xlsx không chứa dữ liệu lỗi nào trong khoảng ngày đối soát {tu_date.strftime('%d/%m/%Y')} - {den_date.strftime('%d/%m/%Y')}. {range_hint} Vui lòng upload tệp lỗi đúng."
+                    )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Lỗi đọc kiểm tra tệp HoSoLoiChiTiet.xlsx: {str(e)}")
+
+
 @app.get("/api/records/compare")
 def compare_records(
     from_date: str,
@@ -1017,6 +1068,7 @@ def compare_records(
     db: Session = Depends(get_db)
 ):
     """Đồng bộ SQL HIS bệnh viện, so sánh danh sách và sinh dữ liệu đối soát (Giải mã mật khẩu HIS)"""
+    validate_reconciliation_files(from_date, to_date, include_errors)
     cfg = db.query(AppConfig).first()
     if not cfg:
         raise HTTPException(status_code=400, detail="Vui lòng cấu hình kết nối SQL Server trước.")
@@ -1083,6 +1135,7 @@ def start_sync(
     user: User = Depends(require_admin)
 ):
     """Kích hoạt tiến trình đối soát chạy ngầm bất đồng bộ"""
+    validate_reconciliation_files(from_date, to_date, include_errors)
     global SYNC_PROGRESS
     if SYNC_PROGRESS["active"]:
         raise HTTPException(status_code=400, detail="Đang có một tiến trình đối soát khác chạy ngầm. Vui lòng đợi.")
