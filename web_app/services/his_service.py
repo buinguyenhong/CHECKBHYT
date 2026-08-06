@@ -119,21 +119,15 @@ def chuan_hoa_ma_lk(value) -> str:
         return ""
     s = str(value).strip()
     s = s.replace("_CC", "/CC")
-    
-    # Loại bỏ tiền tố TN., TN, A., A để chuẩn hóa MA_LK ghép nối chính xác tuyệt đối giữa SQL HIS và BHYT Portal
-    upper_s = s.upper()
-    if upper_s.startswith("TN."):
-        s = s[3:].strip()
-    elif upper_s.startswith("TN"):
-        s = s[2:].strip()
-    elif upper_s.startswith("A."):
-        s = s[2:].strip()
-    elif upper_s.startswith("A"):
-        s = s[1:].strip()
     return s
 
 def remove_leading_A(value) -> str:
-    return chuan_hoa_ma_lk(value)
+    s = chuan_hoa_ma_lk(value)
+    if s.startswith("A."):
+        return s[2:].strip()
+    elif s.startswith("A"):
+        return s[1:].strip()
+    return s
 
 def parse_datetime_to_date(series: pd.Series) -> pd.Series:
     def parse_single(val):
@@ -286,7 +280,7 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
     op = pd.DataFrame()
     if not df_op.empty:
         op["Loại ca"] = "Ngoại trú"
-        s_ma_lk = get_col_series(df_op, ["Column4", "column4", "SoPhieuThanhToanNgoaiTru", "ma_lk"])
+        s_ma_lk = get_col_series(df_op, ["SoPhieu_BA", "Column4", "column4", "SoPhieuThanhToanNgoaiTru", "ma_lk"])
         op["MA_LK"] = s_ma_lk.apply(chuan_hoa_ma_lk)
         op["Họ tên"] = get_col_series(df_op, ["TenBenhNhan", "ho_ten"]).fillna("")
         op["Mã thẻ"] = get_col_series(df_op, ["SoBHYT", "ma_the"]).fillna("")
