@@ -280,19 +280,19 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
     op = pd.DataFrame()
     if not df_op.empty:
         op["Loại ca"] = "Ngoại trú"
-        s_ma_lk = get_col_series(df_op, ["SoPhieu_BA", "Column4", "column4", "SoPhieuThanhToanNgoaiTru", "ma_lk"])
+        s_ma_lk = get_col_series(df_op, ["column4", "SoPhieu_BA", "sobenhan", "SoPhieuThanhToanNgoaiTru", "ma_lk"])
         op["MA_LK"] = s_ma_lk.apply(chuan_hoa_ma_lk)
         op["Họ tên"] = get_col_series(df_op, ["TenBenhNhan", "ho_ten"]).fillna("")
         op["Mã thẻ"] = get_col_series(df_op, ["SoBHYT", "ma_the"]).fillna("")
         op["Tên khoa"] = "Khám bệnh"
-        op["Mã y tế"] = get_col_series(df_op, ["SoPhieuThanhToanNgoaiTru", "ma_bn"]).fillna("")
+        op["Mã y tế"] = get_col_series(df_op, ["SoPhieuThanhToanNgoaiTru", "sobenhan", "ma_bn"]).fillna("")
         op["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_op, ["NgayRa", "ngay_ra"]))
 
     ip = pd.DataFrame()
     if not df_ip.empty:
         ip["Loại ca"] = "Nội trú"
-        s_so_ba = get_col_series(df_ip, ["SoPhieu_BA", "sobenhan", "Column4", "column4", "ma_lk"])
-        ip["MA_LK"] = s_so_ba.apply(remove_leading_A)
+        s_so_ba = get_col_series(df_ip, ["column4", "sobenhan", "SoPhieuThanhToanNgoaiTru", "SoPhieu_BA", "ma_lk"])
+        ip["MA_LK"] = s_so_ba.apply(chuan_hoa_ma_lk)
         ip["Họ tên"] = get_col_series(df_ip, ["TenBenhNhan", "ho_ten"]).fillna("")
         ip["Mã thẻ"] = get_col_series(df_ip, ["SoBHYT", "ma_the"]).fillna("")
         ip["Tên khoa"] = get_col_series(df_ip, ["khoadieutri", "ten_khoa"]).fillna("")
