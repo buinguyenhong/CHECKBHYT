@@ -123,7 +123,9 @@ def chuan_hoa_ma_lk(value) -> str:
 
 def remove_leading_A(value) -> str:
     s = chuan_hoa_ma_lk(value)
-    if s.startswith("A"):
+    if s.startswith("A."):
+        return s[2:].strip()
+    elif s.startswith("A"):
         return s[1:].strip()
     return s
 
@@ -262,36 +264,45 @@ def run_update_sql(conn, sql_text: str) -> int:
     conn.commit()
     return rc
 
+def get_col_series(df: pd.DataFrame, candidates: list[str], default_val="") -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=str)
+    for c in candidates:
+        if c in df.columns:
+            return df[c]
+    col_map = {str(col).lower(): col for col in df.columns}
+    for c in candidates:
+        if c.lower() in col_map:
+            return df[col_map[c.lower()]]
+    return pd.Series([default_val] * len(df), index=df.index)
+
 def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame:
-    req_op = ["TenBenhNhan", "SoBHYT", "Column4", "SoPhieuThanhToanNgoaiTru", "NgayRa"]
-    req_ip = ["TenBenhNhan", "SoBHYT", "SoPhieu_BA", "khoadieutri", "NgayRa"]
-
-    for c in req_op:
-        if c not in df_op.columns:
-            raise ValueError(f"Stored Procedure Ngoại trú thiếu cột '{c}'. Hiện có: {list(df_op.columns)}")
-    for c in req_ip:
-        if c not in df_ip.columns:
-            raise ValueError(f"Stored Procedure Nội trú thiếu cột '{c}'. Hiện có: {list(df_ip.columns)}")
-
     op = pd.DataFrame()
-    op["Loại ca"] = "Ngoại trú"
-    op["MA_LK"] = df_op["Column4"].apply(chuan_hoa_ma_lk)
-    op["Họ tên"] = df_op["TenBenhNhan"].fillna("")
-    op["Mã thẻ"] = df_op["SoBHYT"].fillna("")
-    op["Tên khoa"] = "Khám bệnh"
-    op["Mã y tế"] = df_op["SoPhieuThanhToanNgoaiTru"].fillna("")
-    op["Ngày ra viện"] = parse_datetime_to_date(df_op["NgayRa"])
+    if not df_op.empty:
+        op["Loại ca"] = "Ngoại trú"
+        s_ma_lk = get_col_series(df_op, ["Column4", "column4", "SoPhieuThanhToanNgoaiTru", "ma_lk"])
+        op["MA_LK"] = s_ma_lk.apply(chuan_hoa_ma_lk)
+        op["Họ tên"] = get_col_series(df_op, ["TenBenhNhan", "ho_ten"]).fillna("")
+        op["Mã thẻ"] = get_col_series(df_op, ["SoBHYT", "ma_the"]).fillna("")
+        op["Tên khoa"] = "Khám bệnh"
+        op["Mã y tế"] = get_col_series(df_op, ["SoPhieuThanhToanNgoaiTru", "ma_bn"]).fillna("")
+        op["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_op, ["NgayRa", "ngay_ra"]))
 
     ip = pd.DataFrame()
-    ip["Loại ca"] = "Nội trú"
-    ip["MA_LK"] = df_ip["SoPhieu_BA"].apply(remove_leading_A)
-    ip["Họ tên"] = df_ip["TenBenhNhan"].fillna("")
-    ip["Mã thẻ"] = df_ip["SoBHYT"].fillna("")
-    ip["Tên khoa"] = df_ip["khoadieutri"].fillna("")
-    ip["Mã y tế"] = ""
-    ip["Ngày ra viện"] = parse_datetime_to_date(df_ip["NgayRa"])
+    if not df_ip.empty:
+        ip["Loại ca"] = "Nội trú"
+        s_so_ba = get_col_series(df_ip, ["SoPhieu_BA", "sobenhan", "Column4", "column4", "ma_lk"])
+        ip["MA_LK"] = s_so_ba.apply(remove_leading_A)
+        ip["Họ tên"] = get_col_series(df_ip, ["TenBenhNhan", "ho_ten"]).fillna("")
+        ip["Mã thẻ"] = get_col_series(df_ip, ["SoBHYT", "ma_the"]).fillna("")
+        ip["Tên khoa"] = get_col_series(df_ip, ["khoadieutri", "ten_khoa"]).fillna("")
+        ip["Mã y tế"] = ""
+        ip["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_ip, ["NgayRa", "ngay_ra"]))
 
     out = pd.concat([op, ip], ignore_index=True)
+    if out.empty:
+        return pd.DataFrame(columns=["Loại ca", "MA_LK", "Họ tên", "Mã thẻ", "Tên khoa", "Mã y tế", "Ngày ra viện"])
+
     out = out[out["MA_LK"].astype(str).str.len() > 0]
     out["MA_LK"] = out["MA_LK"].apply(chuan_hoa_ma_lk)
     out = out.drop_duplicates(subset=["MA_LK"], keep="first")
