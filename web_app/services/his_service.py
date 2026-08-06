@@ -119,15 +119,21 @@ def chuan_hoa_ma_lk(value) -> str:
         return ""
     s = str(value).strip()
     s = s.replace("_CC", "/CC")
+    
+    # Loại bỏ tiền tố TN., TN, A., A để chuẩn hóa MA_LK ghép nối chính xác tuyệt đối giữa SQL HIS và BHYT Portal
+    upper_s = s.upper()
+    if upper_s.startswith("TN."):
+        s = s[3:].strip()
+    elif upper_s.startswith("TN"):
+        s = s[2:].strip()
+    elif upper_s.startswith("A."):
+        s = s[2:].strip()
+    elif upper_s.startswith("A"):
+        s = s[1:].strip()
     return s
 
 def remove_leading_A(value) -> str:
-    s = chuan_hoa_ma_lk(value)
-    if s.startswith("A."):
-        return s[2:].strip()
-    elif s.startswith("A"):
-        return s[1:].strip()
-    return s
+    return chuan_hoa_ma_lk(value)
 
 def parse_datetime_to_date(series: pd.Series) -> pd.Series:
     def parse_single(val):
