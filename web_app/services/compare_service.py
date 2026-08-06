@@ -86,6 +86,29 @@ def process_comparison(
     if df_sql.empty:
         return {"total": 0, "loi": 0, "fail": 0, "sent": 0}
 
+    # Dọn dẹp các ca FAIL cũ/mã lỗi từ lượt chạy trước thuộc cùng khoảng ngày nhưng không thuộc SQL HIS hiện tại
+    current_sql_keys = set(df_sql["MA_LK"].dropna().astype(str).map(lambda x: chuan_hoa_ma_lk(x).upper()))
+    sql_dates = [d for d in df_sql["Ngày ra viện"].dropna() if hasattr(d, "year") or isinstance(d, datetime.date)]
+    if sql_dates:
+        min_d = min(sql_dates)
+        max_d = max(sql_dates)
+        if isinstance(min_d, datetime.datetime):
+            min_d = min_d.date()
+        if isinstance(max_d, datetime.datetime):
+            max_d = max_d.date()
+            
+        obsolete_fails = db.query(Record).filter(
+            Record.type_group == "FAIL",
+            Record.status != "RESOLVED",
+            Record.ngay_ra_vien >= min_d,
+            Record.ngay_ra_vien <= max_d
+        ).all()
+        
+        for obs in obsolete_fails:
+            if obs.ma_lk not in current_sql_keys:
+                db.delete(obs)
+        db.commit()
+
     # 1. Chuyển tập hợp danh sách đã gửi thành set để tìm kiếm nhanh O(1)
     sent_keys = set()
     if not df_listbh.empty:
