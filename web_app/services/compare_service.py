@@ -149,11 +149,18 @@ def process_comparison(
                 if rec.status != "RESOLVED":
                     rec.status = "RESOLVED"
                     rec.his_unlock_status = "NORMAL" # Reset trạng thái mở khóa khi đã gửi thành công
+                    d_cu_str = rec.ngay_doi_soat.strftime('%d/%m/%Y') if rec.ngay_doi_soat else "trước đó"
+                    d_moi_str = ngay_doi_soat.strftime('%d/%m/%Y')
+                    log_text = f"Hệ thống tự động duyệt: Ca bệnh đã gửi thành công lên cổng BHYT (đối soát ngày {d_moi_str})."
+                    if rec.type_group == "LOI" and rec.maloi:
+                        log_text += f" Lỗi [{rec.maloi}] (xuất hiện đợt {d_cu_str}) đã được sửa thành công."
+                    else:
+                        log_text += f" Ca FAIL (đợt {d_cu_str}) đã được khắc phục."
                     log = RecordLog(
                         record_id=rec.id,
                         username="system",
                         action="CHANGE_STATUS",
-                        note="He thong tu dong duyet: Ca benh da gui thanh cong len cong BHYT"
+                        note=log_text
                     )
                     db.add(log)
             stats["sent"] += 1
@@ -169,6 +176,7 @@ def process_comparison(
                 
                 # Biến cờ đánh dấu nếu ca này từng có lỗi cũ được sửa
                 had_previous_active_errors = False
+                prev_error_dates = []
                 
                 if include_errors:
                     existing_loi_records = db.query(Record).filter(
@@ -180,11 +188,13 @@ def process_comparison(
                         had_previous_active_errors = True
                         for loi_rec in existing_loi_records:
                             loi_rec.status = "RESOLVED"
+                            d_cu_str = loi_rec.ngay_doi_soat.strftime('%d/%m/%Y') if loi_rec.ngay_doi_soat else "trước đó"
+                            prev_error_dates.append(d_cu_str)
                             log = RecordLog(
                                 record_id=loi_rec.id,
                                 username="system",
                                 action="CHANGE_STATUS",
-                                note="He thong tu dong dong nhom LOI: Ho so khong con trong danh sach loi chi tiet BHYT o lan doi soat nay"
+                                note=f"Đã sửa lỗi cũ (đợt đối soát {d_cu_str}): Lỗi [{loi_rec.maloi}] không còn xuất hiện trong tệp lỗi chi tiết. Ca chuyển sang danh sách FAIL chờ đẩy lại."
                             )
                             db.add(log)
                 
@@ -193,7 +203,8 @@ def process_comparison(
                     Record.type_group == "FAIL"
                 ).first()
                 
-                note_val = "đã sửa lỗi cũ" if had_previous_active_errors else ""
+                dates_str = ", ".join(sorted(list(set(prev_error_dates))))
+                note_val = f"đã sửa lỗi cũ (đợt {dates_str})" if had_previous_active_errors else ""
                 
                 if existing_record:
                     existing_record.ho_ten = ho_ten
@@ -285,11 +296,13 @@ def process_comparison(
                             
                             if not found_in_new:
                                 rec.status = "RESOLVED"
+                                d_cu_str = rec.ngay_doi_soat.strftime('%d/%m/%Y') if rec.ngay_doi_soat else "trước đó"
+                                new_codes = ", ".join(sorted(list(set([e["maloi"] for e in error_map[ma_lk] if e["maloi"]]))))
                                 log = RecordLog(
                                     record_id=rec.id,
                                     username="system",
                                     action="CHANGE_STATUS",
-                                    note="He thong tu dong dong: Loi nay khong con trong danh sach loi chi tiet BHYT moi"
+                                    note=f"Đã sửa lần 1: Lỗi [{rec.maloi}] (từ đợt đối soát {d_cu_str}) đã khắc phục. Đợt này phát sinh lỗi mới: [{new_codes}]."
                                 )
                                 db.add(log)
 

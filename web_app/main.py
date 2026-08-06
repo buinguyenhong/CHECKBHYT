@@ -296,13 +296,19 @@ try:
         db.commit()
         print("[*] Da tao tai khoan admin mac dinh: admin / adminBHYT2026")
 
-    # Seed cấu hình mặc định
+    # Seed hoặc cập nhật cấu hình mặc định sang Stored Procedure Optimized mới
     cfg = db.query(AppConfig).first()
     if not cfg:
         new_cfg = AppConfig()
         db.add(new_cfg)
         db.commit()
         print("[*] Da khoi tao cau hinh CSDL HIS mac dinh.")
+    else:
+        if "095" in str(cfg.sp_op) or "096" in str(cfg.sp_op) or not cfg.sp_op:
+            cfg.sp_op = "dbo.sp_BCVP_DsDeNghiThanhToanBHYT_NgoaiTru_Optimized"
+        if "096" in str(cfg.sp_ip) or "095" in str(cfg.sp_ip) or not cfg.sp_ip:
+            cfg.sp_ip = "dbo.sp_BCVP_DsDeNghiThanhToanBHYT_NoiTru_Optimized"
+        db.commit()
 
     # Seed danh mục lỗi mẫu (bổ sung & cập nhật định dạng)
     from models import ErrorDefinition
@@ -1654,6 +1660,39 @@ def resolve_fail_record(
     return {"status": "success"}
 
 
+@app.get("/api/records/{ma_lk}/history")
+def get_record_history(
+    ma_lk: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Lấy toàn bộ lịch sử đối soát và xử lý lỗi theo mã liên kết ma_lk"""
+    clean_lk = his_service.chuan_hoa_ma_lk(ma_lk).upper()
+    records = db.query(Record).filter(func.upper(Record.ma_lk) == clean_lk).all()
+    if not records:
+        return {"ma_lk": clean_lk, "history": []}
+
+    rec_ids = [r.id for r in records]
+    logs = db.query(RecordLog).filter(RecordLog.record_id.in_(rec_ids)).order_by(RecordLog.created_at.desc()).all()
+
+    history = []
+    for log in logs:
+        rec = next((r for r in records if r.id == log.record_id), None)
+        history.append({
+            "id": log.id,
+            "record_id": log.record_id,
+            "username": log.username,
+            "action": log.action,
+            "note": log.note,
+            "created_at": log.created_at.strftime("%d/%m/%Y %H:%M:%S") if log.created_at else "",
+            "maloi": rec.maloi if rec else "",
+            "motaloi": rec.motaloi if rec else "",
+            "type_group": rec.type_group if rec else "",
+            "ngay_doi_soat": rec.ngay_doi_soat.strftime("%d/%m/%Y") if (rec and rec.ngay_doi_soat) else ""
+        })
+    return {"ma_lk": clean_lk, "history": history}
+
+
 @app.post("/api/records/admin/fail/reset")
 def run_bulk_fail_reset(
     loai: str,
@@ -1816,33 +1855,121 @@ def get_department_breakdown(
 
 @app.get("/api/export/sql_list")
 def export_sql_list(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    loai_ca: Optional[str] = None,
+    ngay_ra_vien: Optional[str] = None,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Xuất file Excel sql_list chứa toàn bộ danh sách nạp từ HIS CSDL"""
-    last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
-    if not last_record:
-        raise HTTPException(status_code=400, detail="Không có dữ liệu đối soát để xuất.")
+    """Xuất file Excel chứa toàn bộ danh sách nạp từ HIS CSDL (dùng Cache theo khoảng ngày và bộ lọc)"""
+    cfg = db.query(AppConfig).first()
+    if not cfg:
+        raise HTTPException(status_code=400, detail="Chưa cấu hình kết nối SQL Server HIS.")
         
-    records = db.query(Record).filter(Record.ngay_doi_soat == last_record.ngay_doi_soat).all()
-    
-    data = []
-    for r in records:
-        data.append({
-            "Loại ca": resolve_loai_ca(r),
-            "MA_LK": r.ma_lk,
-            "Họ tên": r.ho_ten,
-            "Mã thẻ": r.ma_the,
-            "Tên khoa": r.ten_khoa,
-            "Mã y tế": r.ma_y_te,
-            "Ngày ra viện": r.ngay_ra_vien,
-            "Trạng thái đối soát": "Đã gửi BHYT" if r.status == "RESOLVED" and r.type_group != "LOI" else "Chưa gửi / Lỗi"
-        })
+    try:
+        # 1. Xác định khoảng ngày đối soát
+        clean_from = ""
+        clean_to = ""
+        if from_date and to_date:
+            clean_from = from_date.replace('-', '').replace('/', '')
+            clean_to = to_date.replace('-', '').replace('/', '')
+        else:
+            last_record = db.query(Record.ngay_doi_soat).order_by(Record.ngay_doi_soat.desc()).first()
+            if last_record and last_record[0]:
+                d_str = last_record[0].strftime("%Y%m%d")
+                clean_from = d_str
+                clean_to = d_str
+            else:
+                today_str = datetime.date.today().strftime("%Y%m%d")
+                clean_from = today_str
+                clean_to = today_str
+
+        password_plain = decrypt_password(cfg.password) if cfg.password else ""
+        cfg_dict = {
+            "driver": cfg.driver,
+            "server": cfg.server,
+            "database": cfg.database,
+            "auth": cfg.auth,
+            "user": cfg.user,
+            "password": password_plain,
+            "sp_op": cfg.sp_op,
+            "sp_ip": cfg.sp_ip
+        }
         
-    df = pd.DataFrame(data)
-    out_path = os.path.join(UPLOAD_DIR, "sql_list_export.xlsx")
-    df.to_excel(out_path, index=False)
-    return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="sql_list.xlsx")
+        # 2. Đọc từ cache qua fetch_his_data
+        df = his_service.fetch_his_data(cfg_dict, clean_from, clean_to)
+        if df.empty:
+            raise HTTPException(status_code=400, detail="Không có dữ liệu SQL HIS nào trong khoảng ngày đã chọn.")
+
+        # 3. Áp dụng bộ lọc
+        if loai_ca and loai_ca != "All":
+            df = df[df["Loại ca"] == loai_ca]
+
+        if ngay_ra_vien:
+            try:
+                dt_filter = datetime.datetime.strptime(ngay_ra_vien, "%Y-%m-%d").date()
+                def match_date(val):
+                    if pd.isna(val) or val is None:
+                        return False
+                    if hasattr(val, "date"):
+                        try:
+                            return val.date() == dt_filter
+                        except Exception:
+                            pass
+                    if isinstance(val, datetime.date):
+                        return val == dt_filter
+                    try:
+                        val_str = str(val).split()[0].replace('/', '-').strip()
+                        return val_str == ngay_ra_vien
+                    except Exception:
+                        return False
+                df = df[df["Ngày ra viện"].apply(match_date)]
+            except Exception:
+                pass
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="Không tìm thấy bản ghi SQL HIS nào khớp với bộ lọc xuất Excel.")
+
+        # 4. Chuẩn hóa dữ liệu xuất
+        def safe_str(val) -> str:
+            if val is None or pd.isna(val):
+                return ""
+            return str(val).encode('utf-8', errors='replace').decode('utf-8')
+
+        export_rows = []
+        for _, r in df.iterrows():
+            val_d = r.get("Ngày ra viện")
+            d_fmt = ""
+            if pd.notna(val_d):
+                try:
+                    if hasattr(val_d, "strftime"):
+                        d_fmt = val_d.strftime("%d/%m/%Y")
+                    else:
+                        d_fmt = str(val_d).split()[0]
+                except Exception:
+                    d_fmt = str(val_d)
+
+            export_rows.append({
+                "Loại ca": safe_str(r.get("Loại ca", "Ngoại trú")),
+                "MA_LK": safe_str(r.get("MA_LK", "")),
+                "Họ tên": safe_str(r.get("Họ tên", "")),
+                "Mã thẻ BHYT": safe_str(r.get("Mã thẻ", "")),
+                "Tên khoa": safe_str(r.get("Tên khoa", "")),
+                "Mã y tế / Số phiếu": safe_str(r.get("Mã y tế", "")),
+                "Ngày ra viện": d_fmt
+            })
+
+        df_export = pd.DataFrame(export_rows)
+        filename = f"DU_LIEU_SQL_HIS_{clean_from}_{clean_to}.xlsx"
+        out_path = os.path.join(UPLOAD_DIR, filename)
+        df_export.to_excel(out_path, index=False)
+        return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e).encode('utf-8', errors='replace').decode('utf-8')
+        raise HTTPException(status_code=500, detail=f"Lỗi xuất Excel SQL HIS: {error_msg}")
 
 
 @app.get("/api/export/fail")

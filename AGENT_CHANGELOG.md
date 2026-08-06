@@ -55,6 +55,34 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-06 07:45 - Antigravity (Nâng cấp Stored Procedures mới, Xuất Excel Cache Tab 2 & Cơ chế Ghi log Lịch sử Lỗi)
+
+### Mục tiêu
+- Nâng cấp sử dụng 2 Stored Procedure Optimized mới cho Ngoại trú & Nội trú.
+- Sửa lỗi xuất Excel dữ liệu SQL HIS từ cache ở Tab 2 (`/api/export/sql_list`).
+- Triển khai cơ chế ghi nhận lịch sử lỗi đã sửa theo 3 kịch bản đối soát (gửi thành công BHYT, thay đổi mã lỗi, ca không còn lỗi chuyển FAIL) kèm mốc thời gian đối soát cũ.
+- Tích hợp Modal Lịch sử đối soát & xử lý lỗi (`History Modal`) trên cả giao diện IT Admin và Khoa Lâm Sàng.
+
+### Thay đổi
+- `web_app/models.py` [MODIFY]: Cập nhật tên Stored Procedure mặc định của `AppConfig` sang `sp_BCVP_DsDeNghiThanhToanBHYT_NgoaiTru_Optimized` và `sp_BCVP_DsDeNghiThanhToanBHYT_NoiTru_Optimized`.
+- `web_app/services/his_service.py` [MODIFY]: Thêm fallback mặc định cho 2 Stored Procedure Optimized.
+- `web_app/services/compare_service.py` [MODIFY]: Nâng cấp logic `process_comparison` hỗ trợ ghi nhận log lịch sử lỗi đã sửa theo 3 kịch bản kèm thời gian đối soát cũ.
+- `web_app/main.py` [MODIFY]: 
+  - Nâng cấp API `/api/export/sql_list` hỗ trợ đọc từ Cache SQL `.pkl` theo khoảng ngày và bộ lọc để xuất Excel an toàn không gặp lỗi formatting.
+  - Tự động cập nhật `AppConfig` hiện có trong DB sang SP mới khi server khởi chạy.
+  - Thêm API `GET /api/records/{ma_lk}/history` trả về danh sách `RecordLog` theo `ma_lk`.
+- `web_app/templates/admin.html` [MODIFY]:
+  - Thêm nút **"Xuất Excel dữ liệu SQL"** tại Tab 2 panel header và hàm JS `exportSqlData()`.
+  - Thêm nút **"Lịch sử"** ở bảng Tab 3 (Lỗi) và Tab 4 (FAIL).
+  - Tích hợp `#historyModal` và hàm `showHistoryModal(maLk)`.
+- `web_app/templates/department.html` [MODIFY]:
+  - Thêm cột Thao tác và nút **"Lịch sử"** cho giao diện Khoa Lâm Sàng.
+  - Tích hợp `#historyModal` và handler hiển thị dòng thời gian xử lý.
+
+### Kiểm tra
+- Biên dịch cú pháp Python `py_compile` thành công 100%.
+- Viết và chạy kịch bản unit test `scratch/test_new_sp_and_history.py` xác minh cả 3 kịch bản đối soát và cấu hình SP mới thành công 100%.
+
 ## 2026-07-19 14:50 - Antigravity (Cải tiến: Bổ sung chỉ số lỗi vào Báo cáo tổng hợp tháng)
 
 ### Mục tiêu

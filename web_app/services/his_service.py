@@ -316,12 +316,15 @@ def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=No
 
     conn = get_conn(cfg)
     try:
-        log(f"Bắt đầu gọi Stored Procedure Ngoại trú: {cfg.get('sp_op')} từ {tu_ngay} đến {den_ngay}...")
-        df_op = sql_exec_sp(conn, cfg.get("sp_op"), tu_ngay, den_ngay)
+        sp_op = cfg.get("sp_op") or "dbo.sp_BCVP_DsDeNghiThanhToanBHYT_NgoaiTru_Optimized"
+        sp_ip = cfg.get("sp_ip") or "dbo.sp_BCVP_DsDeNghiThanhToanBHYT_NoiTru_Optimized"
+
+        log(f"Bắt đầu gọi Stored Procedure Ngoại trú: {sp_op} từ {tu_ngay} đến {den_ngay}...")
+        df_op = sql_exec_sp(conn, sp_op, tu_ngay, den_ngay)
         log(f"  -> Ngoại trú trả về: {len(df_op)} dòng. Cột: {list(df_op.columns)}")
 
-        log(f"Bắt đầu gọi Stored Procedure Nội trú: {cfg.get('sp_ip')} từ {tu_ngay} đến {den_ngay}...")
-        df_ip = sql_exec_sp(conn, cfg.get("sp_ip"), tu_ngay, den_ngay)
+        log(f"Bắt đầu gọi Stored Procedure Nội trú: {sp_ip} từ {tu_ngay} đến {den_ngay}...")
+        df_ip = sql_exec_sp(conn, sp_ip, tu_ngay, den_ngay)
         log(f"  -> Nội trú trả về: {len(df_ip)} dòng. Cột: {list(df_ip.columns)}")
         
         # Ghi debug ra file log để theo dõi dạng dữ liệu ngày thực tế dưới CSDL HIS bệnh viện

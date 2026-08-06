@@ -1071,10 +1071,11 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Dữ liệu Bệnh nhân tải từ SQL HIS của bệnh viện</h2>
-                <div style="display:flex; gap:15px; align-items:center;">
+                <div style="display:flex; gap:10px; align-items:center;">
                     <span style="font-size:14px; font-weight:700; color:var(--text-secondary);">
                         Tổng số ca: <span id="sql_total_count" style="color:var(--primary); font-size:16px;">0</span>
                     </span>
+                    <button class="btn btn-danger" onclick="exportSqlData()" style="padding:6px 14px; font-size:13px;">Xuất Excel dữ liệu SQL</button>
                     <button class="btn btn-primary" onclick="fetchSqlData()" style="padding:6px 14px; font-size:13px;">Tải lại dữ liệu</button>
                 </div>
             </div>
@@ -2241,6 +2242,64 @@
         }
     }
 
+    function exportSqlData() {
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+        const loaiCa = document.getElementById('sql_filter_loai').value;
+        const filterDate = document.getElementById('sql_filter_date').value;
+        
+        let url = `/api/export/sql_list?`;
+        if (fromDate && toDate) {
+            url += `from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}&`;
+        }
+        url += `loai_ca=${loaiCa}`;
+        if (filterDate) {
+            url += `&ngay_ra_vien=${filterDate}`;
+        }
+        window.location.href = url;
+    }
+
+    async function showHistoryModal(maLk) {
+        const modal = document.getElementById('historyModal');
+        document.getElementById('historyMaLk').innerText = maLk;
+        const tbody = document.getElementById('historyBody');
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 20px;">Đang tải lịch sử đối soát...</td></tr>';
+        modal.style.display = 'flex';
+        
+        try {
+            const res = await fetch(`/api/records/${encodeURIComponent(maLk)}/history`);
+            if (res.ok) {
+                const data = await res.json();
+                const logs = data.history || [];
+                tbody.innerHTML = '';
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 20px;">Chưa có nhật ký lịch sử cho ca này.</td></tr>';
+                    return;
+                }
+                logs.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const badgeColor = item.action === 'CREATE' ? 'rgba(59,130,246,0.15)' : (item.note && item.note.includes('tự động') ? 'rgba(16,185,129,0.15)' : 'rgba(251,191,36,0.15)');
+                    const textColor = item.action === 'CREATE' ? '#60a5fa' : (item.note && item.note.includes('tự động') ? '#34d399' : '#fbbf24');
+                    tr.innerHTML = `
+                        <td style="white-space:nowrap;">${item.created_at || ''}</td>
+                        <td><span class="badge" style="background:${badgeColor}; color:${textColor};">${item.username || 'system'}</span></td>
+                        <td><code>${item.maloi || '-'}</code></td>
+                        <td class="wrap-cell">${item.note || ''}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--danger); padding: 20px;">Lỗi tải lịch sử.</td></tr>';
+            }
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--danger); padding: 20px;">Lỗi kết nối: ${e.message}</td></tr>`;
+        }
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+    }
+
     function filterSqlTable() {
         const query = document.getElementById('sql_search').value.toLowerCase().trim();
         const rows = document.querySelectorAll('#sqlDataBody tr');
@@ -2369,6 +2428,7 @@
                         </td>
                         <td>
                             <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
+                            <button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="showHistoryModal('${r.ma_lk}')">Lịch sử</button>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -2531,6 +2591,7 @@
                 </td>
                 <td>
                     <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
+                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="showHistoryModal('${r.ma_lk}')">Lịch sử</button>
                 </td>
             `;
             tbody.appendChild(tr);

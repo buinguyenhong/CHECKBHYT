@@ -745,11 +745,12 @@
                             <th>Mã lỗi</th>
                             <th>Mô tả lỗi</th>
                             <th>Trạng thái</th>
+                            <th>Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="recordsBody">
                         <tr>
-                            <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 30px;">
                                 Đang tải danh sách dữ liệu...
                             </td>
                         </tr>
@@ -823,7 +824,75 @@
     </div>
 </div>
 
+<!-- Modal xem lịch sử đối soát và xử lý lỗi -->
+<div class="modal" id="historyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); align-items:center; justify-content:center; z-index:1000;">
+    <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:16px; width:90%; max-width:750px; padding:25px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="font-size:16px; font-weight:700;">Lịch sử đối soát &amp; xử lý lỗi — <span id="historyMaLk" style="color:var(--primary);"></span></h3>
+            <button style="background:transparent; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer;" onclick="closeHistoryModal()">&times;</button>
+        </div>
+        <div style="max-height:450px; overflow-y:auto; padding-right:5px;">
+            <table class="data-table" style="font-size:13px;">
+                <thead>
+                    <tr>
+                        <th style="width:140px;">Thời gian</th>
+                        <th style="width:110px;">Thực hiện</th>
+                        <th style="width:90px;">Mã lỗi</th>
+                        <th>Chi tiết nhật ký / Ghi chú lịch sử</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding:20px;">Đang tải lịch sử...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-top:15px;">
+            <button class="btn-export" style="background:var(--btn-action-bg); border:1px solid var(--btn-action-border); color:var(--text-main); font-size:13px; padding:8px 16px;" onclick="closeHistoryModal()">Đóng</button>
+        </div>
+    </div>
+</div>
+
 <script>
+    async function showHistoryModal(maLk) {
+        const modal = document.getElementById('historyModal');
+        document.getElementById('historyMaLk').innerText = maLk;
+        const tbody = document.getElementById('historyBody');
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 20px;">Đang tải lịch sử đối soát...</td></tr>';
+        modal.style.display = 'flex';
+        
+        try {
+            const res = await fetch(`/api/records/${encodeURIComponent(maLk)}/history`);
+            if (res.ok) {
+                const data = await res.json();
+                const logs = data.history || [];
+                tbody.innerHTML = '';
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 20px;">Chưa có nhật ký lịch sử cho ca này.</td></tr>';
+                    return;
+                }
+                logs.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const badgeColor = item.action === 'CREATE' ? 'rgba(59,130,246,0.15)' : (item.note && item.note.includes('tự động') ? 'rgba(16,185,129,0.15)' : 'rgba(251,191,36,0.15)');
+                    const textColor = item.action === 'CREATE' ? '#60a5fa' : (item.note && item.note.includes('tự động') ? '#34d399' : '#fbbf24');
+                    tr.innerHTML = `
+                        <td style="white-space:nowrap;">${item.created_at || ''}</td>
+                        <td><span style="display:inline-block; padding:3px 6px; border-radius:4px; font-size:11px; font-weight:700; background:${badgeColor}; color:${textColor};">${item.username || 'system'}</span></td>
+                        <td><code>${item.maloi || '-'}</code></td>
+                        <td style="white-space:normal; line-height:1.4;">${item.note || ''}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--status-pending); padding: 20px;">Lỗi tải lịch sử.</td></tr>';
+            }
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--status-pending); padding: 20px;">Lỗi kết nối: ${e.message}</td></tr>`;
+        }
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+    }
     function toggleTheme() {
         const activeTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = activeTheme === 'light' ? 'dark' : 'light';
@@ -957,6 +1026,9 @@
                 <td><span style="color:#f87171; font-weight:700;">${r.maloi || ''}</span></td>
                 <td style="max-width:350px; white-space:normal;">${errorInfo}</td>
                 <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>
+                    <button class="btn" style="padding:4px 8px; font-size:12px; background:var(--btn-action-bg); border:1px solid var(--btn-action-border); color:var(--text-main); border-radius:6px; cursor:pointer;" onclick="showHistoryModal('${r.ma_lk}')">Lịch sử</button>
+                </td>
             `;
             tbody.appendChild(tr);
         });
