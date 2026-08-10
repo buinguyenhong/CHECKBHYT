@@ -352,7 +352,7 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
                 return "Khám bệnh"
             return s
         op["Tên khoa"] = s_ten_khoa.apply(clean_khoa)
-        op["Mã y tế"] = get_col_series(df_op, ["SoPhieuThanhToanNgoaiTru", "ma_bn"]).fillna("")
+        op["Mã y tế"] = get_col_series(df_op, ["ma_bn", "SoPhieuThanhToanNgoaiTru"]).fillna("")
         op["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_op, ["NgayRa", "ngay_ra"]))
 
     ip = pd.DataFrame()
