@@ -60,7 +60,14 @@ def deduplicate_database_records(db: Session):
                 keep_rec.motaloi = normalized_motaloi
                 keep_rec.ma_lk = normalized_ma_lk
                 modified_count += 1
-                    
+
+        # Xử lý dọn dẹp ma_y_te bị nhầm thành ma_lk ở đợt nạp trước
+        corrupted_recs = db.query(Record).filter(Record.ma_y_te != "").all()
+        for rec in corrupted_recs:
+            if rec.ma_y_te and rec.ma_lk and rec.ma_y_te.strip().upper() == rec.ma_lk.strip().upper():
+                rec.ma_y_te = ""
+                modified_count += 1
+
         if deleted_count > 0 or modified_count > 0:
             db.commit()
             print(f"[DEDUPLICATE] Da tu dong xoa {deleted_count} ban ghi va chuan hoa {modified_count} ban ghi trong DB.")

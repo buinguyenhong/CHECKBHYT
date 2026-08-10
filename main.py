@@ -512,7 +512,7 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
     op["MA_LK"] = df_op["Column4"].apply(chuan_hoa_ma_lk)
     op["Họ tên"] = df_op["TenBenhNhan"].fillna("")
     op["Mã thẻ"] = df_op["SoBHYT"].fillna("")
-    op["Tên khoa"] = "Khám bệnh"
+    op["Tên khoa"] = df_op["Ten_Phong_Kham"].fillna("Khám bệnh") if "Ten_Phong_Kham" in df_op.columns else "Khám bệnh"
     op["Mã y tế"] = df_op["SoPhieuThanhToanNgoaiTru"].fillna("")
     op["Ngày ra viện"] = parse_datetime_to_date(df_op["NgayRa"])
 

@@ -276,27 +276,94 @@ def get_col_series(df: pd.DataFrame, candidates: list[str], default_val="") -> p
             return df[col_map[c.lower()]]
     return pd.Series([default_val] * len(df), index=df.index)
 
+def fetch_phong_kham_ngoai_tru(conn, stn_list: list) -> dict:
+    """
+    Truy vấn tên phòng khám cho các ca Ngoại trú theo danh sách Số tiếp nhận (tn.SoTiepNhan).
+    - Đã bỏ JOIN DM_DichVu không cần thiết để tối ưu tốc độ truy vấn CSDL HIS.
+    - Trường hợp 1 phòng: hiển thị tên phòng khám.
+    - Trường hợp nhiều phòng: hiển thị tên tất cả các phòng (ghép bằng dấu phẩy).
+    """
+    stn_clean = [str(s).strip() for s in stn_list if str(s).strip()]
+    if not stn_clean or conn is None:
+        return {}
+
+    res_map = {}
+    chunk_size = 500
+    for i in range(0, len(stn_clean), chunk_size):
+        chunk = stn_clean[i:i + chunk_size]
+        quoted = ", ".join([f"'{s}'" for s in chunk])
+        sql = f"""
+        SELECT 
+            tn.SoTiepNhan AS [So_Tiep_Nhan],
+            pb.TenPhongBan AS [Ten_Phong_Kham]
+        FROM KhamBenh kb WITH (NOLOCK)
+        INNER JOIN TiepNhan tn WITH (NOLOCK) ON kb.TiepNhan_Id = tn.TiepNhan_Id
+        INNER JOIN DM_PhongBan pb WITH (NOLOCK) ON kb.PhongBan_Id = pb.PhongBan_Id
+        WHERE tn.SoTiepNhan IN ({quoted})
+        """
+        cur = None
+        try:
+            cur = conn.cursor()
+            try:
+                cur.timeout = SQL_QUERY_TIMEOUT_SECONDS
+            except Exception:
+                pass
+            cur.execute(sql)
+            rows = cur.fetchall()
+            for r in rows:
+                stn = str(r[0]).strip() if r[0] is not None else ""
+                tpk = str(r[1]).strip() if r[1] is not None else ""
+                if stn and tpk:
+                    k_raw = stn.upper()
+                    k_norm = chuan_hoa_ma_lk(stn).upper()
+                    for k in set([k_raw, k_norm]):
+                        if k not in res_map:
+                            res_map[k] = []
+                        if tpk not in res_map[k]:
+                            res_map[k].append(tpk)
+        except Exception as e:
+            safe_print(f"Lỗi khi truy vấn tên phòng khám ngoại trú: {str(e)}")
+        finally:
+            if cur:
+                try:
+                    cur.close()
+                except Exception:
+                    pass
+
+    final_map = {}
+    for k, rooms in res_map.items():
+        final_map[k] = ", ".join(rooms)
+    return final_map
+
 def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame:
     op = pd.DataFrame()
     if not df_op.empty:
         op["Loại ca"] = "Ngoại trú"
-        s_ma_lk = get_col_series(df_op, ["column4", "SoPhieu_BA", "sobenhan", "SoPhieuThanhToanNgoaiTru", "ma_lk"])
+        s_ma_lk = get_col_series(df_op, ["column4", "SoPhieu_BA", "sobenhan", "ma_lk"])
         op["MA_LK"] = s_ma_lk.apply(chuan_hoa_ma_lk)
         op["Họ tên"] = get_col_series(df_op, ["TenBenhNhan", "ho_ten"]).fillna("")
         op["Mã thẻ"] = get_col_series(df_op, ["SoBHYT", "ma_the"]).fillna("")
-        op["Tên khoa"] = "Khám bệnh"
-        op["Mã y tế"] = get_col_series(df_op, ["SoPhieuThanhToanNgoaiTru", "sobenhan", "ma_bn"]).fillna("")
+        s_ten_khoa = get_col_series(df_op, ["Ten_Phong_Kham", "TenKhoa", "Tên khoa", "ten_khoa"]).fillna("")
+        def clean_khoa(val):
+            if pd.isna(val) or val is None:
+                return "Khám bệnh"
+            s = str(val).strip()
+            if not s or s.lower() in ["nan", "none", "null"]:
+                return "Khám bệnh"
+            return s
+        op["Tên khoa"] = s_ten_khoa.apply(clean_khoa)
+        op["Mã y tế"] = get_col_series(df_op, ["SoPhieuThanhToanNgoaiTru", "ma_bn"]).fillna("")
         op["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_op, ["NgayRa", "ngay_ra"]))
 
     ip = pd.DataFrame()
     if not df_ip.empty:
         ip["Loại ca"] = "Nội trú"
-        s_so_ba = get_col_series(df_ip, ["column4", "sobenhan", "SoPhieuThanhToanNgoaiTru", "SoPhieu_BA", "ma_lk"])
+        s_so_ba = get_col_series(df_ip, ["column4", "sobenhan", "SoPhieu_BA", "ma_lk"])
         ip["MA_LK"] = s_so_ba.apply(chuan_hoa_ma_lk)
         ip["Họ tên"] = get_col_series(df_ip, ["TenBenhNhan", "ho_ten"]).fillna("")
         ip["Mã thẻ"] = get_col_series(df_ip, ["SoBHYT", "ma_the"]).fillna("")
         ip["Tên khoa"] = get_col_series(df_ip, ["khoadieutri", "ten_khoa"]).fillna("")
-        ip["Mã y tế"] = ""
+        ip["Mã y tế"] = get_col_series(df_ip, ["ma_bn"]).fillna("")
         ip["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_ip, ["NgayRa", "ngay_ra"]))
 
     out = pd.concat([op, ip], ignore_index=True)
@@ -333,6 +400,25 @@ def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=No
         log(f"Bắt đầu gọi Stored Procedure Ngoại trú: {sp_op} từ {tu_ngay} đến {den_ngay}...")
         df_op = sql_exec_sp(conn, sp_op, tu_ngay, den_ngay)
         log(f"  -> Ngoại trú trả về: {len(df_op)} dòng. Cột: {list(df_op.columns)}")
+
+        if not df_op.empty:
+            stn_series = get_col_series(df_op, ["column4", "SoPhieu_BA", "sobenhan", "ma_lk"])
+            stn_list = [s for s in stn_series.dropna().unique() if str(s).strip()]
+            if stn_list:
+                log(f"Đang lấy tên phòng khám cho {len(stn_list)} số tiếp nhận Ngoại trú...")
+                pk_map = fetch_phong_kham_ngoai_tru(conn, stn_list)
+                if pk_map:
+                    def resolve_pk(val):
+                        if pd.isna(val) or val is None:
+                            return "Khám bệnh"
+                        k_str = str(val).strip()
+                        if not k_str:
+                            return "Khám bệnh"
+                        res = pk_map.get(k_str.upper()) or pk_map.get(chuan_hoa_ma_lk(k_str).upper())
+                        return res if res else "Khám bệnh"
+
+                    df_op["Ten_Phong_Kham"] = stn_series.apply(resolve_pk)
+                    log(f"  -> Đã lấy được tên phòng khám cho các ca Ngoại trú.")
 
         log(f"Bắt đầu gọi Stored Procedure Nội trú: {sp_ip} từ {tu_ngay} đến {den_ngay}...")
         df_ip = sql_exec_sp(conn, sp_ip, tu_ngay, den_ngay)
