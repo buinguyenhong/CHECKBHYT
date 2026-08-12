@@ -56,6 +56,17 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-12 15:35 - Antigravity (Hotfix UI: Sửa lỗi thẻ đóng HTML của Tab 9 khiến Tab 10 bị ẩn)
+
+### Mục tiêu
+- Sửa lỗi khi người dùng bấm vào Nút Tab 10 ("Tra cứu Lịch sử Lỗi Vĩnh viễn") giao diện bị trắng / không hiển thị nội dung gì.
+
+### Thay đổi
+- `web_app/templates/admin.html` [MODIFY]: Đóng bổ sung thẻ `</div>` cho `tab_xml-validator` trước khi mở `<div id="tab_archive">`. Trước đó `tab_archive` bị lồng bên trong `tab_xml-validator` nên khi chuyển tab bị ẩn theo thẻ cha.
+
+### Kiểm tra
+- Đã xác minh cấu trúc thẻ HTML của `tab_archive` độc lập 100% và đã push commit hotfix `cb25eaf` lên GitHub main.
+
 ## 2026-08-12 15:15 - Antigravity (Tính năng & Kiến trúc: Mô-đun Lưu trữ & Thống kê Lịch sử Lỗi Vĩnh viễn)
 
 ### Mục tiêu
