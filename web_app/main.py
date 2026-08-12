@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 import pandas as pd
 
 from database import engine, Base, get_db
-from models import User, AppConfig, Record, RecordLog
+from models import User, AppConfig, Record, RecordLog, ErrorHistoryArchive
 from auth import (
     hash_password, verify_password, get_current_user, require_admin, SESSION_COOKIE_NAME
 )
@@ -309,6 +309,9 @@ try:
         if "096" in str(cfg.sp_ip) or "095" in str(cfg.sp_ip) or not cfg.sp_ip:
             cfg.sp_ip = "dbo.sp_BCVP_DsDeNghiThanhToanBHYT_NoiTru_Optimized"
         db.commit()
+
+    # Backfill dữ liệu lỗi lịch sử nếu bảng error_history_archive còn rỗng
+    compare_service.backfill_archive_from_records(db)
 
     # Seed danh mục lỗi mẫu (bổ sung & cập nhật định dạng)
     from models import ErrorDefinition
@@ -2743,6 +2746,212 @@ async def auto_sync_scheduler():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(auto_sync_scheduler())
+
+
+# ==========================================
+# PERMANENT ERROR ARCHIVE API ENDPOINTS
+# ==========================================
+
+@app.get("/api/archive/errors")
+def get_archive_errors(
+    thang: str = "all",
+    ten_khoa: str = "all",
+    status_val: str = "all",
+    search: str = "",
+    page: int = 1,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    query = db.query(ErrorHistoryArchive)
+    
+    if user.role != "admin" and user.department_name:
+        query = query.filter(ErrorHistoryArchive.ten_khoa == user.department_name)
+    elif ten_khoa != "all" and ten_khoa.strip():
+        query = query.filter(ErrorHistoryArchive.ten_khoa == ten_khoa.strip())
+        
+    if thang != "all" and thang.strip():
+        query = query.filter(ErrorHistoryArchive.thang_doi_soat == thang.strip())
+        
+    if status_val != "all" and status_val.strip():
+        query = query.filter(ErrorHistoryArchive.status == status_val.strip())
+        
+    if search and search.strip():
+        kw = f"%{search.strip()}%"
+        query = query.filter(
+            (ErrorHistoryArchive.ma_lk.ilike(kw)) |
+            (ErrorHistoryArchive.ho_ten.ilike(kw)) |
+            (ErrorHistoryArchive.maloi.ilike(kw)) |
+            (ErrorHistoryArchive.motaloi.ilike(kw))
+        )
+        
+    total_count = query.count()
+    total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+    
+    items = query.order_by(ErrorHistoryArchive.first_detected_at.desc())\
+                 .offset((page - 1) * limit)\
+                 .limit(limit)\
+                 .all()
+                 
+    result_items = []
+    for item in items:
+        result_items.append({
+            "id": item.id,
+            "ma_lk": item.ma_lk,
+            "ho_ten": item.ho_ten or "",
+            "ma_the": item.ma_the or "",
+            "ten_khoa": item.ten_khoa or "",
+            "loai_ca": item.loai_ca or "",
+            "ma_y_te": item.ma_y_te or "",
+            "ngay_ra_vien": item.ngay_ra_vien.strftime("%d/%m/%Y") if item.ngay_ra_vien else "",
+            "maloi": item.maloi or "",
+            "motaloi": item.motaloi or "",
+            "ngay_doi_soat": item.ngay_doi_soat.strftime("%d/%m/%Y") if item.ngay_doi_soat else "",
+            "thang_doi_soat": item.thang_doi_soat or "",
+            "status": item.status or "PENDING",
+            "first_detected_at": item.first_detected_at.strftime("%d/%m/%Y %H:%M") if item.first_detected_at else "",
+            "resolved_at": item.resolved_at.strftime("%d/%m/%Y %H:%M") if item.resolved_at else "",
+            "resolved_by": item.resolved_by or "",
+            "note_history": item.note_history or ""
+        })
+        
+    return {
+        "total": total_count,
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages,
+        "items": result_items
+    }
+
+@app.get("/api/archive/months")
+def get_archive_months(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    query = db.query(ErrorHistoryArchive.thang_doi_soat).distinct()
+    if user.role != "admin" and user.department_name:
+        query = query.filter(ErrorHistoryArchive.ten_khoa == user.department_name)
+    months = [r[0] for r in query.all() if r[0]]
+    months.sort(reverse=True)
+    return {"months": months}
+
+@app.get("/api/archive/stats")
+def get_archive_stats(
+    thang: str = "all",
+    ten_khoa: str = "all",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    query = db.query(ErrorHistoryArchive)
+    if user.role != "admin" and user.department_name:
+        query = query.filter(ErrorHistoryArchive.ten_khoa == user.department_name)
+    elif ten_khoa != "all" and ten_khoa.strip():
+        query = query.filter(ErrorHistoryArchive.ten_khoa == ten_khoa.strip())
+        
+    if thang != "all" and thang.strip():
+        query = query.filter(ErrorHistoryArchive.thang_doi_soat == thang.strip())
+        
+    all_recs = query.all()
+    total_errors = len(all_recs)
+    resolved_errors = sum(1 for r in all_recs if r.status == "RESOLVED")
+    pending_errors = total_errors - resolved_errors
+    rate = round((resolved_errors / total_errors * 100), 1) if total_errors > 0 else 0.0
+    
+    from collections import Counter
+    maloi_counter = Counter(r.maloi for r in all_recs if r.maloi)
+    top_errors = [{"maloi": k, "count": v} for k, v in maloi_counter.most_common(10)]
+    
+    dept_map = {}
+    for r in all_recs:
+        kname = r.ten_khoa or "Chưa xác định"
+        if kname not in dept_map:
+            dept_map[kname] = {"total": 0, "resolved": 0, "pending": 0}
+        dept_map[kname]["total"] += 1
+        if r.status == "RESOLVED":
+            dept_map[kname]["resolved"] += 1
+        else:
+            dept_map[kname]["pending"] += 1
+            
+    dept_breakdown = [
+        {"ten_khoa": k, "total": v["total"], "resolved": v["resolved"], "pending": v["pending"]}
+        for k, v in sorted(dept_map.items(), key=lambda x: x[1]["total"], reverse=True)
+    ]
+    
+    return {
+        "total_errors": total_errors,
+        "resolved_errors": resolved_errors,
+        "pending_errors": pending_errors,
+        "resolution_rate": rate,
+        "top_errors": top_errors,
+        "dept_breakdown": dept_breakdown
+    }
+
+@app.get("/api/export/archive/errors")
+def export_archive_errors(
+    thang: str = "all",
+    ten_khoa: str = "all",
+    status_val: str = "all",
+    search: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    query = db.query(ErrorHistoryArchive)
+    if user.role != "admin" and user.department_name:
+        query = query.filter(ErrorHistoryArchive.ten_khoa == user.department_name)
+    elif ten_khoa != "all" and ten_khoa.strip():
+        query = query.filter(ErrorHistoryArchive.ten_khoa == ten_khoa.strip())
+        
+    if thang != "all" and thang.strip():
+        query = query.filter(ErrorHistoryArchive.thang_doi_soat == thang.strip())
+        
+    if status_val != "all" and status_val.strip():
+        query = query.filter(ErrorHistoryArchive.status == status_val.strip())
+        
+    if search and search.strip():
+        kw = f"%{search.strip()}%"
+        query = query.filter(
+            (ErrorHistoryArchive.ma_lk.ilike(kw)) |
+            (ErrorHistoryArchive.ho_ten.ilike(kw)) |
+            (ErrorHistoryArchive.maloi.ilike(kw)) |
+            (ErrorHistoryArchive.motaloi.ilike(kw))
+        )
+        
+    records = query.order_by(ErrorHistoryArchive.first_detected_at.desc()).all()
+    
+    rows = []
+    for r in records:
+        rows.append({
+            "Mã liên kết": r.ma_lk,
+            "Họ tên": r.ho_ten or "",
+            "Mã thẻ BHYT": r.ma_the or "",
+            "Khoa lâm sàng": r.ten_khoa or "",
+            "Loại ca": r.loai_ca or "",
+            "Mã y tế": r.ma_y_te or "",
+            "Ngày ra viện": r.ngay_ra_vien.strftime("%d/%m/%Y") if r.ngay_ra_vien else "",
+            "Mã lỗi": r.maloi or "",
+            "Mô tả lỗi": r.motaloi or "",
+            "Đợt đối soát": r.ngay_doi_soat.strftime("%d/%m/%Y") if r.ngay_doi_soat else "",
+            "Tháng đối soát": r.thang_doi_soat or "",
+            "Trạng thái": "Đã sửa (RESOLVED)" if r.status == "RESOLVED" else "Chưa sửa (" + str(r.status) + ")",
+            "Thời điểm phát hiện": r.first_detected_at.strftime("%d/%m/%Y %H:%M") if r.first_detected_at else "",
+            "Thời điểm sửa xong": r.resolved_at.strftime("%d/%m/%Y %H:%M") if r.resolved_at else "",
+            "Người/HT duyệt": r.resolved_by or "",
+            "Lịch sử ghi chú": r.note_history or ""
+        })
+        
+    df = pd.DataFrame(rows)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name="LichSuLoiBHYT")
+    output.seek(0)
+    
+    filename = f"BAO_CAO_LICHSU_LOI_BHYT_{thang.replace('-', '_')}.xlsx"
+    return Response(
+        content=output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 
 
 

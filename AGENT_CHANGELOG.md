@@ -35,6 +35,7 @@ Nguyên tắc:
 
 - Ghi ngắn gọn nhưng đủ để agent khác hiểu tại sao sửa.
 - Luôn nêu rõ file quan trọng đã đụng tới.
+- **ĐỒNG BỘ TÀI LIỆU KIẾN THỨC (BẮT BUỘC):** Khi có thay đổi về code, Stored Procedure, CSDL, API hoặc quy trình, ngoài việc ghi changelog, Agent **BẮT BUỘC** phải cập nhật đồng bộ các tệp tài liệu kiến thức gốc như `Project.md`, `INSTALL_WEB.md`, `xml_validation_tool_spec.md`. Tuyệt đối không để tài liệu chính bị lệch với code thực tế.
 - Nếu thay đổi nghiệp vụ, ghi rõ tác động đến `FAIL`, `LOI`, `WAITING_RESEND`, `RESOLVED`, reset HIS, hoặc quy trình upload file.
 - Nếu không chạy được app/test, ghi rõ lý do.
 - Không ghi thông tin nhạy cảm như password SQL, IP thật, dữ liệu bệnh nhân thật.
@@ -54,6 +55,42 @@ Nguyên tắc:
   - `CLOSE`: `BenhAn.TrangThai = 'DaThanhToan'`.
 
 ## Nhật ký thay đổi
+
+## 2026-08-12 15:15 - Antigravity (Tính năng & Kiến trúc: Mô-đun Lưu trữ & Thống kê Lịch sử Lỗi Vĩnh viễn)
+
+### Mục tiêu
+- Triển khai mô-đun Lưu trữ Lịch sử Lỗi BHYT vĩnh viễn (`error_history_archive`) đảm bảo không mất dữ liệu lịch sử khi đối soát đợt mới.
+- Cung cấp khả năng lọc và thống kê đa tiêu chí (theo tháng đối soát `YYYY-MM`, theo khoa lâm sàng, theo trạng thái, theo từ khóa).
+- Xây dựng giao diện tách biệt: Tab 10 trên Admin IT và Tab 3 trên giao diện Khoa Lâm Sàng.
+
+### Thay đổi
+- `web_app/models.py` [MODIFY]: Khai báo model `ErrorHistoryArchive` (lưu trữ ma_lk, ho_ten, ma_the, ten_khoa, loai_ca, maloi, motaloi, ngay_doi_soat, thang_doi_soat, status, first_detected_at, resolved_at, resolved_by, note_history).
+- `web_app/services/compare_service.py` [MODIFY]: 
+  - Triển khai hàm `sync_archive_error()` tự động ghi nhận/cập nhật vết lỗi sang bảng lưu trữ vĩnh viễn khi chạy đối soát.
+  - Triển khai hàm `backfill_archive_from_records()` tự động khôi phục dữ liệu từ `records` sang `error_history_archive` ở lần chạy đầu tiên.
+- `web_app/main.py` [MODIFY]:
+  - Thêm API `GET /api/archive/errors` (tra cứu phân trang dữ liệu lưu trữ).
+  - Thêm API `GET /api/archive/months` (danh sách tháng có sẵn).
+  - Thêm API `GET /api/archive/stats` (KPI tổng lỗi, đã sửa, chưa sửa, tỷ lệ %, top 10 mã lỗi).
+  - Thêm API `GET /api/export/archive/errors` (xuất file Excel báo cáo lưu trữ).
+  - Gọi backfill dữ liệu lưu trữ khi ứng dụng startup.
+- `web_app/templates/admin.html` [MODIFY]: Tích hợp Tab 10 "Tra cứu Lịch sử Lỗi Vĩnh viễn" kèm KPI cards, bộ lọc tháng/khoa/trạng thái, ô tìm kiếm và phân trang.
+- `web_app/templates/department.html` [MODIFY]: Tích hợp Tab 3 "Lịch sử lưu trữ của khoa" cho các khoa lâm sàng tra cứu thành tích sửa lỗi.
+
+### Kiểm tra
+- Viết và chạy kịch bản unit test `scratch/test_archive_module.py` kiểm tra nạp dữ liệu, cập nhật trạng thái `RESOLVED` và backfill thành công 100%.
+- Chạy lại bộ kiểm thử `scratch/test_reconciliation.py` đạt kết quả `All tests completed successfully!`.
+
+
+## 2026-08-12 14:25 - Antigravity (Quy định bắt buộc: Đồng bộ Kiến thức & Tài liệu dự án song song với Changelog)
+
+### Mục tiêu
+- Thiết lập quy định cứng bắt buộc cho tất cả các Agent/Developer: Khi có bất kỳ thay đổi nào về mã nguồn, cấu hình, CSDL, Stored Procedures, API hoặc quy trình nghiệp vụ, bên cạnh việc ghi log changelog, **BẮT BUỘC** phải cập nhật đồng bộ các tệp kiến thức dự án (`Project.md`, `INSTALL_WEB.md`, `xml_validation_tool_spec.md`).
+
+### Thay đổi
+- `.agents/AGENTS.md` [NEW]: Tạo tệp quy tắc cấu hình workspace ghi nhận quy định bắt buộc đồng bộ kiến thức tài liệu và mã nguồn trước khi tư vấn/phát triển.
+- `AGENT_CHANGELOG.md` [MODIFY]: Cập nhật phần "Nguyên tắc ghi log cho agent" với yêu cầu đồng bộ tài liệu kiến thức gốc.
+- `Project.md` [MODIFY]: Đồng bộ tên 2 Stored Procedure Optimized mới vào mục 5.1 tài liệu dự án.
 
 ## 2026-08-06 07:45 - Antigravity (Nâng cấp Stored Procedures mới, Xuất Excel Cache Tab 2 & Cơ chế Ghi log Lịch sử Lỗi)
 

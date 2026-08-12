@@ -910,6 +910,7 @@
         <button class="tab-btn" onclick="switchTab('reports')">7. Xuất báo cáo</button>
         <button class="tab-btn" onclick="switchTab('error-defs')">8. Hướng dẫn Lỗi</button>
         <button class="tab-btn" onclick="switchTab('xml-validator')">9. Kiểm tra XML</button>
+        <button class="tab-btn" onclick="switchTab('archive')">10. Tra cứu Lịch sử Lỗi Vĩnh viễn</button>
     </div>
 
     <!-- TAB 1: SYNC & COMPARE -->
@@ -1572,6 +1573,89 @@
                         <tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">Chưa có dữ liệu phân tích. Hãy bấm "Phân tích XML ngay" hoặc xuất file XML vào thư mục Input.</td></tr>
                     </tbody>
                 </table>
+        </div>
+    </div>
+
+    <!-- TAB 10: PERMANENT ERROR ARCHIVE -->
+    <div id="tab_archive" class="tab-pane">
+        <!-- Archive KPI Summary Cards -->
+        <div class="kpi-row" style="margin-bottom: 20px;">
+            <div class="kpi-card" style="border-left: 4px solid var(--primary);">
+                <div class="kpi-label">Tổng số lỗi lịch sử</div>
+                <div class="kpi-val" id="archiveKpiTotal">0</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid var(--success);">
+                <div class="kpi-label">Đã khắc phục (RESOLVED)</div>
+                <div class="kpi-val" id="archiveKpiResolved">0</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #f87171;">
+                <div class="kpi-label">Lỗi chưa sửa</div>
+                <div class="kpi-val" id="archiveKpiPending">0</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #38bdf8;">
+                <div class="kpi-label">Tỷ lệ khắc phục (%)</div>
+                <div class="kpi-val" id="archiveKpiRate">0%</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Lưu trữ &amp; Thống kê Lịch sử Lỗi BHYT Vĩnh viễn</h2>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <select class="form-control" id="archiveMonthFilter" style="width: auto; min-width: 150px;" onchange="fetchArchiveData(1)">
+                        <option value="all">-- Tất cả tháng --</option>
+                    </select>
+                    <select class="form-control" id="archiveDeptFilter" style="width: auto; min-width: 180px;" onchange="fetchArchiveData(1)">
+                        <option value="all">-- Tất cả Khoa --</option>
+                    </select>
+                    <select class="form-control" id="archiveStatusFilter" style="width: auto; min-width: 160px;" onchange="fetchArchiveData(1)">
+                        <option value="all">-- Tất cả Trạng thái --</option>
+                        <option value="RESOLVED">Đã sửa (RESOLVED)</option>
+                        <option value="PENDING">Chưa sửa (PENDING)</option>
+                        <option value="WAITING_REVIEW">Chờ duyệt (REVIEW)</option>
+                    </select>
+                    <button class="btn btn-success" onclick="exportArchiveData()">Xuất Báo cáo Excel</button>
+                </div>
+            </div>
+
+            <!-- Search input bar -->
+            <div style="display: flex; gap: 12px; margin-top: 15px; margin-bottom: 15px;">
+                <input type="text" class="form-control" id="archiveSearchKw" placeholder="Nhập Mã liên kết, Họ tên bệnh nhân hoặc Mã lỗi để lọc..." style="flex: 1;" onkeyup="if(event.key==='Enter') fetchArchiveData(1)">
+                <button class="btn btn-primary" onclick="fetchArchiveData(1)">Tìm kiếm</button>
+            </div>
+
+            <!-- Data Table -->
+            <div class="table-responsive">
+                <table class="data-table" id="archiveTable">
+                    <thead>
+                        <tr>
+                            <th>Mã LK</th>
+                            <th>Họ và Tên</th>
+                            <th>Khoa</th>
+                            <th>Mã lỗi</th>
+                            <th>Mô tả chi tiết lỗi</th>
+                            <th>Đợt phát hiện</th>
+                            <th>Tháng</th>
+                            <th>Trạng thái</th>
+                            <th>Thời điểm sửa</th>
+                            <th>Duyệt bởi</th>
+                            <th>Lịch sử ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody id="archiveTableBody">
+                        <tr><td colspan="11" style="text-align:center; padding: 20px;">Đang tải dữ liệu lưu trữ...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; flex-wrap: wrap; gap: 10px;">
+                <div id="archivePaginationInfo" style="font-size: 13px; color: var(--text-secondary);">Hiển thị 0 / 0 bản ghi</div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" id="btnArchivePrev" onclick="changeArchivePage(-1)">Trang trước</button>
+                    <span id="archivePageNum" style="align-self: center; font-weight: 700; padding: 0 10px;">1 / 1</span>
+                    <button class="btn btn-secondary" id="btnArchiveNext" onclick="changeArchivePage(1)">Trang sau</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1705,6 +1789,170 @@
         if (tabId === 'reports') { fetchDeptReport(); }
         if (tabId === 'error-defs') { fetchErrorDefinitions(); }
         if (tabId === 'xml-validator') { fetchXmlValidatorResults(); }
+        if (tabId === 'archive') { initArchiveTab(); }
+    }
+
+    /* Archive Tab Functions */
+    let archiveState = {
+        page: 1,
+        limit: 30,
+        totalPages: 1
+    };
+
+    function initArchiveTab() {
+        fetchArchiveMonths();
+        fetchArchiveDepts();
+        fetchArchiveData(1);
+    }
+
+    async function fetchArchiveMonths() {
+        try {
+            const res = await fetch('/api/archive/months');
+            if (res.ok) {
+                const data = await res.json();
+                const select = document.getElementById('archiveMonthFilter');
+                if (select) {
+                    let html = '<option value="all">-- Tất cả tháng --</option>';
+                    (data.months || []).forEach(m => {
+                        html += `<option value="${m}">Tháng ${m}</option>`;
+                    });
+                    select.innerHTML = html;
+                }
+            }
+        } catch (e) {
+            console.error("Lỗi fetchArchiveMonths:", e);
+        }
+    }
+
+    async function fetchArchiveDepts() {
+        try {
+            const res = await fetch('/api/users');
+            if (res.ok) {
+                const users = await res.json();
+                const depts = new Set();
+                users.forEach(u => {
+                    if (u.department_name && u.department_name.trim()) {
+                        depts.add(u.department_name.trim());
+                    }
+                });
+                const select = document.getElementById('archiveDeptFilter');
+                if (select) {
+                    let html = '<option value="all">-- Tất cả Khoa --</option>';
+                    Array.from(depts).sort().forEach(d => {
+                        html += `<option value="${d}">${d}</option>`;
+                    });
+                    select.innerHTML = html;
+                }
+            }
+        } catch (e) {
+            console.error("Lỗi fetchArchiveDepts:", e);
+        }
+    }
+
+    async function fetchArchiveStats() {
+        try {
+            const month = document.getElementById('archiveMonthFilter')?.value || 'all';
+            const dept = document.getElementById('archiveDeptFilter')?.value || 'all';
+            const res = await fetch(`/api/archive/stats?thang=${encodeURIComponent(month)}&ten_khoa=${encodeURIComponent(dept)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (document.getElementById('archiveKpiTotal')) document.getElementById('archiveKpiTotal').innerText = data.total_errors || 0;
+                if (document.getElementById('archiveKpiResolved')) document.getElementById('archiveKpiResolved').innerText = data.resolved_errors || 0;
+                if (document.getElementById('archiveKpiPending')) document.getElementById('archiveKpiPending').innerText = data.pending_errors || 0;
+                if (document.getElementById('archiveKpiRate')) document.getElementById('archiveKpiRate').innerText = (data.resolution_rate || 0) + '%';
+            }
+        } catch (e) {
+            console.error("Lỗi fetchArchiveStats:", e);
+        }
+    }
+
+    async function fetchArchiveData(page = 1) {
+        archiveState.page = page;
+        const month = document.getElementById('archiveMonthFilter')?.value || 'all';
+        const dept = document.getElementById('archiveDeptFilter')?.value || 'all';
+        const statusVal = document.getElementById('archiveStatusFilter')?.value || 'all';
+        const search = document.getElementById('archiveSearchKw')?.value || '';
+        const tbody = document.getElementById('archiveTableBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px;">Đang tải dữ liệu lưu trữ...</td></tr>';
+
+        try {
+            const url = `/api/archive/errors?thang=${encodeURIComponent(month)}&ten_khoa=${encodeURIComponent(dept)}&status_val=${encodeURIComponent(statusVal)}&search=${encodeURIComponent(search)}&page=${page}&limit=${archiveState.limit}`;
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                archiveState.totalPages = data.total_pages || 1;
+                
+                if (document.getElementById('archivePaginationInfo')) {
+                    document.getElementById('archivePaginationInfo').innerText = `Hiển thị ${data.items.length} / ${data.total} bản ghi (Trang ${data.page}/${data.total_pages})`;
+                }
+                if (document.getElementById('archivePageNum')) {
+                    document.getElementById('archivePageNum').innerText = `${data.page} / ${data.total_pages}`;
+                }
+                
+                if (!data.items || data.items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color: var(--text-secondary);">Không tìm thấy bản ghi lịch sử nào phù hợp.</td></tr>';
+                    fetchArchiveStats();
+                    return;
+                }
+
+                let html = '';
+                data.items.forEach(r => {
+                    let badgeClass = 'badge-pending';
+                    let statusText = 'Chưa sửa';
+                    if (r.status === 'RESOLVED') {
+                        badgeClass = 'badge-resolved';
+                        statusText = 'Đã sửa (RESOLVED)';
+                    } else if (r.status === 'WAITING_REVIEW') {
+                        badgeClass = 'badge-waiting';
+                        statusText = 'Chờ duyệt';
+                    }
+
+                    html += `
+                        <tr>
+                            <td><strong>${r.ma_lk}</strong></td>
+                            <td>${r.ho_ten}</td>
+                            <td>${r.ten_khoa}</td>
+                            <td><code style="color:var(--danger); font-weight:bold;">${r.maloi}</code></td>
+                            <td class="wrap-cell" style="max-width:250px;">${r.motaloi}</td>
+                            <td>${r.ngay_doi_soat}</td>
+                            <td><span class="badge" style="background:rgba(59,130,246,0.1); color:#60a5fa;">${r.thang_doi_soat}</span></td>
+                            <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                            <td>${r.resolved_at || '-'}</td>
+                            <td>${r.resolved_by || '-'}</td>
+                            <td class="wrap-cell" style="max-width:200px; font-size:11.5px;">${r.note_history || '-'}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+                fetchArchiveStats();
+            } else {
+                tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color: var(--danger);">Không thể tải dữ liệu lịch sử.</td></tr>';
+            }
+        } catch (e) {
+            console.error("Lỗi fetchArchiveData:", e);
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding: 20px; color: var(--danger);">Lỗi kết nối: ${e.message}</td></tr>`;
+        }
+    }
+
+    function changeArchivePage(delta) {
+        let newPage = archiveState.page + delta;
+        if (newPage < 1) newPage = 1;
+        if (newPage > archiveState.totalPages) newPage = archiveState.totalPages;
+        if (newPage !== archiveState.page) {
+            fetchArchiveData(newPage);
+        }
+    }
+
+    function exportArchiveData() {
+        const month = document.getElementById('archiveMonthFilter')?.value || 'all';
+        const dept = document.getElementById('archiveDeptFilter')?.value || 'all';
+        const statusVal = document.getElementById('archiveStatusFilter')?.value || 'all';
+        const search = document.getElementById('archiveSearchKw')?.value || '';
+        
+        const url = `/api/export/archive/errors?thang=${encodeURIComponent(month)}&ten_khoa=${encodeURIComponent(dept)}&status_val=${encodeURIComponent(statusVal)}&search=${encodeURIComponent(search)}`;
+        window.location.href = url;
     }
 
     function toggleAuthFields() {

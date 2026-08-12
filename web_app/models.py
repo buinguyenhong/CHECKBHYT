@@ -84,3 +84,29 @@ class ErrorDefinition(Base):
     resolution = Column(String, nullable=True)                    # Cách xử lý
     requires_his_reset = Column(Boolean, default=False)           # Cờ đánh dấu có cần Reset HIS hay không
 
+
+class ErrorHistoryArchive(Base):
+    __tablename__ = "error_history_archive"
+
+    id = Column(Integer, primary_key=True, index=True)
+    record_id = Column(Integer, nullable=True, index=True)
+    ma_lk = Column(String, index=True, nullable=False)
+    ho_ten = Column(String, default="")
+    ma_the = Column(String, default="")
+    ten_khoa = Column(String, index=True, default="")
+    loai_ca = Column(String, default="Ngoại trú")
+    ma_y_te = Column(String, default="")
+    ngay_ra_vien = Column(Date, nullable=True)
+
+    maloi = Column(String, index=True, default="")
+    motaloi = Column(Text, default="")
+    ngay_doi_soat = Column(Date, index=True, nullable=False)
+    thang_doi_soat = Column(String, index=True, nullable=False)  # Định dạng 'YYYY-MM'
+    status = Column(String, index=True, default="PENDING")  # 'PENDING' | 'WAITING_REVIEW' | 'WAITING_RESEND' | 'RESOLVED'
+
+    first_detected_at = Column(DateTime, default=datetime.datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(String, nullable=True)
+    note_history = Column(Text, default="")
+
+

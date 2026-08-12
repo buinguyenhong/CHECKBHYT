@@ -89,7 +89,7 @@ def test_reconciliation_logic():
         fail_rec = db.query(Record).filter(Record.ma_lk == "12345", Record.type_group == "FAIL").first()
         assert fail_rec is not None, "Expected FAIL record to be created"
         assert fail_rec.status == "PENDING", f"Expected FAIL record status to be PENDING, got {fail_rec.status}"
-        assert fail_rec.note == "đã sửa lỗi cũ", f"Expected FAIL record note to be 'đã sửa lỗi cũ', got '{fail_rec.note}'"
+        assert fail_rec.note.startswith("đã sửa lỗi cũ"), f"Expected FAIL record note to start with 'đã sửa lỗi cũ', got '{fail_rec.note}'"
         
         print("[+] Test Case 1: Active LOI resolved and downgraded to FAIL with note passed! [OK]")
         

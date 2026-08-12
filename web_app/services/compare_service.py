@@ -2,9 +2,83 @@ import pandas as pd
 import datetime
 import re
 from sqlalchemy import func
-from sqlalchemy.orm import Session
-from models import Record, RecordLog
+from models import Record, RecordLog, ErrorHistoryArchive
 from services.his_service import chuan_hoa_ma_lk
+
+def sync_archive_error(db: Session, rec: Record, resolved: bool = False, resolved_by: str = "system", note: str = ""):
+    """Đồng bộ hoặc ghi mới bản ghi lỗi vào bảng lưu trữ vĩnh viễn error_history_archive."""
+    if not rec or not rec.ma_lk:
+        return
+    
+    rec_maloi = str(rec.maloi or "").strip().upper()
+    if not rec_maloi and rec.type_group != "LOI":
+        return
+
+    rec_motaloi = clean_error_desc(str(rec.motaloi or ""))
+    thang_str = rec.ngay_doi_soat.strftime('%Y-%m') if rec.ngay_doi_soat else datetime.date.today().strftime('%Y-%m')
+    
+    arch = db.query(ErrorHistoryArchive).filter(
+        ErrorHistoryArchive.ma_lk == rec.ma_lk,
+        ErrorHistoryArchive.maloi == rec_maloi,
+        func.lower(ErrorHistoryArchive.motaloi) == rec_motaloi.lower()
+    ).first()
+
+    target_status = "RESOLVED" if (resolved or rec.status == "RESOLVED") else rec.status
+
+    if arch:
+        arch.record_id = rec.id
+        arch.ho_ten = rec.ho_ten or arch.ho_ten
+        arch.ma_the = rec.ma_the or arch.ma_the
+        arch.ten_khoa = rec.ten_khoa or arch.ten_khoa
+        arch.loai_ca = rec.loai_ca or arch.loai_ca
+        arch.ma_y_te = rec.ma_y_te or arch.ma_y_te
+        arch.ngay_ra_vien = rec.ngay_ra_vien or arch.ngay_ra_vien
+        arch.status = target_status
+        if target_status == "RESOLVED":
+            if not arch.resolved_at:
+                arch.resolved_at = datetime.datetime.utcnow()
+            arch.resolved_by = resolved_by
+        if note and note not in (arch.note_history or ""):
+            arch.note_history = f"[{datetime.date.today().strftime('%d/%m/%Y')}] {note} | {arch.note_history or ''}".strip(" | ")
+    else:
+        new_arch = ErrorHistoryArchive(
+            record_id=rec.id,
+            ma_lk=rec.ma_lk,
+            ho_ten=rec.ho_ten,
+            ma_the=rec.ma_the,
+            ten_khoa=rec.ten_khoa,
+            loai_ca=rec.loai_ca,
+            ma_y_te=rec.ma_y_te,
+            ngay_ra_vien=rec.ngay_ra_vien,
+            maloi=rec_maloi,
+            motaloi=rec.motaloi,
+            ngay_doi_soat=rec.ngay_doi_soat or datetime.date.today(),
+            thang_doi_soat=thang_str,
+            status=target_status,
+            first_detected_at=datetime.datetime.utcnow(),
+            resolved_at=datetime.datetime.utcnow() if target_status == "RESOLVED" else None,
+            resolved_by=resolved_by if target_status == "RESOLVED" else None,
+            note_history=f"[{datetime.date.today().strftime('%d/%m/%Y')}] {note}" if note else (rec.note or "")
+        )
+        db.add(new_arch)
+
+
+def backfill_archive_from_records(db: Session):
+    """Backfill dữ liệu từ bảng records sang error_history_archive nếu bảng archive còn rỗng."""
+    try:
+        count = db.query(ErrorHistoryArchive).count()
+        if count > 0:
+            return
+        
+        loi_records = db.query(Record).filter(Record.type_group == "LOI").all()
+        for rec in loi_records:
+            sync_archive_error(db, rec, resolved=(rec.status == "RESOLVED"), resolved_by="system", note=rec.note)
+        db.commit()
+        print(f"[ARCHIVE BACKFILL] Da backfill {len(loi_records)} ban ghi loi sang error_history_archive.")
+    except Exception as e:
+        print(f"[ARCHIVE BACKFILL] Loi backfill archive: {str(e)}")
+        db.rollback()
+
 
 def clean_error_desc(text: str) -> str:
     """Chuẩn hóa chuỗi mô tả lỗi: xóa khoảng trắng thừa, newline, tab và chuyển thành chuỗi sạch."""
@@ -196,12 +270,13 @@ def process_comparison(
                         note=log_text
                     )
                     db.add(log)
+                    sync_archive_error(db, rec, resolved=True, resolved_by="system", note=log_text)
             stats["sent"] += 1
         else:
             # Chưa gửi thành công:
             if not has_error:
-                # Nếu không có tệp listbh đầu vào (hoặc rỗng), ta chưa đánh dấu FAIL lúc này, tránh sai lệch.
-                if df_listbh is None or df_listbh.empty:
+                # Nếu không có tệp listbh đầu vào, ta chưa đánh dấu FAIL lúc này, tránh sai lệch.
+                if df_listbh is None:
                     continue
                 # Không có lỗi chi tiết -> Bản ghi hành chính thuộc nhóm FAIL (IT xử lý)
                 type_group = "FAIL"
@@ -223,13 +298,15 @@ def process_comparison(
                             loi_rec.status = "RESOLVED"
                             d_cu_str = loi_rec.ngay_doi_soat.strftime('%d/%m/%Y') if loi_rec.ngay_doi_soat else "trước đó"
                             prev_error_dates.append(d_cu_str)
+                            note_text = f"Đã sửa lỗi cũ (đợt đối soát {d_cu_str}): Lỗi [{loi_rec.maloi}] không còn xuất hiện trong tệp lỗi chi tiết. Ca chuyển sang danh sách FAIL chờ đẩy lại."
                             log = RecordLog(
                                 record_id=loi_rec.id,
                                 username="system",
                                 action="CHANGE_STATUS",
-                                note=f"Đã sửa lỗi cũ (đợt đối soát {d_cu_str}): Lỗi [{loi_rec.maloi}] không còn xuất hiện trong tệp lỗi chi tiết. Ca chuyển sang danh sách FAIL chờ đẩy lại."
+                                note=note_text
                             )
                             db.add(log)
+                            sync_archive_error(db, loi_rec, resolved=True, resolved_by="system", note=note_text)
                 
                 existing_record = db.query(Record).filter(
                     Record.ma_lk == ma_lk,
@@ -331,13 +408,15 @@ def process_comparison(
                                 rec.status = "RESOLVED"
                                 d_cu_str = rec.ngay_doi_soat.strftime('%d/%m/%Y') if rec.ngay_doi_soat else "trước đó"
                                 new_codes = ", ".join(sorted(list(set([e["maloi"] for e in error_map[ma_lk] if e["maloi"]]))))
+                                note_text = f"Đã sửa lần 1: Lỗi [{rec.maloi}] (từ đợt đối soát {d_cu_str}) đã khắc phục. Đợt này phát sinh lỗi mới: [{new_codes}]."
                                 log = RecordLog(
                                     record_id=rec.id,
                                     username="system",
                                     action="CHANGE_STATUS",
-                                    note=f"Đã sửa lần 1: Lỗi [{rec.maloi}] (từ đợt đối soát {d_cu_str}) đã khắc phục. Đợt này phát sinh lỗi mới: [{new_codes}]."
+                                    note=note_text
                                 )
                                 db.add(log)
+                                sync_archive_error(db, rec, resolved=True, resolved_by="system", note=note_text)
 
                 stats["loi"] += 1
                 for err_detail in error_map[ma_lk]:
@@ -403,6 +482,7 @@ def process_comparison(
                                 note="He thong tu dong mo lai: Loi chua duoc khac phuc va chua gui thanh cong"
                             )
                             db.add(log)
+                        sync_archive_error(db, existing_record)
                     else:
                         new_rec = Record(
                             ma_lk=ma_lk,
@@ -433,6 +513,7 @@ def process_comparison(
                             note=f"Khoi tao doi soat ngay {ngay_doi_soat.strftime('%d/%m/%Y')}. Nhom: LOI (Ma loi: {maloi})"
                         )
                         db.add(log_entry)
+                        sync_archive_error(db, new_rec)
 
     db.commit()
     return stats

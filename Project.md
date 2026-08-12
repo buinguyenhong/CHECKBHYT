@@ -126,9 +126,9 @@ Việc cần làm khi triển khai thật:
 Webapp lấy danh sách hồ sơ đáng lẽ phải gửi bằng 2 stored procedure:
 
 - Ngoại trú:
-  - `dbo.sp_BCVP_095_DsDeNghiThanhToanBHYT_NgoaiTru_25a_CV5937`
+  - `dbo.sp_BCVP_DsDeNghiThanhToanBHYT_NgoaiTru_Optimized`
 - Nội trú:
-  - `dbo.sp_BCVP_096_DsDeNghiThanhToanBHYT_NoiTru_26A_CV5937`
+  - `dbo.sp_BCVP_DsDeNghiThanhToanBHYT_NoiTru_Optimized`
 
 Tham số truyền vào:
 
@@ -233,9 +233,10 @@ Các bảng chính:
 
 - `users`: tài khoản admin/khoa.
 - `app_config`: cấu hình kết nối SQL Server HIS, SP, tự đồng bộ.
-- `records`: hồ sơ đối soát và trạng thái xử lý.
-- `record_logs`: lịch sử thay đổi trạng thái/ghi chú.
+- `records`: hồ sơ đối soát và trạng thái xử lý hiện tại.
+- `record_logs`: nhật ký lịch sử thay đổi trạng thái/ghi chú từng ca.
 - `error_definitions`: danh mục hướng dẫn lỗi theo `MALOI` và từ khóa trong `MOTALOI`.
+- `error_history_archive`: cơ sở dữ liệu lưu trữ vĩnh viễn tất cả các dòng lỗi từng phát sinh qua các đợt đối soát (lưu `ma_lk`, `maloi`, `motaloi`, `thang_doi_soat`, `status`, `first_detected_at`, `resolved_at`, `resolved_by`, `note_history`).
 
 Trạng thái `Record.status`:
 
@@ -993,6 +994,13 @@ Báo cáo & Xuất file:
 - `GET /api/export/sql_list`
 - `GET /api/export/fail`
 - `GET /api/export/loi`
+
+Lưu trữ Lịch sử Lỗi Vĩnh viễn:
+
+- `GET /api/archive/errors`
+- `GET /api/archive/months`
+- `GET /api/archive/stats`
+- `GET /api/export/archive/errors`
 
 Quản trị:
 
