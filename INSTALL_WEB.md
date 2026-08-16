@@ -33,13 +33,17 @@ python -m venv .venv
 .\.venv\Scripts\activate
 ```
 
-### Bước 3: Cài đặt các thư viện phụ thuộc
+### Bước 3: Cài đặt các thư viện phụ thuộc & Trình duyệt Playwright
 Đảm bảo bạn đã kích hoạt môi trường ảo (đầu dòng lệnh có chữ `(.venv)`). Tiến hành cài đặt:
 ```powershell
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# Cài đặt trình duyệt Chromium cho tính năng Tự động hóa Cổng BHYT (Playwright RPA)
+playwright install chromium
 ```
-*Ghi chú: File `requirements.txt` đã được cấu hình tự động tích hợp đầy đủ mọi thư viện phục vụ cả bản Desktop PySide6 và bản LAN WebApp (FastAPI, Uvicorn, SQLAlchemy, Jinja2, v.v.).*
+*Ghi chú: File `requirements.txt` đã được cấu hình tự động tích hợp đầy đủ mọi thư viện phục vụ cả bản Desktop PySide6, bản LAN WebApp (FastAPI, Uvicorn, SQLAlchemy, Jinja2) và module Tự động hóa Cổng BHYT Playwright.*
+
 
 ### Bước 4: Khởi chạy Máy chủ LAN WebApp
 Khởi động máy chủ dịch vụ bằng tập lệnh tích hợp sẵn:
