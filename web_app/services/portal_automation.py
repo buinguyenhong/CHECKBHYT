@@ -231,9 +231,20 @@ class PortalAutomationService:
 
                 # 4. Bấm Tìm kiếm
                 log("Bấm Tìm kiếm dữ liệu...")
-                page.locator("span").filter(has_text=re.compile(r"^Tìm kiếm$")).first.click(timeout=10000)
-                time.sleep(2)
-                page.wait_for_load_state("networkidle", timeout=20000)
+                try:
+                    page.locator("span").filter(has_text=re.compile(r"^Tìm kiếm$")).first.click(timeout=10000)
+                except Exception:
+                    page.get_by_role("button", name=re.compile(r"Tìm kiếm", re.IGNORECASE)).first.click(timeout=10000)
+                
+                time.sleep(2.0)
+                try:
+                    loading = page.locator(".dxgvLoadingDiv, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS")
+                    if loading.count() > 0:
+                        loading.first.wait_for(state="hidden", timeout=45000)
+                except Exception:
+                    pass
+                time.sleep(1.5)
+
 
                 # 5. Xuất Excel và tải file
                 log("Đang kích hoạt Xuất Excel danh sách đã gửi (đang chờ Cổng BHYT xuất file, hỗ trợ tối đa 5 phút vào ngày cao điểm)...")
