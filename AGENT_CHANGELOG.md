@@ -56,6 +56,30 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-16 17:15 - Antigravity (Tính năng Mới: Bộ công cụ Client RPA Runner chạy trên Máy trạm & Tải trực tiếp từ WebApp)
+
+### Mục tiêu
+- Cho phép người dùng chạy tự động hóa Chromium Luồng B và Luồng C trực tiếp ngay trên màn hình máy trạm (Client PC), tự quan sát và gõ Captcha tại chỗ, sau đó tự động tải và gửi file Excel lên máy chủ WebApp Server để đối soát.
+- Tích hợp liên kết tải gói cài đặt Client RPA (`.zip`) trực tiếp trên giao diện Admin WebApp.
+
+### Thay đổi
+- `client_runner/client_agent.py` [NEW]: Giao diện Tkinter Client RPA Runner cho máy trạm, tự động kết nối API Server, mở Chromium cục bộ, tải file và đẩy lên Server đối soát.
+- `client_runner/requirements_client.txt` [NEW]: Danh sách thư viện nhẹ cho máy trạm.
+- `client_runner/Cai_Dat_May_Tram.bat` [NEW]: Tập lệnh cài đặt 1 chạm cho máy trạm.
+- `client_runner/Chay_RPA_May_Tram.bat` [NEW]: Tập lệnh mở công cụ Client RPA trên máy trạm.
+- `client_runner/Huong_Dan_Su_Dung.txt` [NEW]: Tài liệu hướng dẫn sử dụng cho máy trạm.
+- `web_app/main.py` [MODIFY]: Thêm API `GET /api/client/config` và `GET /api/client/download-runner` (đóng gói zip động).
+- `web_app/templates/admin.html` [MODIFY]: Bổ sung thẻ "💻 Tự động hóa tại Máy trạm (Client PC Runner)" với nút "📥 Tải Bộ Công Cụ Client RPA (.zip)".
+- `web_app/run.py` & `LaunchWebBHYT.py` [MODIFY]: Cấu hình cưỡng bức mã hóa UTF-8 cho stdout/stderr.
+
+### Nghiệp vụ ảnh hưởng
+- Không làm thay đổi logic đối soát cốt lõi; người dùng có thể linh hoạt chọn: (1) Chạy tự động tại Server, (2) Chạy tự động tại Máy trạm Client, hoặc (3) Nạp file thủ công như cũ.
+
+### Kiểm tra
+- Đã test đóng gói zip và kiểm tra tính tương thích cấu hình Client RPA Runner.
+
+
+
 ## 2026-08-16 14:55 - Antigravity (Tính năng & Tự động hóa: Module Bán tự động Tải Cổng BHYT Luồng B & Luồng C bằng Playwright RPA)
 
 ### Mục tiêu

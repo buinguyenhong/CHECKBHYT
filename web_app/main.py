@@ -1177,7 +1177,51 @@ async def run_automation_flow_c(
 
 
 
+import zipfile
+
+
+@app.get("/api/client/config")
+def get_client_config(db: Session = Depends(get_db)):
+    """Trả về cấu hình Cổng BHYT để Client RPA Runner đồng bộ."""
+    cfg = db.query(AppConfig).first()
+    return {
+        "portal_url": cfg.portal_url if cfg and cfg.portal_url else "https://gdbhyt.baohiemxahoi.gov.vn/",
+        "portal_ma_cskcb": cfg.portal_ma_cskcb if cfg and cfg.portal_ma_cskcb else "66232",
+        "portal_username": cfg.portal_username if cfg and cfg.portal_username else "066091019320",
+        "portal_password": cfg.portal_password if cfg and cfg.portal_password else "Nguyenhong123@"
+    }
+
+
+@app.get("/api/client/download-runner")
+def download_client_runner():
+    """Đóng gói và tải về bộ công cụ Client RPA Runner cho máy trạm."""
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    runner_src_dir = os.path.join(root_dir, "client_runner")
+    os.makedirs(os.path.join(root_dir, "uploaded_files"), exist_ok=True)
+    zip_output_path = os.path.join(root_dir, "uploaded_files", "CheckBHYT_Client_RPA.zip")
+
+    if not os.path.exists(runner_src_dir):
+        raise HTTPException(status_code=404, detail="Không tìm thấy thư mục client_runner trên máy chủ.")
+
+    # Tạo file zip chứa toàn bộ thư mục client_runner
+    with zipfile.ZipFile(zip_output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for r_root, r_dirs, r_files in os.walk(runner_src_dir):
+            for file in r_files:
+                if file.endswith(".pyc") or "__pycache__" in r_root:
+                    continue
+                file_path = os.path.join(r_root, file)
+                arcname = os.path.relpath(file_path, runner_src_dir)
+                zipf.write(file_path, arcname)
+
+    return FileResponse(
+        path=zip_output_path,
+        filename="CheckBHYT_Client_RPA.zip",
+        media_type="application/zip"
+    )
+
+
 # ==========================================
+
 # API: CORRELATION & COMPARE ENGINE
 # ==========================================
 

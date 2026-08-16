@@ -44,3 +44,7 @@ web_app/xml_validator/validator.log
 
 # Browser automation session (cookies / storage state)
 web_app/browser_session/
+client_runner/browser_session/
+client_runner/downloaded_temp/
+client_runner/client_config.json
+

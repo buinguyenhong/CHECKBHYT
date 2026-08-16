@@ -1029,27 +1029,47 @@
                 </label>
             </div>
 
-            <!-- AUTOMATION RPA SECTION -->
+            <!-- CLIENT RPA SECTION -->
+            <div style="margin-bottom:20px; padding:16px 20px; background:linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%); border:1px solid rgba(16, 185, 129, 0.3); border-radius:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div>
+                        <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <span>💻</span> Tự động hóa tại Máy trạm (Client PC Runner)
+                        </h3>
+                        <span style="font-size:12.5px; color:var(--text-secondary); display:block; margin-top:3px;">
+                            Dành cho máy trạm trong mạng LAN: Mở Chromium trực tiếp trên màn hình máy tính của bạn để nhập Captcha, tự động tải và đẩy file lên Server đối soát tức thì.
+                        </span>
+                    </div>
+                    <div>
+                        <a href="/api/client/download-runner" class="btn" style="background:#10b981; color:#fff; font-weight:700; padding:10px 20px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(16,185,129,0.35);">
+                            <span>📥</span> Tải Bộ Công Cụ Client RPA (.zip)
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AUTOMATION RPA SERVER SECTION -->
             <div style="margin-bottom:20px; padding:16px 20px; background:linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%); border:1px solid rgba(139, 92, 246, 0.3); border-radius:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
                     <div>
                         <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <span>🤖</span> Tự động hóa Bán tự động với Cổng BHYT (Playwright RPA)
+                            <span>🤖</span> Tự động hóa trực tiếp trên Server (Server RPA)
                         </h3>
                         <span style="font-size:12.5px; color:var(--text-secondary); display:block; margin-top:3px;">
-                            Tự động đăng nhập, tải danh sách và thực thi đối soát độc lập mà không cần thao tác thủ công.
+                            Dành cho IT khi ngồi trực tiếp tại máy chủ Server: Trình duyệt mở trên Server, tự động tải và đối soát nội bộ.
                         </span>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <button class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:9px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(37,99,235,0.3);" id="btnAutoFlowB" onclick="runPortalAutomation('B')">
-                            <span>📥</span> Tự động tải DS đã gửi &amp; Đối soát B
+                            <span>📥</span> Chạy Luồng B trên Server
                         </button>
                         <button class="btn" style="background:#8b5cf6; color:#fff; font-weight:700; padding:9px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(139,92,246,0.3);" id="btnAutoFlowC" onclick="runPortalAutomation('C')">
-                            <span>⚠️</span> Tự động tải DS lỗi &amp; Đối soát C
+                            <span>⚠️</span> Chạy Luồng C trên Server
                         </button>
                     </div>
                 </div>
             </div>
+
 
             <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
                 <div style="display:flex; gap: 15px; align-items: center; flex-wrap: wrap;">
