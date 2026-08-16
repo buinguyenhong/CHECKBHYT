@@ -597,8 +597,11 @@ class BHYTLauncher:
             env = os.environ.copy()
             env["BHYT_PORT"] = str(port)
             env["BHYT_NO_RELOAD"] = "1"  # Khóa reload tối ưu hóa RAM chạy ngầm
+            env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONUTF8"] = "1"
             
             cmd = [sys.executable, run_script_path, "--port", str(port)]
+
             
             log_file_path = os.path.join(folder, "web_app_server.log")
             log_file = open(log_file_path, "a", encoding="utf-8")

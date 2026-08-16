@@ -2,7 +2,21 @@ import sys
 import os
 import socket
 
+# Tự động cấu hình mã hóa UTF-8 trên Windows để không bị lỗi Unicode charmap
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
 # Hướng dẫn IT cài đặt nếu thiếu thư viện
+
 try:
     import fastapi
     import uvicorn

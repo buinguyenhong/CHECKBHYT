@@ -1,3 +1,4 @@
+import sys
 import os
 import re
 import time
@@ -5,6 +6,27 @@ import glob
 import datetime
 import pandas as pd
 from typing import Callable, Optional
+
+# Tự động cấu hình mã hóa UTF-8 cho stdout/stderr tránh lỗi charmap trên Windows Server
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+def safe_print(msg: str):
+    try:
+        print(msg)
+    except Exception:
+        try:
+            print(msg.encode('ascii', 'replace').decode('ascii'))
+        except Exception:
+            pass
 
 # Thư mục lưu trữ phiên đăng nhập và các tệp tải lên
 SESSION_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "browser_session")
@@ -26,7 +48,8 @@ def add_portal_log(msg: str):
     portal_logs.append(entry)
     if len(portal_logs) > 200:
         portal_logs.pop(0)
-    print(f"[*] [PortalAutomation] {entry}")
+    safe_print(f"[*] [PortalAutomation] {entry}")
+
 
 class PortalAutomationService:
     def __init__(
@@ -142,7 +165,8 @@ class PortalAutomationService:
         def log(msg: str):
             if log_func:
                 log_func(msg)
-            print(f"[*] [Flow B] {msg}")
+            safe_print(f"[*] [Flow B] {msg}")
+
 
         log(f"Bắt đầu Luồng B (Tải danh sách đã gửi từ {from_date} đến {to_date})...")
 
@@ -283,7 +307,8 @@ class PortalAutomationService:
         def log(msg: str):
             if log_func:
                 log_func(msg)
-            print(f"[*] [Flow C] {msg}")
+            safe_print(f"[*] [Flow C] {msg}")
+
 
         log(f"Bắt đầu Luồng C (Tải danh sách lỗi chi tiết từ {from_date} đến {to_date})...")
 
