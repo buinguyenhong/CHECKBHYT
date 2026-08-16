@@ -78,7 +78,8 @@ class PortalAutomationService:
         def log(msg: str):
             if log_func:
                 log_func(msg)
-            print(f"[*] [PortalAutomation] {msg}")
+            safe_print(f"[*] [PortalAutomation] {msg}")
+
 
         log("Đang truy cập Cổng BHYT...")
         page.goto(self.base_url, timeout=60000)
@@ -622,14 +623,15 @@ class PortalAutomationService:
                     try:
                         next_page_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom .dxp-button:has-text('>')").first
                         if next_page_btn.is_visible(timeout=3000) and "dxp-disabled" not in (next_page_btn.get_attribute("class") or ""):
-                            log("Chuyển sang trang tiếp theo...")
+                            log(f"Chuyển sang trang tiếp theo (Trang {page_idx + 1})...")
                             next_page_btn.click()
                             page_idx += 1
-                            time.sleep(3)
-                            page.wait_for_load_state("networkidle", timeout=15000)
+                            time.sleep(1.5)
+                            wait_for_grid_data(timeout=30)
                         else:
                             log("Đã duyệt hết tất cả các trang.")
                             break
+
                     except Exception:
                         log("Hoàn thành duyệt các trang.")
                         break
