@@ -742,6 +742,8 @@
                             <th>Họ tên</th>
                             <th>Mã thẻ BHYT</th>
                             <th>Ngày ra viện</th>
+                            <th>Tổng tiền</th>
+                            <th>Tiền BHYT</th>
                             <th>Loại ca</th>
                             <th>Mã lỗi</th>
                             <th>Mô tả lỗi</th>
@@ -751,7 +753,7 @@
                     </thead>
                     <tbody id="recordsBody">
                         <tr>
-                            <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            <td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 30px;">
                                 Đang tải danh sách dữ liệu...
                             </td>
                         </tr>
@@ -843,6 +845,8 @@
                             <th>Mã LK</th>
                             <th>Họ tên</th>
                             <th>Thẻ BHYT</th>
+                            <th>Tổng tiền</th>
+                            <th>Tiền BHYT</th>
                             <th>Mã lỗi</th>
                             <th>Mô tả lỗi</th>
                             <th>Đợt đối soát</th>
@@ -853,7 +857,7 @@
                         </tr>
                     </thead>
                     <tbody id="deptArchiveTableBody">
-                        <tr><td colspan="10" style="text-align:center; padding:20px;">Đang tải lịch sử lưu trữ...</td></tr>
+                        <tr><td colspan="12" style="text-align:center; padding:20px;">Đang tải lịch sử lưu trữ...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1002,11 +1006,16 @@
                         ? '<span class="status-badge status-resolved">Đã sửa</span>'
                         : '<span class="status-badge status-pending">Chưa sửa</span>';
 
+                    const ttStr = (r.tong_tien && r.tong_tien > 0) ? new Intl.NumberFormat('vi-VN').format(r.tong_tien) + ' đ' : '-';
+                    const tbStr = (r.tien_bhyt && r.tien_bhyt > 0) ? new Intl.NumberFormat('vi-VN').format(r.tien_bhyt) + ' đ' : '-';
+
                     html += `
                         <tr>
                             <td><strong>${r.ma_lk}</strong></td>
                             <td>${r.ho_ten}</td>
                             <td><code>${r.ma_the}</code></td>
+                            <td style="font-weight:600; color:#38bdf8;">${ttStr}</td>
+                            <td style="font-weight:600; color:#34d399;">${tbStr}</td>
                             <td><code style="color:var(--status-pending); font-weight:bold;">${r.maloi}</code></td>
                             <td style="white-space:normal; max-width:250px;">${r.motaloi}</td>
                             <td>${r.ngay_doi_soat}</td>
@@ -1019,11 +1028,11 @@
                 });
                 tbody.innerHTML = html;
             } else {
-                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px; color: var(--status-pending);">Không thể tải dữ liệu lịch sử.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 20px; color: var(--status-pending);">Không thể tải dữ liệu lịch sử.</td></tr>';
             }
         } catch (e) {
             console.error("Lỗi fetchDeptArchiveData:", e);
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding: 20px; color: var(--status-pending);">Lỗi kết nối: ${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding: 20px; color: var(--status-pending);">Lỗi kết nối: ${e.message}</td></tr>`;
         }
     }
 
@@ -1120,6 +1129,8 @@
             const statusText = isResolved ? 'Đã xử lý' : 'Chưa xử lý';
 
             const formattedDate = r.ngay_ra_vien ? new Date(r.ngay_ra_vien).toLocaleDateString('vi-VN') : '';
+            const ttStr = (r.tong_tien && r.tong_tien > 0) ? new Intl.NumberFormat('vi-VN').format(r.tong_tien) + ' đ' : '-';
+            const tbStr = (r.tien_bhyt && r.tien_bhyt > 0) ? new Intl.NumberFormat('vi-VN').format(r.tien_bhyt) + ' đ' : '-';
 
             let errorInfo = r.motaloi || '';
             if (r.maloi && (r.root_cause || r.resolution)) {
@@ -1137,6 +1148,8 @@
                 <td>${r.ho_ten}</td>
                 <td><code style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:13px;">${r.ma_the}</code></td>
                 <td>${formattedDate}</td>
+                <td style="font-weight:600; color:#38bdf8;">${ttStr}</td>
+                <td style="font-weight:600; color:#34d399;">${tbStr}</td>
                 <td>${r.loai_ca}</td>
                 <td><span style="color:#f87171; font-weight:700;">${r.maloi || ''}</span></td>
                 <td style="max-width:350px; white-space:normal;">${errorInfo}</td>

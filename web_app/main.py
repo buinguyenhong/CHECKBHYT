@@ -284,6 +284,27 @@ def save_last_kpis(db: Session, stats: dict, df_listbh: pd.DataFrame, ngay_doi_s
     cfg.last_resolved = db.query(Record).filter(Record.status == "RESOLVED").count()
     db.commit()
 
+# 1.5. Auto-migrate SQLite schema if new columns are missing
+try:
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        res = conn.execute(text("PRAGMA table_info(records);")).fetchall()
+        cols = [r[1] for r in res]
+        if "tong_tien" not in cols:
+            conn.execute(text("ALTER TABLE records ADD COLUMN tong_tien FLOAT DEFAULT 0.0;"))
+        if "tien_bhyt" not in cols:
+            conn.execute(text("ALTER TABLE records ADD COLUMN tien_bhyt FLOAT DEFAULT 0.0;"))
+            
+        res_arch = conn.execute(text("PRAGMA table_info(error_history_archive);")).fetchall()
+        cols_arch = [r[1] for r in res_arch]
+        if "tong_tien" not in cols_arch:
+            conn.execute(text("ALTER TABLE error_history_archive ADD COLUMN tong_tien FLOAT DEFAULT 0.0;"))
+        if "tien_bhyt" not in cols_arch:
+            conn.execute(text("ALTER TABLE error_history_archive ADD COLUMN tien_bhyt FLOAT DEFAULT 0.0;"))
+        conn.commit()
+except Exception as e:
+    print(f"[*] [Migration warning] {str(e)}")
+
 # 2. Tạo tài khoản admin mặc định & config mặc định khi khởi chạy
 db = next(get_db())
 try:
@@ -1257,6 +1278,8 @@ def get_department_records(
             "motaloi": r.motaloi,
             "status": r.status,
             "note": r.note,
+            "tong_tien": float(r.tong_tien or 0.0),
+            "tien_bhyt": float(r.tien_bhyt or 0.0),
             "loai_ca": resolve_loai_ca(r),
             "root_cause": "Chưa rõ nguyên nhân (Hệ thống tự động quét)",
             "resolution": "Chờ phòng IT bổ sung hướng dẫn chi tiết",
@@ -1577,6 +1600,8 @@ def get_admin_loi_records(
             "motaloi": r.motaloi,
             "status": r.status,
             "note": r.note or "",
+            "tong_tien": float(r.tong_tien or 0.0),
+            "tien_bhyt": float(r.tien_bhyt or 0.0),
             "loai_ca": resolve_loai_ca(r),
             "root_cause": "Chưa rõ nguyên nhân (Hệ thống tự động quét)",
             "resolution": "Chờ phòng IT bổ sung hướng dẫn chi tiết",
@@ -2165,7 +2190,9 @@ def export_monthly_summary(
         Record.ngay_doi_soat,
         Record.ngay_ra,
         Record.maloi,
-        Record.motaloi
+        Record.motaloi,
+        Record.tong_tien,
+        Record.tien_bhyt
     ).all()
 
     rec_data = []
@@ -2178,11 +2205,13 @@ def export_monthly_summary(
             "status": r[2],
             "maloi": r[6] or "",
             "motaloi": r[7] or "",
+            "tong_tien": float(r[8] or 0.0),
+            "tien_bhyt": float(r[9] or 0.0),
             "month": month_str
         })
     df_rec = pd.DataFrame(rec_data)
     if df_rec.empty:
-        df_rec = pd.DataFrame(columns=["ma_lk", "type_group", "status", "maloi", "motaloi", "month"])
+        df_rec = pd.DataFrame(columns=["ma_lk", "type_group", "status", "maloi", "motaloi", "tong_tien", "tien_bhyt", "month"])
 
     # 3. Lấy tất cả các tháng khả dụng
     all_months = set()
@@ -2209,27 +2238,70 @@ def export_monthly_summary(
             df_rec_m = df_rec[df_rec["month"] == m] if not df_rec.empty else pd.DataFrame()
             rec_lks = set(df_rec_m["ma_lk"].unique()) if not df_rec_m.empty else set()
 
-            total_cases_val = len(sent_lks | rec_lks)
+            # Map ma_lk -> (tong_tien, tien_bhyt) từ các records duy nhất
+            lk_money_map = {}
+            if not df_rec_m.empty:
+                for _, row in df_rec_m.iterrows():
+                    lk = row["ma_lk"]
+                    tt = float(row.get("tong_tien", 0.0) or 0.0)
+                    tb = float(row.get("tien_bhyt", 0.0) or 0.0)
+                    if lk not in lk_money_map:
+                        lk_money_map[lk] = {"tong_tien": tt, "tien_bhyt": tb}
+                    else:
+                        if tt > lk_money_map[lk]["tong_tien"]:
+                            lk_money_map[lk]["tong_tien"] = tt
+                        if tb > lk_money_map[lk]["tien_bhyt"]:
+                            lk_money_map[lk]["tien_bhyt"] = tb
+
+            all_cases_lks = sent_lks | rec_lks
+            total_cases_val = len(all_cases_lks)
+            total_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in all_cases_lks)
+            total_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in all_cases_lks)
+
             sent_cases_val = len(sent_lks)
+            sent_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in sent_lks)
+            sent_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in sent_lks)
 
             err_cases_val = 0
+            err_amount_val = 0.0
+            err_bhyt_val = 0.0
             err_resolved_val = 0
+            err_resolved_amount_val = 0.0
+            err_resolved_bhyt_val = 0.0
             total_errors_val = 0
             errors_resolved_val = 0
             fail_cases_val = 0
+            fail_amount_val = 0.0
+            fail_bhyt_val = 0.0
             fail_resolved_val = 0
+            fail_resolved_amount_val = 0.0
+            fail_resolved_bhyt_val = 0.0
 
             if not df_rec_m.empty:
                 df_loi_m = df_rec_m[df_rec_m["type_group"] == "LOI"]
-                err_cases_val = len(df_loi_m["ma_lk"].unique())
-                err_resolved_val = len(df_loi_m[df_loi_m["status"] == "RESOLVED"]["ma_lk"].unique())
+                loi_lks = set(df_loi_m["ma_lk"].unique())
+                err_cases_val = len(loi_lks)
+                err_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in loi_lks)
+                err_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in loi_lks)
+
+                loi_res_lks = set(df_loi_m[df_loi_m["status"] == "RESOLVED"]["ma_lk"].unique())
+                err_resolved_val = len(loi_res_lks)
+                err_resolved_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in loi_res_lks)
+                err_resolved_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in loi_res_lks)
 
                 total_errors_val = len(df_loi_m)
                 errors_resolved_val = len(df_loi_m[df_loi_m["status"] == "RESOLVED"])
 
                 df_fail_m = df_rec_m[df_rec_m["type_group"] == "FAIL"]
-                fail_cases_val = len(df_fail_m["ma_lk"].unique())
-                fail_resolved_val = len(df_fail_m[df_fail_m["status"] == "RESOLVED"]["ma_lk"].unique())
+                fail_lks = set(df_fail_m["ma_lk"].unique())
+                fail_cases_val = len(fail_lks)
+                fail_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in fail_lks)
+                fail_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in fail_lks)
+
+                fail_res_lks = set(df_fail_m[df_fail_m["status"] == "RESOLVED"]["ma_lk"].unique())
+                fail_resolved_val = len(fail_res_lks)
+                fail_resolved_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in fail_res_lks)
+                fail_resolved_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in fail_res_lks)
 
             summary_data = {
                 "Chỉ số đối soát": [
@@ -2251,6 +2323,26 @@ def export_monthly_summary(
                     errors_resolved_val,
                     fail_cases_val,
                     fail_resolved_val
+                ],
+                "Tổng chi phí (VNĐ)": [
+                    total_amount_val,
+                    sent_amount_val,
+                    err_amount_val,
+                    err_resolved_amount_val,
+                    0,
+                    0,
+                    fail_amount_val,
+                    fail_resolved_amount_val
+                ],
+                "Tiền BHYT chi trả (VNĐ)": [
+                    total_bhyt_val,
+                    sent_bhyt_val,
+                    err_bhyt_val,
+                    err_resolved_bhyt_val,
+                    0,
+                    0,
+                    fail_bhyt_val,
+                    fail_resolved_bhyt_val
                 ]
             }
             df_summary = pd.DataFrame(summary_data)
@@ -2277,12 +2369,17 @@ def export_monthly_summary(
             pd.DataFrame([["2. DANH SÁCH 10 LỖI THƯỜNG GẶP NHẤT"]]).to_excel(writer, sheet_name=sheet_name, startrow=13, startcol=0, header=False, index=False)
             top_errs.to_excel(writer, sheet_name=sheet_name, startrow=14, startcol=0, index=False)
 
-            # Định dạng độ rộng cột tối ưu
+            # Định dạng độ rộng cột và số tiền có định dạng phân cách
             ws = writer.sheets[sheet_name]
             ws.column_dimensions['A'].width = 30
-            ws.column_dimensions['B'].width = 20
-            ws.column_dimensions['C'].width = 65
-            ws.column_dimensions['D'].width = 20
+            ws.column_dimensions['B'].width = 16
+            ws.column_dimensions['C'].width = 25
+            ws.column_dimensions['D'].width = 25
+
+            for r_idx in range(5, 13):
+                ws.cell(row=r_idx, column=2).number_format = '#,##0'
+                ws.cell(row=r_idx, column=3).number_format = '#,##0'
+                ws.cell(row=r_idx, column=4).number_format = '#,##0'
 
     return FileResponse(
         out_path, 
@@ -2808,6 +2905,8 @@ def get_archive_errors(
             "motaloi": item.motaloi or "",
             "ngay_doi_soat": item.ngay_doi_soat.strftime("%d/%m/%Y") if item.ngay_doi_soat else "",
             "thang_doi_soat": item.thang_doi_soat or "",
+            "tong_tien": float(item.tong_tien or 0.0),
+            "tien_bhyt": float(item.tien_bhyt or 0.0),
             "status": item.status or "PENDING",
             "first_detected_at": item.first_detected_at.strftime("%d/%m/%Y %H:%M") if item.first_detected_at else "",
             "resolved_at": item.resolved_at.strftime("%d/%m/%Y %H:%M") if item.resolved_at else "",
@@ -2857,6 +2956,23 @@ def get_archive_stats(
     pending_errors = total_errors - resolved_errors
     rate = round((resolved_errors / total_errors * 100), 1) if total_errors > 0 else 0.0
     
+    # Tính tổng tiền lỗi theo ca duy nhất
+    seen_lks = {}
+    for r in all_recs:
+        lk = r.ma_lk
+        tt = float(r.tong_tien or 0.0)
+        tb = float(r.tien_bhyt or 0.0)
+        if lk not in seen_lks:
+            seen_lks[lk] = {"tong_tien": tt, "tien_bhyt": tb}
+        else:
+            if tt > seen_lks[lk]["tong_tien"]:
+                seen_lks[lk]["tong_tien"] = tt
+            if tb > seen_lks[lk]["tien_bhyt"]:
+                seen_lks[lk]["tien_bhyt"] = tb
+                
+    total_amount = sum(v["tong_tien"] for v in seen_lks.values())
+    total_bhyt_amount = sum(v["tien_bhyt"] for v in seen_lks.values())
+
     from collections import Counter
     maloi_counter = Counter(r.maloi for r in all_recs if r.maloi)
     top_errors = [{"maloi": k, "count": v} for k, v in maloi_counter.most_common(10)]
@@ -2882,6 +2998,8 @@ def get_archive_stats(
         "resolved_errors": resolved_errors,
         "pending_errors": pending_errors,
         "resolution_rate": rate,
+        "total_amount": total_amount,
+        "total_bhyt_amount": total_bhyt_amount,
         "top_errors": top_errors,
         "dept_breakdown": dept_breakdown
     }
@@ -2928,6 +3046,8 @@ def export_archive_errors(
             "Loại ca": r.loai_ca or "",
             "Mã y tế": r.ma_y_te or "",
             "Ngày ra viện": r.ngay_ra_vien.strftime("%d/%m/%Y") if r.ngay_ra_vien else "",
+            "Tổng chi phí (VNĐ)": float(r.tong_tien or 0.0),
+            "Tiền BHYT chi trả (VNĐ)": float(r.tien_bhyt or 0.0),
             "Mã lỗi": r.maloi or "",
             "Mô tả lỗi": r.motaloi or "",
             "Đợt đối soát": r.ngay_doi_soat.strftime("%d/%m/%Y") if r.ngay_doi_soat else "",

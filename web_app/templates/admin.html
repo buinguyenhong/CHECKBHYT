@@ -1165,6 +1165,8 @@
                             <th>Họ tên</th>
                             <th>Mã thẻ</th>
                             <th>Ngày ra viện</th>
+                            <th>Tổng tiền</th>
+                            <th>Tiền BHYT</th>
                             <th>Khoa phòng</th>
                             <th>Loại ca</th>
                             <th>Mã lỗi</th>
@@ -1178,7 +1180,7 @@
                     </thead>
                     <tbody id="loiBody">
                         <tr>
-                            <td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">
+                            <td colspan="16" style="text-align:center; padding:30px; color:var(--text-secondary);">
                                 Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.
                             </td>
                         </tr>
@@ -1212,6 +1214,8 @@
                             <th>Mã thẻ</th>
                             <th>Tên khoa</th>
                             <th>Ngày ra viện</th>
+                            <th>Tổng tiền</th>
+                            <th>Tiền BHYT</th>
                             <th>Loại ca</th>
                             <th>Ghi chú xử lý IT</th>
                             <th>Trạng thái</th>
@@ -1633,6 +1637,8 @@
                             <th>Mã LK</th>
                             <th>Họ và Tên</th>
                             <th>Khoa</th>
+                            <th>Tổng tiền</th>
+                            <th>Tiền BHYT</th>
                             <th>Mã lỗi</th>
                             <th>Mô tả chi tiết lỗi</th>
                             <th>Đợt phát hiện</th>
@@ -1644,7 +1650,7 @@
                         </tr>
                     </thead>
                     <tbody id="archiveTableBody">
-                        <tr><td colspan="11" style="text-align:center; padding: 20px;">Đang tải dữ liệu lưu trữ...</td></tr>
+                        <tr><td colspan="13" style="text-align:center; padding: 20px;">Đang tải dữ liệu lưu trữ...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1910,11 +1916,16 @@
                         statusText = 'Chờ duyệt';
                     }
 
+                    const ttStr = (r.tong_tien && r.tong_tien > 0) ? new Intl.NumberFormat('vi-VN').format(r.tong_tien) + ' đ' : '-';
+                    const tbStr = (r.tien_bhyt && r.tien_bhyt > 0) ? new Intl.NumberFormat('vi-VN').format(r.tien_bhyt) + ' đ' : '-';
+
                     html += `
                         <tr>
                             <td><strong>${r.ma_lk}</strong></td>
                             <td>${r.ho_ten}</td>
                             <td>${r.ten_khoa}</td>
+                            <td style="font-weight:600; color:#38bdf8;">${ttStr}</td>
+                            <td style="font-weight:600; color:#34d399;">${tbStr}</td>
                             <td><code style="color:var(--danger); font-weight:bold;">${r.maloi}</code></td>
                             <td class="wrap-cell" style="max-width:250px;">${r.motaloi}</td>
                             <td>${r.ngay_doi_soat}</td>
@@ -1929,11 +1940,11 @@
                 tbody.innerHTML = html;
                 fetchArchiveStats();
             } else {
-                tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color: var(--danger);">Không thể tải dữ liệu lịch sử.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 20px; color: var(--danger);">Không thể tải dữ liệu lịch sử.</td></tr>';
             }
         } catch (e) {
             console.error("Lỗi fetchArchiveData:", e);
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding: 20px; color: var(--danger);">Lỗi kết nối: ${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding: 20px; color: var(--danger);">Lỗi kết nối: ${e.message}</td></tr>`;
         }
     }
 
@@ -2657,12 +2668,17 @@
                         }
                     }
                     
+                    const ttStr = (r.tong_tien && r.tong_tien > 0) ? new Intl.NumberFormat('vi-VN').format(r.tong_tien) + ' đ' : '-';
+                    const tbStr = (r.tien_bhyt && r.tien_bhyt > 0) ? new Intl.NumberFormat('vi-VN').format(r.tien_bhyt) + ' đ' : '-';
+                    
                     tr.innerHTML = `
                         <td>${stt++}</td>
                         <td><strong>${r.ma_lk}</strong></td>
                         <td>${r.ho_ten}</td>
                         <td><code>${r.ma_the}</code></td>
                         <td>${formattedDate}</td>
+                        <td style="font-weight:600; color:#38bdf8;">${ttStr}</td>
+                        <td style="font-weight:600; color:#34d399;">${tbStr}</td>
                         <td>${r.ten_khoa}</td>
                         <td>${r.loai_ca}</td>
                         <td><span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; font-weight:bold;">${r.maloi || ''}</span></td>
@@ -2691,7 +2707,7 @@
                 } catch (jsonErr) {
                     detail = text || detail;
                 }
-                tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--danger);">Lỗi: ${detail}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--danger);">Lỗi: ${detail}</td></tr>`;
             }
         } catch (e) {
             console.error("Lỗi fetchLoiRecords:", e);
@@ -2825,12 +2841,17 @@
                     formattedDate = r.ngay_ra_vien;
                 }
             }
+            const ttStr = (r.tong_tien && r.tong_tien > 0) ? new Intl.NumberFormat('vi-VN').format(r.tong_tien) + ' đ' : '-';
+            const tbStr = (r.tien_bhyt && r.tien_bhyt > 0) ? new Intl.NumberFormat('vi-VN').format(r.tien_bhyt) + ' đ' : '-';
+            
             tr.innerHTML = `
                 <td><strong>${r.ma_lk}</strong></td>
                 <td>${r.ho_ten}</td>
                 <td><code>${r.ma_the}</code></td>
                 <td>${r.ten_khoa}</td>
                 <td>${formattedDate}</td>
+                <td style="font-weight:600; color:#38bdf8;">${ttStr}</td>
+                <td style="font-weight:600; color:#34d399;">${tbStr}</td>
                 <td>${r.loai_ca}</td>
                 <td style="font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
                 <td>

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean, Float
 from sqlalchemy.orm import relationship
 import datetime
 from database import Base
@@ -48,6 +48,9 @@ class Record(Base):
     ngay_ra_vien = Column(Date, nullable=True)
     loai_ca = Column(String, default="Ngoại trú")  # 'Ngoại trú' | 'Nội trú'
     
+    tong_tien = Column(Float, default=0.0)      # Tổng cộng chi phí ca bệnh (Tongcong từ SP)
+    tien_bhyt = Column(Float, default=0.0)      # Tiền BHYT chi trả (QuyBHYT_ChiTra từ SP)
+
     ngay_doi_soat = Column(Date, index=True, nullable=False)  # Ngày thực hiện đối soát
     status = Column(String, default="PENDING")  # 'PENDING' | 'WAITING_RESEND' | 'RESOLVED'
     type_group = Column(String, default="FAIL")  # 'LOI' (Danh sách lỗi) | 'FAIL' (Danh sách fail)
@@ -97,6 +100,9 @@ class ErrorHistoryArchive(Base):
     loai_ca = Column(String, default="Ngoại trú")
     ma_y_te = Column(String, default="")
     ngay_ra_vien = Column(Date, nullable=True)
+
+    tong_tien = Column(Float, default=0.0)      # Tổng cộng chi phí ca bệnh (Tongcong từ SP)
+    tien_bhyt = Column(Float, default=0.0)      # Tiền BHYT chi trả (QuyBHYT_ChiTra từ SP)
 
     maloi = Column(String, index=True, default="")
     motaloi = Column(Text, default="")

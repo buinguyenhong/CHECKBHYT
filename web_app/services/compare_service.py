@@ -33,6 +33,10 @@ def sync_archive_error(db: Session, rec: Record, resolved: bool = False, resolve
         arch.loai_ca = rec.loai_ca or arch.loai_ca
         arch.ma_y_te = rec.ma_y_te or arch.ma_y_te
         arch.ngay_ra_vien = rec.ngay_ra_vien or arch.ngay_ra_vien
+        if rec.tong_tien is not None and rec.tong_tien > 0:
+            arch.tong_tien = rec.tong_tien
+        if rec.tien_bhyt is not None and rec.tien_bhyt > 0:
+            arch.tien_bhyt = rec.tien_bhyt
         arch.status = target_status
         if target_status == "RESOLVED":
             if not arch.resolved_at:
@@ -50,6 +54,8 @@ def sync_archive_error(db: Session, rec: Record, resolved: bool = False, resolve
             loai_ca=rec.loai_ca,
             ma_y_te=rec.ma_y_te,
             ngay_ra_vien=rec.ngay_ra_vien,
+            tong_tien=rec.tong_tien or 0.0,
+            tien_bhyt=rec.tien_bhyt or 0.0,
             maloi=rec_maloi,
             motaloi=rec.motaloi,
             ngay_doi_soat=rec.ngay_doi_soat or datetime.date.today(),
@@ -248,11 +254,27 @@ def process_comparison(
         ten_khoa = str(row.get("Tên khoa", ""))
         ma_y_te = str(row.get("Mã y tế", ""))
         ngay_ra_vien = row.get("Ngày ra viện", None) if not pd.isna(row.get("Ngày ra viện")) else None
+        
+        tong_tien_val = row.get("Tổng cộng", 0.0)
+        try:
+            tong_tien = float(tong_tien_val) if not pd.isna(tong_tien_val) else 0.0
+        except Exception:
+            tong_tien = 0.0
+            
+        tien_bhyt_val = row.get("Tiền BHYT", 0.0)
+        try:
+            tien_bhyt = float(tien_bhyt_val) if not pd.isna(tien_bhyt_val) else 0.0
+        except Exception:
+            tien_bhyt = 0.0
 
         if is_sent:
             # Quy tắc 4: Tự động chuyển thành RESOLVED cho toàn bộ bản ghi lỗi/fail cũ của ma_lk này
             existing_records = db.query(Record).filter(Record.ma_lk == ma_lk).all()
             for rec in existing_records:
+                if tong_tien > 0:
+                    rec.tong_tien = tong_tien
+                if tien_bhyt > 0:
+                    rec.tien_bhyt = tien_bhyt
                 if rec.status != "RESOLVED":
                     rec.status = "RESOLVED"
                     rec.his_unlock_status = "NORMAL" # Reset trạng thái mở khóa khi đã gửi thành công
@@ -323,6 +345,8 @@ def process_comparison(
                     existing_record.ma_y_te = ma_y_te
                     existing_record.ngay_ra_vien = ngay_ra_vien
                     existing_record.loai_ca = loai_ca
+                    existing_record.tong_tien = tong_tien
+                    existing_record.tien_bhyt = tien_bhyt
                     existing_record.ngay_doi_soat = ngay_doi_soat
                     if note_val:
                         existing_record.note = note_val
@@ -346,6 +370,8 @@ def process_comparison(
                         ma_y_te=ma_y_te,
                         ngay_ra_vien=ngay_ra_vien,
                         loai_ca=loai_ca,
+                        tong_tien=tong_tien,
+                        tien_bhyt=tien_bhyt,
                         ngay_doi_soat=ngay_doi_soat,
                         status="PENDING",
                         type_group="FAIL",
@@ -470,6 +496,8 @@ def process_comparison(
                         existing_record.ma_y_te = ma_y_te
                         existing_record.ngay_ra_vien = ngay_ra_vien
                         existing_record.loai_ca = loai_ca
+                        existing_record.tong_tien = tong_tien
+                        existing_record.tien_bhyt = tien_bhyt
                         existing_record.ngay_doi_soat = ngay_doi_soat
                         existing_record.type_group = "LOI"
                         
@@ -492,6 +520,8 @@ def process_comparison(
                             ma_y_te=ma_y_te,
                             ngay_ra_vien=ngay_ra_vien,
                             loai_ca=loai_ca,
+                            tong_tien=tong_tien,
+                            tien_bhyt=tien_bhyt,
                             ngay_doi_soat=ngay_doi_soat,
                             status="PENDING",
                             type_group="LOI",

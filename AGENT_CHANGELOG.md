@@ -56,6 +56,33 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-16 08:15 - Antigravity (Tính năng: Tích hợp Tổng hợp Tài chính Tongcong & QuyBHYT_ChiTra theo số ca bệnh)
+
+### Mục tiêu
+- Trích xuất 2 trường tài chính `Tongcong` (tổng chi phí ca bệnh) và `QuyBHYT_ChiTra` (tiền bảo hiểm y tế chi trả) từ 2 Stored Procedures ngoại trú và nội trú (`sp_BCVP_DsDeNghiThanhToanBHYT_NgoaiTru_Optimized` & `sp_BCVP_DsDeNghiThanhToanBHYT_NoiTru_Optimized`).
+- Tổng hợp chính xác số tiền dựa theo số ca bệnh duy nhất (`MA_LK`), không nhân đôi số tiền khi 1 ca bệnh mắc nhiều lỗi.
+- Bổ sung 2 cột số tiền tài chính vào Báo cáo Tổng hợp Tháng Excel (`/api/export/monthly_summary`), Báo cáo Lưu trữ Lỗi (`/api/export/archive/errors`), API Thống kê (`/api/archive/stats`) và giao diện hiển thị Tab 3 (Lỗi), Tab 4 (FAIL), Tab 10 (Lưu trữ lỗi).
+
+### Thay đổi
+- `web_app/models.py` [MODIFY]: Bổ sung 2 trường `tong_tien = Column(Float, default=0.0)` và `tien_bhyt = Column(Float, default=0.0)` vào model `Record` và `ErrorHistoryArchive`.
+- `web_app/services/his_service.py` [MODIFY]: Cập nhật `normalize_sql_list()` trích xuất linh hoạt các biến thể tên cột (`Tongcong`, `QuyBHYT_ChiTra`,...) thành số thực và trả về 2 cột `"Tổng cộng"`, `"Tiền BHYT"`.
+- `web_app/services/compare_service.py` [MODIFY]: Cập nhật `process_comparison()` và `sync_archive_error()` lưu `tong_tien`, `tien_bhyt` cho tất cả các bản ghi `Record` (nhóm `LOI`, `FAIL`) và `ErrorHistoryArchive`.
+- `web_app/main.py` [MODIFY]:
+  - Thêm auto-migration SQLite khi khởi động server (`ALTER TABLE ... ADD COLUMN ...` nếu thiếu `tong_tien`, `tien_bhyt`).
+  - Nâng cấp API `/api/export/monthly_summary`: gom nhóm theo `MA_LK` duy nhất trong tháng, tính toán và xuất Bảng 1 "SỐ LIỆU TỔNG HỢP" gồm 4 cột: `Chỉ số đối soát | Số lượng | Tổng chi phí (VNĐ) | Tiền BHYT chi trả (VNĐ)` kèm định dạng phân cách số hàng nghìn (`#,##0`).
+  - Bổ sung `tong_tien`, `tien_bhyt` vào API `/api/records/admin/loi`, `/api/records/dept`, `/api/archive/errors`, `/api/archive/stats`, `/api/export/archive/errors`.
+- `web_app/templates/admin.html` [MODIFY]: Bổ sung cột Tổng tiền và Tiền BHYT trên thead và hàm render JS cho Tab 3 (`#loiTable`), Tab 4 (`#failTable`), Tab 10 (`#archiveTable`).
+- `web_app/templates/department.html` [MODIFY]: Bổ sung cột Tổng tiền và Tiền BHYT trên thead và render JS cho Tab 1 (`#recordsTable`) và Tab 3 (`#deptArchiveTable`).
+- `scratch/test_money_aggregation.py` [NEW]: Kịch bản unit test xác thực trích xuất SP, lưu trữ CSDL và gom nhóm tiền theo ca bệnh duy nhất.
+
+### Nghiệp vụ ảnh hưởng
+- Báo cáo tổng hợp tháng và toàn bộ hệ thống đã có đầy đủ thông tin tài chính (tổng viện phí và tiền BHYT chi trả) để đối chiếu, theo dõi và ước lượng giá trị tài chính của các ca lỗi cần khắc phục.
+- Đảm bảo tính toán độc lập theo ca bệnh (`MA_LK`), không bị sai lệch số tiền khi 1 bệnh nhân mắc nhiều lỗi cùng lúc.
+
+### Kiểm tra
+- Chạy kịch bản `scratch/test_money_aggregation.py` đạt kết quả 100% OK.
+- Chạy lại các kịch bản kiểm thử hồi quy `scratch/test_archive_module.py` và `scratch/test_reconciliation.py` đều hoàn thành thành công.
+
 ## 2026-08-12 15:35 - Antigravity (Hotfix UI: Sửa lỗi thẻ đóng HTML của Tab 9 khiến Tab 10 bị ẩn)
 
 ### Mục tiêu

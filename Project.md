@@ -144,6 +144,8 @@ Cột bắt buộc từ SP ngoại trú:
 - `Column4`
 - `SoPhieuThanhToanNgoaiTru`
 - `NgayRa`
+- `Tongcong`: Tổng số tiền chi phí của ca bệnh.
+- `QuyBHYT_ChiTra`: Tổng số tiền quỹ BHYT chi trả cho ca bệnh.
 
 Cột bắt buộc từ SP nội trú:
 
@@ -152,6 +154,8 @@ Cột bắt buộc từ SP nội trú:
 - `SoPhieu_BA`
 - `khoadieutri`
 - `NgayRa`
+- `Tongcong`: Tổng số tiền chi phí của ca bệnh.
+- `QuyBHYT_ChiTra`: Tổng số tiền quỹ BHYT chi trả cho ca bệnh.
 
 ### 5.2. File danh sách đã gửi BHYT
 
@@ -233,10 +237,12 @@ Các bảng chính:
 
 - `users`: tài khoản admin/khoa.
 - `app_config`: cấu hình kết nối SQL Server HIS, SP, tự đồng bộ.
-- `records`: hồ sơ đối soát và trạng thái xử lý hiện tại.
+- `records`: hồ sơ đối soát và trạng thái xử lý hiện tại (gồm `ma_lk`, `ho_ten`, `ma_the`, `ten_khoa`, `loai_ca`, `ngay_ra_vien`, `tong_tien`, `tien_bhyt`, `maloi`, `motaloi`, `type_group`, `status`, `note`, `unlock_status`).
 - `record_logs`: nhật ký lịch sử thay đổi trạng thái/ghi chú từng ca.
 - `error_definitions`: danh mục hướng dẫn lỗi theo `MALOI` và từ khóa trong `MOTALOI`.
-- `error_history_archive`: cơ sở dữ liệu lưu trữ vĩnh viễn tất cả các dòng lỗi từng phát sinh qua các đợt đối soát (lưu `ma_lk`, `maloi`, `motaloi`, `thang_doi_soat`, `status`, `first_detected_at`, `resolved_at`, `resolved_by`, `note_history`).
+- `error_history_archive`: cơ sở dữ liệu lưu trữ vĩnh viễn tất cả các dòng lỗi từng phát sinh qua các đợt đối soát (lưu `ma_lk`, `ho_ten`, `ma_the`, `ten_khoa`, `loai_ca`, `tong_tien`, `tien_bhyt`, `maloi`, `motaloi`, `thang_doi_soat`, `status`, `first_detected_at`, `resolved_at`, `resolved_by`, `note_history`).
+
+> **Quy tắc tổng hợp tài chính theo tháng:** Khi tính tổng chi phí (`tong_tien`) và tiền BHYT chi trả (`tien_bhyt`), hệ thống luôn gom nhóm và tính dựa trên **số ca bệnh duy nhất (`MA_LK`)**, không tính lặp theo dòng lỗi (một ca bệnh có thể phát sinh nhiều dòng lỗi khác nhau nhưng số tiền chỉ được tính một lần cho ca bệnh đó).
 
 Trạng thái `Record.status`:
 

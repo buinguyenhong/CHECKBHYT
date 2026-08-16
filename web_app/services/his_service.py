@@ -354,6 +354,14 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
         op["Tên khoa"] = s_ten_khoa.apply(clean_khoa)
         op["Mã y tế"] = get_col_series(df_op, ["ma_bn", "SoPhieuThanhToanNgoaiTru"]).fillna("")
         op["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_op, ["NgayRa", "ngay_ra"]))
+        op["Tổng cộng"] = pd.to_numeric(
+            get_col_series(df_op, ["Tongcong", "tongcong", "TongCong", "tong_tien", "TongTien", "tong_cong", "Tổng cộng", "TỔNG CỘNG"], default_val=0),
+            errors="coerce"
+        ).fillna(0.0)
+        op["Tiền BHYT"] = pd.to_numeric(
+            get_col_series(df_op, ["QuyBHYT_ChiTra", "quybhyt_chitra", "QuyBHYTChiTra", "tien_bhyt", "TienBHYT", "quy_bhyt_chi_tra", "Tiền BHYT", "TIỀN BHYT"], default_val=0),
+            errors="coerce"
+        ).fillna(0.0)
 
     ip = pd.DataFrame()
     if not df_ip.empty:
@@ -365,16 +373,25 @@ def normalize_sql_list(df_op: pd.DataFrame, df_ip: pd.DataFrame) -> pd.DataFrame
         ip["Tên khoa"] = get_col_series(df_ip, ["khoadieutri", "ten_khoa"]).fillna("")
         ip["Mã y tế"] = get_col_series(df_ip, ["ma_bn"]).fillna("")
         ip["Ngày ra viện"] = parse_datetime_to_date(get_col_series(df_ip, ["NgayRa", "ngay_ra"]))
+        ip["Tổng cộng"] = pd.to_numeric(
+            get_col_series(df_ip, ["Tongcong", "tongcong", "TongCong", "tong_tien", "TongTien", "tong_cong", "Tổng cộng", "TỔNG CỘNG"], default_val=0),
+            errors="coerce"
+        ).fillna(0.0)
+        ip["Tiền BHYT"] = pd.to_numeric(
+            get_col_series(df_ip, ["QuyBHYT_ChiTra", "quybhyt_chitra", "QuyBHYTChiTra", "tien_bhyt", "TienBHYT", "quy_bhyt_chi_tra", "Tiền BHYT", "TIỀN BHYT"], default_val=0),
+            errors="coerce"
+        ).fillna(0.0)
 
     out = pd.concat([op, ip], ignore_index=True)
+    cols = ["Loại ca", "MA_LK", "Họ tên", "Mã thẻ", "Tên khoa", "Mã y tế", "Ngày ra viện", "Tổng cộng", "Tiền BHYT"]
     if out.empty:
-        return pd.DataFrame(columns=["Loại ca", "MA_LK", "Họ tên", "Mã thẻ", "Tên khoa", "Mã y tế", "Ngày ra viện"])
+        return pd.DataFrame(columns=cols)
 
     out = out[out["MA_LK"].astype(str).str.len() > 0]
     out["MA_LK"] = out["MA_LK"].apply(chuan_hoa_ma_lk)
     out = out.drop_duplicates(subset=["MA_LK"], keep="first")
 
-    return out[["Loại ca", "MA_LK", "Họ tên", "Mã thẻ", "Tên khoa", "Mã y tế", "Ngày ra viện"]].copy()
+    return out[cols].copy()
 
 def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=None) -> pd.DataFrame:
     """
