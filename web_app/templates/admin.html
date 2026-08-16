@@ -2442,7 +2442,14 @@
                 body: JSON.stringify({ from_date: fromDate, to_date: toDate })
             });
 
-            const data = await res.json();
+            let data;
+            const text = await res.text();
+            try {
+                data = JSON.parse(text);
+            } catch {
+                data = { status: 'error', detail: text || `Lỗi máy chủ HTTP ${res.status}` };
+            }
+
             if (res.ok && data.status === 'success') {
                 logToConsole(`Tự động hóa ${flowLabel} HOÀN TẤT THÀNH CÔNG! ✅`);
                 alert(`Thành công! ${data.message || 'Đối soát hoàn tất.'}`);
@@ -2453,13 +2460,15 @@
                 if (activeTab === 'review') loadUnlockDeptList();
                 if (activeTab === 'reports') fetchDeptReport();
             } else {
-                logToConsole(`LỖI: ${data.detail || 'Không thể thực thi tự động hóa'}`);
-                alert(`Lỗi thực thi: ${data.detail || 'Không rõ nguyên nhân'}`);
+                const errMsg = data.detail || (typeof data === 'string' ? data : 'Không thể thực thi tự động hóa');
+                logToConsole(`LỖI: ${errMsg}`);
+                alert(`Lỗi thực thi: ${errMsg}`);
             }
         } catch (e) {
             logToConsole(`Lỗi kết nối khi chạy tự động hóa: ${e.message}`);
             alert(`Lỗi kết nối máy chủ: ${e.message}`);
         } finally {
+
             btn.disabled = false;
             btn.innerHTML = originalText;
             setTimeout(() => {

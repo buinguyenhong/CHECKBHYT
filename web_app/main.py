@@ -5,7 +5,7 @@ import base64
 import asyncio
 from io import BytesIO
 from fastapi import FastAPI, Depends, Request, Response, Form, UploadFile, File, HTTPException, status, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -1105,9 +1105,12 @@ async def run_automation_flow_b(
             "compare_result": compare_res,
             "message": "Đã tự động tải Danh sách đã gửi và hoàn thành Đối soát B!"
         }
+    except HTTPException as he:
+        add_portal_log(f"LỖI LUỒNG B: {he.detail}")
+        return JSONResponse(status_code=he.status_code, content={"status": "error", "detail": he.detail})
     except Exception as e:
         add_portal_log(f"LỖI LUỒNG B: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi thực thi Luồng B: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "detail": f"Lỗi thực thi Luồng B: {str(e)}"})
 
 
 @app.post("/api/automation/flow-c")
@@ -1162,9 +1165,13 @@ async def run_automation_flow_c(
             "compare_result": compare_res,
             "message": msg
         }
+    except HTTPException as he:
+        add_portal_log(f"LỖI LUỒNG C: {he.detail}")
+        return JSONResponse(status_code=he.status_code, content={"status": "error", "detail": he.detail})
     except Exception as e:
         add_portal_log(f"LỖI LUỒNG C: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi thực thi Luồng C: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "detail": f"Lỗi thực thi Luồng C: {str(e)}"})
+
 
 
 

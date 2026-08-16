@@ -149,7 +149,19 @@ class PortalAutomationService:
         with sync_playwright() as p:
             # Khởi chạy trình duyệt headed để hiển thị cho người dùng thao tác captcha nếu cần
             storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
-            browser = p.chromium.launch(headless=False)
+            try:
+                browser = p.chromium.launch(headless=False)
+            except Exception as launch_err:
+                err_str = str(launch_err)
+                if "Executable doesn't exist" in err_str or "playwright install" in err_str:
+                    log("Chưa cài đặt trình duyệt Chromium cho Playwright trên máy chủ!")
+                    raise Exception("Trình duyệt Chromium chưa được cài đặt trên máy chủ. Vui lòng chạy lệnh: playwright install chromium (hoặc bấm 'Cài riêng Chromium' trên tool LaunchWebBHYT).")
+                try:
+                    log(f"Thử khởi chạy Chromium chế độ ngầm (headless): {launch_err}")
+                    browser = p.chromium.launch(headless=True)
+                except Exception as h_err:
+                    raise Exception(f"Không thể khởi chạy trình duyệt Chromium: {h_err}")
+
             context = browser.new_context(
                 storage_state=storage_path,
                 viewport={'width': 1366, 'height': 768},
@@ -160,6 +172,7 @@ class PortalAutomationService:
             try:
                 # 1. Đảm bảo đã đăng nhập
                 self._ensure_login(page, log_func=log)
+
 
                 # 2. Điều hướng vào menu Danh sách đề nghị thanh toán
                 log("Đang điều hướng đến: Danh sách đề nghị thanh toán...")
@@ -283,7 +296,19 @@ class PortalAutomationService:
 
         with sync_playwright() as p:
             storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
-            browser = p.chromium.launch(headless=False)
+            try:
+                browser = p.chromium.launch(headless=False)
+            except Exception as launch_err:
+                err_str = str(launch_err)
+                if "Executable doesn't exist" in err_str or "playwright install" in err_str:
+                    log("Chưa cài đặt trình duyệt Chromium cho Playwright trên máy chủ!")
+                    raise Exception("Trình duyệt Chromium chưa được cài đặt trên máy chủ. Vui lòng chạy lệnh: playwright install chromium (hoặc bấm 'Cài riêng Chromium' trên tool LaunchWebBHYT).")
+                try:
+                    log(f"Thử khởi chạy Chromium chế độ ngầm (headless): {launch_err}")
+                    browser = p.chromium.launch(headless=True)
+                except Exception as h_err:
+                    raise Exception(f"Không thể khởi chạy trình duyệt Chromium: {h_err}")
+
             context = browser.new_context(
                 storage_state=storage_path,
                 viewport={'width': 1366, 'height': 768},
@@ -294,6 +319,7 @@ class PortalAutomationService:
             try:
                 # 1. Đảm bảo đã đăng nhập
                 self._ensure_login(page, log_func=log)
+
 
                 # 2. Điều hướng vào menu: Hồ sơ đề nghị thanh toán -> Hồ sơ XML -> Quyết định 3176/QĐ-BYT -> Kết quả gửi hồ sơ XML
                 log("Đang điều hướng cố định theo 4 bước: Hồ sơ đề nghị thanh toán > Hồ sơ XML > QĐ 3176 > Kết quả gửi hồ sơ XML...")
