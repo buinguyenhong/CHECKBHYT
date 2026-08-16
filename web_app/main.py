@@ -17,6 +17,7 @@ from auth import (
     hash_password, verify_password, get_current_user, require_admin, SESSION_COOKIE_NAME
 )
 from services import his_service, excel_service, compare_service
+from services.portal_automation import portal_service, portal_logs, add_portal_log
 
 # ==========================================
 # XOR CRYPTOGRAPHY FOR HIS DB PASSWORD
@@ -301,6 +302,18 @@ try:
             conn.execute(text("ALTER TABLE error_history_archive ADD COLUMN tong_tien FLOAT DEFAULT 0.0;"))
         if "tien_bhyt" not in cols_arch:
             conn.execute(text("ALTER TABLE error_history_archive ADD COLUMN tien_bhyt FLOAT DEFAULT 0.0;"))
+
+        res_cfg = conn.execute(text("PRAGMA table_info(app_config);")).fetchall()
+        cols_cfg = [r[1] for r in res_cfg]
+        if "portal_url" not in cols_cfg:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN portal_url VARCHAR DEFAULT 'https://gdbhyt.baohiemxahoi.gov.vn/';"))
+        if "portal_ma_cskcb" not in cols_cfg:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN portal_ma_cskcb VARCHAR DEFAULT '66232';"))
+        if "portal_username" not in cols_cfg:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN portal_username VARCHAR DEFAULT '066091019320';"))
+        if "portal_password" not in cols_cfg:
+            conn.execute(text("ALTER TABLE app_config ADD COLUMN portal_password VARCHAR DEFAULT 'Nguyenhong123@';"))
+
         conn.commit()
 except Exception as e:
     print(f"[*] [Migration warning] {str(e)}")
@@ -1035,6 +1048,126 @@ async def upload_loi(
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Lỗi đọc file Excel HoSoLoiChiTiet: {str(e)}")
+
+
+# ==========================================
+# API: BHYT PORTAL RPA AUTOMATION (PLAYWRIGHT)
+# ==========================================
+
+@app.get("/api/automation/logs")
+def get_automation_logs(user: User = Depends(require_admin)):
+    """Lấy danh sách log tiến trình tự động hóa Cổng BHYT thời gian thực"""
+    return {"logs": portal_logs[-60:]}
+
+
+@app.post("/api/automation/flow-b")
+async def run_automation_flow_b(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Kích hoạt Luồng B: Tự động đăng nhập Cổng BHYT, tải listbh.xlsx và kích hoạt Đối soát B (tìm ca FAIL).
+    """
+    from_date = data.get("from_date", "").strip()
+    to_date = data.get("to_date", "").strip()
+    if not from_date or not to_date:
+        raise HTTPException(status_code=400, detail="Vui lòng chọn khoảng ngày đối soát (Từ ngày - Đến ngày).")
+
+    # Cập nhật thông tin đăng nhập từ CSDL nếu có
+    cfg = db.query(AppConfig).first()
+    if cfg:
+        portal_service.update_config(
+            base_url=cfg.portal_url or "https://gdbhyt.baohiemxahoi.gov.vn/",
+            ma_cskcb=cfg.portal_ma_cskcb or "66232",
+            username=cfg.portal_username or "066091019320",
+            password=cfg.portal_password or "Nguyenhong123@"
+        )
+
+    try:
+        add_portal_log(f"--- BẮT ĐẦU LUỒNG B (ĐỐI SOÁT B) TỪ {from_date} ĐẾN {to_date} ---")
+        # Chạy Playwright Sync trong thread riêng để không bị xung đột với Asyncio Event Loop của FastAPI
+        result = await asyncio.to_thread(portal_service.run_flow_b, from_date, to_date, add_portal_log)
+        
+        # Tự động gọi đối soát B với CSDL HIS
+        add_portal_log("Tải file listbh.xlsx thành công. Đang kích hoạt Đối soát B với CSDL HIS...")
+        clean_from = from_date.replace('-', '').replace('/', '')
+        clean_to = to_date.replace('-', '').replace('/', '')
+        
+        # Gọi engine đối soát
+        compare_res = compare_records(clean_from, clean_to, include_errors=False, user=user, db=db)
+        add_portal_log("Đối soát B hoàn tất thành công! ✅")
+        
+        return {
+            "status": "success",
+            "flow": "B",
+            "portal_result": result,
+            "compare_result": compare_res,
+            "message": "Đã tự động tải Danh sách đã gửi và hoàn thành Đối soát B!"
+        }
+    except Exception as e:
+        add_portal_log(f"LỖI LUỒNG B: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi thực thi Luồng B: {str(e)}")
+
+
+@app.post("/api/automation/flow-c")
+async def run_automation_flow_c(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Kích hoạt Luồng C: Tự động cào Danh sách lỗi từ QĐ 3176, gom thành HoSoLoiChiTiet.xlsx và kích hoạt Đối soát C.
+    """
+    from_date = data.get("from_date", "").strip()
+    to_date = data.get("to_date", "").strip()
+    if not from_date or not to_date:
+        raise HTTPException(status_code=400, detail="Vui lòng chọn khoảng ngày đối soát (Từ ngày - Đến ngày).")
+
+    cfg = db.query(AppConfig).first()
+    if cfg:
+        portal_service.update_config(
+            base_url=cfg.portal_url or "https://gdbhyt.baohiemxahoi.gov.vn/",
+            ma_cskcb=cfg.portal_ma_cskcb or "66232",
+            username=cfg.portal_username or "066091019320",
+            password=cfg.portal_password or "Nguyenhong123@"
+        )
+
+    try:
+        add_portal_log(f"--- BẮT ĐẦU LUỒNG C (ĐỐI SOÁT C) TỪ {from_date} ĐẾN {to_date} ---")
+        # Chạy Playwright Sync trong thread riêng để không bị xung đột với Asyncio Event Loop của FastAPI
+        result = await asyncio.to_thread(portal_service.run_flow_c, from_date, to_date, add_portal_log)
+        
+        total_errs = result.get("total_errors", 0)
+        clean_from = from_date.replace('-', '').replace('/', '')
+        clean_to = to_date.replace('-', '').replace('/', '')
+
+        if total_errs == 0:
+            add_portal_log("Không tìm thấy gói hồ sơ có lỗi nào trên Cổng BHYT trong khoảng ngày này.")
+            # Chạy đối soát không kèm lỗi
+            compare_res = compare_records(clean_from, clean_to, include_errors=False, user=user, db=db)
+            add_portal_log("Đối soát hoàn tất! Không có lỗi chi tiết nào cần xử lý. ✅")
+            msg = "Cổng BHYT không có gói lỗi nào trong khoảng ngày này. Đã hoàn tất đối soát danh sách!"
+        else:
+            # Tự động gọi đối soát C (kèm file lỗi chi tiết) với CSDL HIS
+            add_portal_log(f"Tổng hợp {total_errs} dòng lỗi chi tiết thành công. Đang kích hoạt Đối soát C...")
+            compare_res = compare_records(clean_from, clean_to, include_errors=True, user=user, db=db)
+            add_portal_log("Đối soát C hoàn tất thành công! ✅")
+            msg = f"Đã tự động tải {total_errs} dòng lỗi chi tiết và hoàn thành Đối soát C!"
+        
+        return {
+            "status": "success",
+            "flow": "C",
+            "portal_result": result,
+            "compare_result": compare_res,
+            "message": msg
+        }
+    except Exception as e:
+        add_portal_log(f"LỖI LUỒNG C: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi thực thi Luồng C: {str(e)}")
+
+
+
 
 
 # ==========================================

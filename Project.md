@@ -236,7 +236,7 @@ SQLite lưu trạng thái vận hành của webapp, không thay thế SQL Server
 Các bảng chính:
 
 - `users`: tài khoản admin/khoa.
-- `app_config`: cấu hình kết nối SQL Server HIS, SP, tự đồng bộ.
+- `app_config`: cấu hình kết nối SQL Server HIS, SP, tự đồng bộ, và thông tin đăng nhập tự động hóa Cổng BHYT (`portal_url`, `portal_ma_cskcb`, `portal_username`, `portal_password`).
 - `records`: hồ sơ đối soát và trạng thái xử lý hiện tại (gồm `ma_lk`, `ho_ten`, `ma_the`, `ten_khoa`, `loai_ca`, `ngay_ra_vien`, `tong_tien`, `tien_bhyt`, `maloi`, `motaloi`, `type_group`, `status`, `note`, `unlock_status`).
 - `record_logs`: nhật ký lịch sử thay đổi trạng thái/ghi chú từng ca.
 - `error_definitions`: danh mục hướng dẫn lỗi theo `MALOI` và từ khóa trong `MOTALOI`.
@@ -337,6 +337,29 @@ Hiện file được lưu cố định:
 Nếu upload lại, file cũ bị ghi đè.
 
 Khi upload file lỗi, hệ thống còn cố gắng ghép ngay vào ngày đối soát gần nhất đang có trong SQLite và chuyển các record tương ứng sang nhóm `LOI`.
+
+### 8.4.1. Module Tự động hóa Cổng BHYT Bán tự động (Playwright RPA)
+
+Hệ thống tích hợp module RPA (`web_app/services/portal_automation.py`) dựa trên Playwright để tự động hóa 2 luồng độc lập:
+
+1. **Luồng B (Đối soát B - Danh sách đã gửi)**:
+   - Tự động mở trình duyệt Chromium, tự điền Mã CSKCB, Tên đăng nhập, Mật khẩu. Người dùng chỉ cần gõ mã Captcha (hoặc tự động bỏ qua nếu session cookie `portal_storage_state.json` còn hiệu lực).
+   - Điều hướng tới `Hồ sơ XML -> Danh sách đề nghị thanh toán`.
+   - Chọn trạng thái `Đã đề nghị thanh toán`, bấm `Tìm kiếm`.
+   - Kích hoạt `Xuất Excel`, lưu tự động về `uploaded_files/listbh.xlsx`.
+   - Tự động kích hoạt đối soát B với CSDL HIS để tìm các ca FAIL và sinh câu lệnh SQL reset.
+
+2. **Luồng C (Đối soát C - Danh sách lỗi chi tiết)**:
+   - Tự động điều hướng tới `Hồ sơ XML -> Quyết định 3176/QĐ-BYT -> Kết quả gửi hồ sơ XML`.
+   - Lọc theo khoảng ngày và hiển thị 100 bản ghi/trang, lọc các gói có lỗi.
+   - Duyệt qua từng trang, click mở chi tiết từng gói lỗi và xuất file Excel lỗi chi tiết về thư mục tạm `uploaded_files/temp_errors/`.
+   - Tự động gom toàn bộ các file Excel thành 1 file duy nhất `uploaded_files/HoSoLoiChiTiet.xlsx` theo đúng cấu trúc chuẩn.
+   - Tự động kích hoạt đối soát C (kèm file lỗi chi tiết) với CSDL HIS để phân loại lỗi, phân khoa phòng và lưu trữ vĩnh viễn vào `error_history_archive`.
+
+API liên quan:
+- `POST /api/automation/flow-b`
+- `POST /api/automation/flow-c`
+- `GET /api/automation/logs`
 
 ### 8.5. Chạy đồng bộ và đối soát thủ công
 

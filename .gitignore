@@ -41,3 +41,6 @@ web_app/uploaded_files/
 web_app/xml_validator/Input/
 web_app/xml_validator/Output/
 web_app/xml_validator/validator.log
+
+# Browser automation session (cookies / storage state)
+web_app/browser_session/

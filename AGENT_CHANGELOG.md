@@ -56,6 +56,32 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-16 14:55 - Antigravity (Tính năng & Tự động hóa: Module Bán tự động Tải Cổng BHYT Luồng B & Luồng C bằng Playwright RPA)
+
+### Mục tiêu
+- Tích hợp công cụ tự động hóa trình duyệt (Playwright RPA) bán tự động với Cổng giám định BHYT (`https://gdbhyt.baohiemxahoi.gov.vn/`).
+- Tự động hóa độc lập 2 luồng:
+  - **Luồng B (Đối soát B)**: Tự động đăng nhập (tái sử dụng session / tự điền user/pass, user chỉ gõ captcha nếu cần) -> vào menu "Danh sách đề nghị thanh toán" -> chọn trạng thái "Đã đề nghị thanh toán" -> tìm kiếm -> xuất file Excel `listbh.xlsx` -> nạp vào hệ thống và tự động kích hoạt đối soát B với CSDL HIS.
+  - **Luồng C (Đối soát C)**: Tự động vào menu "Kết quả gửi hồ sơ XML (QĐ 3176)" -> lọc danh sách gói có lỗi -> duyệt qua từng trang và click tải chi tiết từng gói lỗi -> gom toàn bộ thành file Excel `HoSoLoiChiTiet.xlsx` -> nạp vào hệ thống và tự động kích hoạt đối soát C.
+
+### Thay đổi
+- `requirements.txt` [MODIFY]: Bổ sung thư viện `playwright`.
+- `web_app/models.py` [MODIFY]: Bổ sung các trường `portal_url`, `portal_ma_cskcb`, `portal_username`, `portal_password` vào bảng `AppConfig`.
+- `web_app/services/portal_automation.py` [NEW]: Module xử lý `PortalAutomationService` (thực thi Playwright, lưu `portal_storage_state.json`, tải `listbh.xlsx` cho Luồng B, cào/tải và gom `HoSoLoiChiTiet.xlsx` cho Luồng C, quản lý log thời gian thực).
+- `web_app/main.py` [MODIFY]:
+  - Thêm auto-migration `app_config` khi khởi động server.
+  - Thêm endpoints `/api/automation/flow-b`, `/api/automation/flow-c`, `/api/automation/logs`.
+- `web_app/templates/admin.html` [MODIFY]: Thêm khu vực "🤖 Tự động hóa Bán tự động với Cổng BHYT" trên Tab 1 với 2 nút bấm Luồng B & Luồng C, kết nối API và truyền log tiến trình thời gian thực vào bảng Log Console.
+- `scratch/test_portal_automation_logic.py` [NEW]: Kịch bản kiểm thử độc lập cho logic gom file Excel và cấu hình service.
+
+### Nghiệp vụ ảnh hưởng
+- Người dùng không còn phải tải thủ công từng file từ Cổng BHYT rồi kéo thả vào phần mềm. Mọi thao tác từ đăng nhập, chọn trạng thái, xuất file, tải từng gói lỗi, gom file Excel và kích hoạt đối soát đều được thực hiện chỉ với 1 click chuột.
+- Luồng B và Luồng C hoàn toàn tách biệt, có thể chạy độc lập nhiều lần trong ngày.
+
+### Kiểm tra
+- Chạy kịch bản `scratch/test_portal_automation_logic.py` đạt 100% OK.
+- Đã cài đặt hoàn tất `playwright` và `chromium` trong môi trường runtime.
+
 ## 2026-08-16 08:15 - Antigravity (Tính năng: Tích hợp Tổng hợp Tài chính Tongcong & QuyBHYT_ChiTra theo số ca bệnh)
 
 ### Mục tiêu

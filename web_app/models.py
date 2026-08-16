@@ -36,6 +36,12 @@ class AppConfig(Base):
     last_fail = Column(Integer, default=0)
     last_resolved = Column(Integer, default=0)
 
+    # Cấu hình tự động hóa Cổng BHYT (Playwright RPA)
+    portal_url = Column(String, default="https://gdbhyt.baohiemxahoi.gov.vn/")
+    portal_ma_cskcb = Column(String, default="66232")
+    portal_username = Column(String, default="066091019320")
+    portal_password = Column(String, default="Nguyenhong123@")
+
 class Record(Base):
     __tablename__ = "records"
 

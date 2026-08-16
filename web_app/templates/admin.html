@@ -1029,9 +1029,31 @@
                 </label>
             </div>
 
+            <!-- AUTOMATION RPA SECTION -->
+            <div style="margin-bottom:20px; padding:16px 20px; background:linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%); border:1px solid rgba(139, 92, 246, 0.3); border-radius:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+                    <div>
+                        <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <span>🤖</span> Tự động hóa Bán tự động với Cổng BHYT (Playwright RPA)
+                        </h3>
+                        <span style="font-size:12.5px; color:var(--text-secondary); display:block; margin-top:3px;">
+                            Tự động đăng nhập, tải danh sách và thực thi đối soát độc lập mà không cần thao tác thủ công.
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:9px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(37,99,235,0.3);" id="btnAutoFlowB" onclick="runPortalAutomation('B')">
+                            <span>📥</span> Tự động tải DS đã gửi &amp; Đối soát B
+                        </button>
+                        <button class="btn" style="background:#8b5cf6; color:#fff; font-weight:700; padding:9px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(139,92,246,0.3);" id="btnAutoFlowC" onclick="runPortalAutomation('C')">
+                            <span>⚠️</span> Tự động tải DS lỗi &amp; Đối soát C
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
                 <div style="display:flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                    <button class="btn btn-success" style="padding:12px 24px;" id="btnStartSync" onclick="runComparison()">Bước 2: Đối soát SQL HIS với listbh</button>
+                    <button class="btn btn-success" style="padding:12px 24px;" id="btnStartSync" onclick="runComparison()">Bước 2: Đối soát Thủ công (với file đã nạp)</button>
                     
                     <div id="syncResetActions" style="display:flex; gap:10px; align-items:center; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.15); padding:8px 16px; border-radius:8px; flex-wrap:wrap;">
                         <span style="font-weight:700; color:var(--primary); font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">Bước 3: Có ca FAIL, tạo SQL reset HIS</span>
@@ -2365,6 +2387,87 @@
             }
         } catch (e) {
             console.error("Lỗi kiểm tra trạng thái đối soát khi tải trang:", e);
+        }
+    }
+
+    let autoLogInterval = null;
+
+    // Trigger Playwright Portal Automation for Flow B and Flow C
+    async function runPortalAutomation(flowType) {
+        const fromDate = document.getElementById('sync_from').value;
+        const toDate = document.getElementById('sync_to').value;
+
+        if (!fromDate || !toDate) {
+            alert("Vui lòng chọn khoảng ngày đối soát (Từ ngày - Đến ngày) trước khi kích hoạt tự động hóa!");
+            return;
+        }
+
+        const flowLabel = flowType === 'B' ? 'Luồng B (Tải DS đã gửi & Đối soát B)' : 'Luồng C (Tải DS lỗi chi tiết & Đối soát C)';
+        const endpoint = flowType === 'B' ? '/api/automation/flow-b' : '/api/automation/flow-c';
+        const btn = document.getElementById(flowType === 'B' ? 'btnAutoFlowB' : 'btnAutoFlowC');
+        const originalText = btn.innerHTML;
+
+        if (!confirm(`Bạn có chắc muốn kích hoạt ${flowLabel} cho khoảng ngày ${fromDate} đến ${toDate}?\n\nTrình duyệt sẽ tự động mở lên. Nếu cần nhập CAPTCHA, bạn chỉ cần gõ mã trên màn hình trình duyệt.`)) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = `<span>⏳</span> Đang chạy ${flowType}...`;
+        logToConsole(`=== BẮT ĐẦU TỰ ĐỘNG HÓA CỔNG BHYT: ${flowLabel} ===`);
+
+        // Bắt đầu theo dõi logs tự động hóa
+        if (autoLogInterval) clearInterval(autoLogInterval);
+        let lastLogCount = 0;
+
+        autoLogInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/automation/logs');
+                if (res.ok) {
+                    const data = await res.json();
+                    const logs = data.logs || [];
+                    if (logs.length > lastLogCount) {
+                        for (let i = lastLogCount; i < logs.length; i++) {
+                            logToConsole(logs[i]);
+                        }
+                        lastLogCount = logs.length;
+                    }
+                }
+            } catch (e) {}
+        }, 1500);
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ from_date: fromDate, to_date: toDate })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                logToConsole(`Tự động hóa ${flowLabel} HOÀN TẤT THÀNH CÔNG! ✅`);
+                alert(`Thành công! ${data.message || 'Đối soát hoàn tất.'}`);
+                updateGlobalKPIs();
+                if (activeTab === 'sql_data') fetchSqlData();
+                if (activeTab === 'loi') fetchLoiRecords();
+                if (activeTab === 'fail') fetchFailRecords();
+                if (activeTab === 'review') loadUnlockDeptList();
+                if (activeTab === 'reports') fetchDeptReport();
+            } else {
+                logToConsole(`LỖI: ${data.detail || 'Không thể thực thi tự động hóa'}`);
+                alert(`Lỗi thực thi: ${data.detail || 'Không rõ nguyên nhân'}`);
+            }
+        } catch (e) {
+            logToConsole(`Lỗi kết nối khi chạy tự động hóa: ${e.message}`);
+            alert(`Lỗi kết nối máy chủ: ${e.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            setTimeout(() => {
+                if (autoLogInterval) {
+                    clearInterval(autoLogInterval);
+                    autoLogInterval = null;
+                }
+            }, 3000);
         }
     }
 
