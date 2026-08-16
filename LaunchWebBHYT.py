@@ -252,10 +252,10 @@ class BHYTLauncher:
         )
         ent_port.pack(anchor=tk.W, pady=(0, 20), ipady=6)
         
-        # Step 2: Install requirements
+        # Step 2: Install requirements & Playwright
         lbl_step2 = tk.Label(
             self.frame_install, 
-            text="BƯỚC 2: TỰ ĐỘNG CÀI ĐẶT THƯ VIỆN PHỤ THUỘC (DEPENDENCIES)", 
+            text="BƯỚC 2: TỰ ĐỘNG CÀI ĐẶT THƯ VIỆN & TRÌNH DUYỆT RPA (DEPENDENCIES)", 
             font=("Segoe UI", 9, "bold"), 
             bg=self.card_bg, 
             fg=self.text_sec
@@ -264,18 +264,21 @@ class BHYTLauncher:
         
         lbl_step2_sub = tk.Label(
             self.frame_install, 
-            text="Hệ thống sẽ chạy ngầm lệnh 'pip install -r requirements.txt' để tải tất cả thư viện cần thiết phục vụ vận hành ngoại tuyến (offline LAN).", 
+            text="Hệ thống sẽ chạy ngầm lệnh 'pip install -r requirements.txt' và 'playwright install chromium' để tải tất cả thư viện backend và trình duyệt tự động hóa Cổng BHYT.", 
             font=("Segoe UI", 9), 
             bg=self.card_bg, 
             fg=self.text_sec,
             justify=tk.LEFT,
             wraplength=500
         )
-        lbl_step2_sub.pack(anchor=tk.W, pady=(0, 15))
+        lbl_step2_sub.pack(anchor=tk.W, pady=(0, 12))
         
+        btn_setup_frame = tk.Frame(self.frame_install, bg=self.card_bg)
+        btn_setup_frame.pack(fill=tk.X, pady=(0, 10))
+
         self.btn_setup = tk.Button(
-            self.frame_install, 
-            text="Kích hoạt cài đặt thư viện (pip setup)", 
+            btn_setup_frame, 
+            text="Kích hoạt cài đặt thư viện & Chromium RPA", 
             command=self.run_setup_thread, 
             font=("Segoe UI", 10, "bold"), 
             bg=self.accent_blue, 
@@ -285,7 +288,21 @@ class BHYTLauncher:
             bd=0, 
             cursor="hand2"
         )
-        self.btn_setup.pack(fill=tk.X, ipady=10, pady=(0, 10))
+        self.btn_setup.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=10, padx=(0, 6))
+
+        self.btn_chromium = tk.Button(
+            btn_setup_frame, 
+            text="Cài riêng Chromium", 
+            command=self.run_install_chromium_thread, 
+            font=("Segoe UI", 9, "bold"), 
+            bg="#334155", 
+            fg=self.text_main, 
+            activebackground="#475569", 
+            activeforeground="white", 
+            bd=0, 
+            cursor="hand2"
+        )
+        self.btn_chromium.pack(side=tk.RIGHT, ipady=10, ipadx=8)
 
         # Khung chứa cửa sổ Log cài đặt
         log_frame = tk.Frame(self.frame_install, bg=self.card_bg)
@@ -425,8 +442,18 @@ class BHYTLauncher:
     def run_setup_thread(self):
         if not self.validate_inputs():
             return
-        self.btn_setup.configure(state=tk.DISABLED, text="Đang tải các thư viện...")
+        self.btn_setup.configure(state=tk.DISABLED, text="Đang tải các thư viện & Chromium...")
+        if hasattr(self, 'btn_chromium'):
+            self.btn_chromium.configure(state=tk.DISABLED)
         threading.Thread(target=self.run_setup, daemon=True).start()
+
+    def run_install_chromium_thread(self):
+        if not self.validate_inputs():
+            return
+        self.btn_setup.configure(state=tk.DISABLED)
+        if hasattr(self, 'btn_chromium'):
+            self.btn_chromium.configure(state=tk.DISABLED, text="Đang tải Chromium...")
+        threading.Thread(target=self.run_install_chromium, daemon=True).start()
 
     def append_log(self, text):
         self.txt_log.configure(state=tk.NORMAL)
@@ -439,12 +466,13 @@ class BHYTLauncher:
         try:
             self.root.after(0, lambda: self.txt_log.configure(state=tk.NORMAL))
             self.root.after(0, lambda: self.txt_log.delete("1.0", tk.END))
-            self.root.after(0, lambda: self.txt_log.insert(tk.END, ">>> Đang kết nối mạng và chuẩn bị cài đặt thư viện...\n"))
+            self.root.after(0, lambda: self.txt_log.insert(tk.END, ">>> [1/2] Đang cài đặt thư viện phụ thuộc (pip install -r requirements.txt)...\n"))
             self.root.after(0, lambda: self.txt_log.configure(state=tk.DISABLED))
 
-            cmd = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
-            process = subprocess.Popen(
-                cmd,
+            # Bước 1: pip install -r requirements.txt
+            cmd_pip = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
+            process_pip = subprocess.Popen(
+                cmd_pip,
                 cwd=folder,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -453,25 +481,95 @@ class BHYTLauncher:
             )
             
             while True:
-                line = process.stdout.readline()
+                line = process_pip.stdout.readline()
                 if not line:
                     break
                 self.root.after(0, lambda l=line: self.append_log(l))
                 
-            process.wait()
+            process_pip.wait()
             
-            if process.returncode == 0:
-                self.root.after(0, lambda: self.append_log("\n>>> CÀI ĐẶT THÀNH CÔNG! ✅\n"))
-                messagebox.showinfo("Thành công", "Cài đặt thành công toàn bộ thư viện dependencies BHYT! Chuyển sang Tab 2 để khởi chạy Server.")
+            if process_pip.returncode != 0:
+                self.root.after(0, lambda: self.append_log(f"\n>>> CÀI ĐẶT THƯ VIỆN THẤT BẠI! Mã lỗi: {process_pip.returncode} ❌\n"))
+                messagebox.showerror("Lỗi cài đặt", f"Cài đặt thư viện thất bại, vui lòng kiểm tra kết nối mạng máy tính. Mã lỗi: {process_pip.returncode}")
+                return
+
+            # Bước 2: playwright install chromium
+            self.root.after(0, lambda: self.append_log("\n>>> [2/2] Đang cài đặt trình duyệt tự động hóa Chromium (Playwright RPA)...\n"))
+            cmd_pw = [sys.executable, "-m", "playwright", "install", "chromium"]
+            process_pw = subprocess.Popen(
+                cmd_pw,
+                cwd=folder,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                creationflags=0x08000000
+            )
+
+            while True:
+                line = process_pw.stdout.readline()
+                if not line:
+                    break
+                self.root.after(0, lambda l=line: self.append_log(l))
+
+            process_pw.wait()
+
+            if process_pw.returncode == 0:
+                self.root.after(0, lambda: self.append_log("\n>>> CÀI ĐẶT THÀNH CÔNG TOÀN BỘ HỆ THỐNG & CHROMIUM RPA! ✅\n"))
+                messagebox.showinfo("Thành công", "Cài đặt thành công toàn bộ thư viện dependencies & Chromium Playwright RPA!\nChuyển sang Tab 2 để khởi chạy Server.")
                 self.root.after(0, lambda: self.switch_tab("sys"))
             else:
-                self.root.after(0, lambda: self.append_log(f"\n>>> CÀI ĐẶT THẤT BẠI! Mã lỗi: {process.returncode} ❌\n"))
-                messagebox.showerror("Lỗi cài đặt", f"Cài đặt thất bại, vui lòng kiểm tra kết nối mạng máy tính. Mã lỗi: {process.returncode}")
+                self.root.after(0, lambda: self.append_log(f"\n>>> CÀI ĐẶT CHROMIUM CÓ CẢNH BÁO! Mã lỗi: {process_pw.returncode}\n"))
+                messagebox.showwarning("Cảnh báo Chromium", "Đã cài xong thư viện Python nhưng cài đặt Chromium có cảnh báo. Bạn có thể bấm nút 'Cài riêng Chromium' để thử lại.")
+                self.root.after(0, lambda: self.switch_tab("sys"))
+
         except Exception as e:
             self.root.after(0, lambda: self.append_log(f"\n>>> LỖI HỆ THỐNG: {e}\n"))
             messagebox.showerror("Lỗi hệ thống", f"Không thể kích hoạt bộ cài: {e}")
         finally:
-            self.root.after(0, lambda: self.btn_setup.configure(state=tk.NORMAL, text="Kích hoạt cài đặt thư viện (pip setup)"))
+            self.root.after(0, lambda: self.btn_setup.configure(state=tk.NORMAL, text="Kích hoạt cài đặt thư viện & Chromium RPA"))
+            if hasattr(self, 'btn_chromium'):
+                self.root.after(0, lambda: self.btn_chromium.configure(state=tk.NORMAL, text="Cài riêng Chromium"))
+
+    def run_install_chromium(self):
+        folder = self.folder_path.get().strip()
+        try:
+            self.root.after(0, lambda: self.txt_log.configure(state=tk.NORMAL))
+            self.root.after(0, lambda: self.txt_log.delete("1.0", tk.END))
+            self.root.after(0, lambda: self.txt_log.insert(tk.END, ">>> Đang tải và cài đặt trình duyệt Chromium cho Playwright RPA...\n"))
+            self.root.after(0, lambda: self.txt_log.configure(state=tk.DISABLED))
+
+            cmd_pw = [sys.executable, "-m", "playwright", "install", "chromium"]
+            process_pw = subprocess.Popen(
+                cmd_pw,
+                cwd=folder,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                creationflags=0x08000000
+            )
+
+            while True:
+                line = process_pw.stdout.readline()
+                if not line:
+                    break
+                self.root.after(0, lambda l=line: self.append_log(l))
+
+            process_pw.wait()
+
+            if process_pw.returncode == 0:
+                self.root.after(0, lambda: self.append_log("\n>>> CÀI ĐẶT CHROMIUM THÀNH CÔNG! ✅\n"))
+                messagebox.showinfo("Thành công", "Đã cài đặt thành công trình duyệt Chromium Playwright!")
+            else:
+                self.root.after(0, lambda: self.append_log(f"\n>>> CÀI ĐẶT CHROMIUM THẤT BẠI! Mã lỗi: {process_pw.returncode} ❌\n"))
+                messagebox.showerror("Lỗi cài đặt", f"Không thể cài đặt Chromium. Mã lỗi: {process_pw.returncode}")
+        except Exception as e:
+            self.root.after(0, lambda: self.append_log(f"\n>>> LỖI HỆ THỐNG: {e}\n"))
+            messagebox.showerror("Lỗi hệ thống", f"Lỗi thực thi: {e}")
+        finally:
+            self.root.after(0, lambda: self.btn_setup.configure(state=tk.NORMAL, text="Kích hoạt cài đặt thư viện & Chromium RPA"))
+            if hasattr(self, 'btn_chromium'):
+                self.root.after(0, lambda: self.btn_chromium.configure(state=tk.NORMAL, text="Cài riêng Chromium"))
+
 
     def start_server_background(self):
         if not self.validate_inputs():
