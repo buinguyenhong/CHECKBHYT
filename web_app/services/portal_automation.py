@@ -353,60 +353,89 @@ class PortalAutomationService:
                 self.wait_portal_idle(page, timeout=45000)
                 time.sleep(1.5)
 
-                # 5. Xuất Excel và tải file (Click trực tiếp Cha -> Chờ Con -> Click trực tiếp Con)
+                # 5. Xuất Excel và tải file (Chỉ click vào mục con bên trong Popup Menu)
                 log("Đang kích hoạt Xuất Excel danh sách đã gửi (hỗ trợ tối đa 5 phút vào ngày cao điểm)...")
                 
-                # Bước 5.1: Click nút cha "Xuất Excel"
-                opened_export = False
-                export_selectors = [
+                # Bước 5.1: Click nút cha "Xuất Excel" để mở menu lựa chọn
+                log("Click nút cha 'Xuất Excel' để mở menu lựa chọn...")
+                export_btn_selectors = [
+                    "#HeaderMenu span:has-text('Xuất Excel')",
                     "#bt_XuatExcel_CD",
                     "#bt_XuatExcel",
                     ".dxbButton:has-text('Xuất Excel')",
-                    "span:has-text('Xuất Excel')",
-                    "td.dxb:has-text('Xuất Excel')"
+                    "td.dxb:has-text('Xuất Excel')",
+                    "span:has-text('Xuất Excel')"
                 ]
-                for x_sel in export_selectors:
+                for x_sel in export_btn_selectors:
                     try:
                         x_el = page.locator(x_sel).first
                         if x_el.is_visible(timeout=2000):
                             x_el.click(force=True)
-                            opened_export = True
-                            time.sleep(1.2)
+                            log(f"Đã click nút cha Xuất Excel ({x_sel}) ✅")
                             break
                     except Exception:
                         pass
                 
-                if not opened_export:
-                    page.evaluate("""() => {
-                        const els = Array.from(document.querySelectorAll('.dxbButton, span, td, div')).filter(e => e.textContent && e.textContent.trim().startsWith('Xuất Excel'));
-                        if (els.length > 0) els[0].click();
-                    }""")
-                    time.sleep(1.2)
+                time.sleep(1.2)
 
-                # Bước 5.2: Chờ và Click chính xác vào mục con "Xuất excel"
+                # Bước 5.2: Đợi menu popup hiển thị
+                try:
+                    page.wait_for_selector(".dxm-popup, div[id*='_DXME'], .dxm-shadow, table.dxm-item", timeout=5000)
+                except Exception:
+                    pass
+
+                # Bước 5.3: Click CHÍNH XÁC vào mục con TRONG POPUP MENU (loại trừ nút cha dưới nền)
+                log("Đang click vào mục 'Xuất excel' trong popup menu...")
                 with page.expect_download(timeout=300000) as download_info:
                     clicked_sub = False
-                    try:
-                        sub_items = page.locator("span, td, a").filter(has_text=re.compile(r"^Xuất excel$", re.IGNORECASE))
-                        if sub_items.count() > 0:
-                            sub_items.first.click(force=True)
-                            clicked_sub = True
-                    except Exception:
-                        pass
-
-                    if not clicked_sub:
+                    
+                    # Cách 1: Tìm trực tiếp bên trong container popup (.dxm-popup hoặc div[id*='_DXME'])
+                    popup_selectors = [
+                        ".dxm-popup .dxm-item",
+                        ".dxm-popup table.dxm-item",
+                        ".dxm-popup td.dxm-item",
+                        ".dxm-popup span",
+                        "div[id*='_DXME'] .dxm-item",
+                        "div[id*='_DXME'] span",
+                        ".dxm-shadow .dxm-item",
+                        ".dxm-shadow span"
+                    ]
+                    for p_sel in popup_selectors:
                         try:
-                            popup_item = page.locator(".dxm-popup span, .dxm-item span, tr.dxm-item span").filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE)).first
-                            popup_item.click(force=True)
-                            clicked_sub = True
-                        except Exception as ex:
-                            log(f"Lưu ý click popup item: {ex}")
+                            p_items = page.locator(p_sel).filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE))
+                            if p_items.count() > 0:
+                                p_items.first.click(force=True)
+                                clicked_sub = True
+                                log(f"Đã click mục con Xuất excel trong popup ({p_sel}) ✅")
+                                break
+                        except Exception:
+                            pass
 
+                    # Cách 2: JavaScript tìm đúng phần tử trong popup container đang hiển thị
                     if not clicked_sub:
-                        page.evaluate("""() => {
-                            const sub = Array.from(document.querySelectorAll('.dxm-popup span, .dxm-item span, span, a, td')).find(e => e.textContent && e.textContent.trim().toLowerCase() === 'xuất excel');
-                            if (sub) sub.click();
+                        clicked_sub = page.evaluate("""() => {
+                            const popups = Array.from(document.querySelectorAll('.dxm-popup, div[id*="_DXME"], .dxm-shadow, .dxm-subMenuItem'));
+                            for (const pop of popups) {
+                                if (pop.offsetParent !== null) {
+                                    const target = Array.from(pop.querySelectorAll('.dxm-item, span, td, a, tr')).find(e => e.textContent && e.textContent.trim().toLowerCase().includes('xuất excel'));
+                                    if (target) {
+                                        target.click();
+                                        return true;
+                                    }
+                                }
+                            }
+                            const allItems = Array.from(document.querySelectorAll('.dxm-popup span, .dxm-item span, .dxm-item, span, td, a')).filter(e => e.textContent && e.textContent.trim().toLowerCase() === 'xuất excel');
+                            if (allItems.length > 1) {
+                                allItems[allItems.length - 1].click();
+                                return true;
+                            } else if (allItems.length === 1) {
+                                allItems[0].click();
+                                return true;
+                            }
+                            return false;
                         }""")
+                        if clicked_sub:
+                            log("Đã click mục con Xuất excel qua JS popup locator ✅")
 
                 log("Cổng BHYT đã tạo tệp Excel xong! Đang tải về máy...")
                 download = download_info.value
