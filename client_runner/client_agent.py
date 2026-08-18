@@ -588,31 +588,41 @@ class ClientRPAGui:
                     except Exception: pass
 
                     # 3. LỌC THEO NGÀY: MỞ LỊCH TỪ NGÀY VÀ BẤM NÚT TODAY
-                    self.log("Đang chọn 'Từ ngày' bằng cách mở lịch và bấm nút Today...")
+                    self.log("Đang mở lịch 'Từ ngày' để bấm nút Today...")
                     
                     opened_tu_ngay = False
-                    tu_ngay_selectors = [
-                        "#deTuNgay_B-1Img",
-                        "#deTuNgay_B-1",
-                        "td:has-text('Từ ngày') ~ td .dxeButtonEditButton_EIS",
-                        "td:has-text('Từ ngày') ~ td img",
-                        "tr:has-text('Từ ngày') .dxeButtonEditButton_EIS",
-                        "tr:has-text('Từ ngày') img",
-                        "#deTuNgay_I",
-                        "#txtTuNgay_I",
-                        "input[name*='TuNgay']"
-                    ]
-                    for sel in tu_ngay_selectors:
-                        try:
-                            el = page.locator(sel).first
-                            if el.is_visible(timeout=2000):
-                                el.click()
-                                opened_tu_ngay = True
-                                self.log(f"Đã mở lịch Từ ngày ({sel}) ✅")
-                                time.sleep(0.6)
-                                break
-                        except Exception:
-                            pass
+                    try:
+                        opened_tu_ngay = page.evaluate("""() => {
+                            try {
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                if (cc) {
+                                    const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
+                                    if (deTu && typeof deTu.ShowDropDown === 'function') {
+                                        deTu.ShowDropDown();
+                                        return true;
+                                    }
+                                }
+                            } catch(e) {}
+                            return false;
+                        }""")
+                        if opened_tu_ngay:
+                            self.log("Đã mở popup lịch Từ ngày qua DevExpress ShowDropDown() ✅")
+                            time.sleep(0.8)
+                    except Exception:
+                        pass
+
+                    if not opened_tu_ngay:
+                        for sel in ["td:has-text('Từ ngày') ~ td img", "td:has-text('Từ ngày') ~ td .dxeButtonEditButton_EIS", "tr:has-text('Từ ngày') img", "tr:has-text('Từ ngày') .dxeButtonEditButton_EIS", "#deTuNgay_B-1Img", "#deTuNgay_B-1", "#deTuNgay_I", "#txtTuNgay_I", "input[name*='TuNgay']", "table[id*='TuNgay'] td[id*='B-1']"]:
+                            try:
+                                el = page.locator(sel).first
+                                if el.is_visible(timeout=1500):
+                                    el.click(force=True)
+                                    opened_tu_ngay = True
+                                    self.log(f"Đã mở lịch Từ ngày ({sel}) ✅")
+                                    time.sleep(0.8)
+                                    break
+                            except Exception:
+                                pass
 
                     if not opened_tu_ngay:
                         opened_tu_ngay = page.evaluate("""() => {
@@ -626,30 +636,35 @@ class ClientRPAGui:
                             }
                             return false;
                         }""")
-                        time.sleep(0.6)
+                        time.sleep(0.8)
 
                     # Bấm nút Today
                     self.log("Đang bấm nút 'Today' trên popup lịch...")
                     today_clicked = False
                     try:
-                        page.wait_for_selector(".dxbButton:has-text('Today'), span:has-text('Today'), td:has-text('Today'), button:has-text('Today'), #deTuNgay_DDD_C_BT", timeout=5000)
+                        page.wait_for_selector(".dxeCalendarTodayButton_EIS, td[id*='_BT'], table[id*='_BT'], .dxbButton:has-text('Today'), span:has-text('Today'), td:has-text('Today')", timeout=5000)
                     except Exception:
                         pass
 
-                    for t_sel in ["#deTuNgay_DDD_C_BT", ".dxbButton:has-text('Today')", "span:has-text('Today')", "button:has-text('Today')", "td:has-text('Today')"]:
+                    for t_sel in [".dxeCalendarTodayButton_EIS", "td[id*='_DDD_C_BT']", "table[id*='_DDD_C_BT']", "#deTuNgay_DDD_C_BT", ".dxbButton:has-text('Today')", "span:has-text('Today')", "td:has-text('Today')", "div:has-text('Today')", "button:has-text('Today')"]:
                         try:
                             t_btn = page.locator(t_sel).first
-                            if t_btn.is_visible(timeout=2000):
+                            if t_btn.is_visible(timeout=1500):
                                 t_btn.click(force=True)
                                 today_clicked = True
-                                self.log("Đã click nút 'Today' cho Từ ngày ✅")
+                                self.log(f"Đã click nút 'Today' ({t_sel}) ✅")
                                 break
                         except Exception:
                             pass
 
                     if not today_clicked:
                         today_clicked = page.evaluate("""() => {
-                            const btns = Array.from(document.querySelectorAll('span, button, td, div')).filter(el => el.textContent && el.textContent.trim() === 'Today');
+                            const todayBtn = document.querySelector('.dxeCalendarTodayButton_EIS, td[id*="_BT"], table[id*="_BT"]');
+                            if (todayBtn) {
+                                todayBtn.click();
+                                return true;
+                            }
+                            const btns = Array.from(document.querySelectorAll('span, button, td, div, a')).filter(el => el.textContent && el.textContent.trim().toLowerCase() === 'today');
                             for (const b of btns) {
                                 if (b.offsetParent !== null) {
                                     b.click();
