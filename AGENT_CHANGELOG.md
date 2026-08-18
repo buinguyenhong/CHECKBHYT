@@ -56,6 +56,19 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-18 20:15 - Antigravity (Quét & Cập nhật toàn bộ các loại lỗi mới từ thư mục XuatHoSoLoi vào Danh mục Hướng dẫn lỗi)
+
+### Mục tiêu
+- Đọc và phân tích toàn bộ các file báo cáo lỗi chi tiết trong thư mục `C:\Users\Admin\Downloads\XuatHoSoLoi (2)`.
+- Nhận diện các mẫu lỗi mới phát sinh (Mã lỗi XML, Thẻ dữ liệu/Keyword, Mô tả nguyên nhân) và nạp tự động vào bảng `error_definitions` trong CSDL `app_state.db` để người dùng chỉnh sửa hướng dẫn trên WebApp.
+
+### Thay đổi
+- `web_app/services/compare_service.py` [MODIFY]: Mở rộng danh sách `KEYWORDS` đầy đủ (hơn 50 thẻ trường XML quan trọng như `MA_BS_DOC_KQ`, `KET_LUAN`, `MA_BAC_SI`, `MA_THUOC`, `MA_VAT_TU`, `CAN_NANG`, `CHAN_DOAN_VAO`, `GT_THE_DEN`, `GT_THE_TU`, `MA_BENH_KT`, `MA_DKBD`, `MA_NOI_DEN`, `NGAY_TTOAN`, `SO_NGAY_DTRI`, `T_BNTT`, `MA_GIUONG`, `MA_NHOM`, `TEN_DICH_VU`, `THANH_TIEN_BH`, `THOI_DIEM_DBLS`, `NGOAITRU_TUNGAY`, `QT_BENHLY`, `LAN_SINH`, `MATINH_CU_TRU`, `MA_THE_TAM`, `NGAY_SINH_CON`, `SO_CCCD_NND`, `SO_CCCD`, `XML9`, `XML11`, `XML13`, v.v.) phục vụ đối soát và tự động phát hiện lỗi mới.
+- CSDL `app_state.db` [MODIFY]: Bổ sung 44 định nghĩa lỗi mới chưa từng có trong danh mục (nâng tổng số lên 67 định nghĩa lỗi).
+- `AGENT_CHANGELOG.md` & `Project.md` [MODIFY]: Đồng bộ tài liệu.
+
+---
+
 ## 2026-08-18 19:38 - Antigravity (Tích hợp Local Web Bridge: WebApp tự động nhận diện và điều khiển RPA trên Máy chủ hoặc Máy trạm)
 
 ### Mục tiêu

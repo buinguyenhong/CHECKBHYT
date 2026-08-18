@@ -230,7 +230,17 @@ def process_comparison(
     # Danh mục lỗi đã biết (cho việc tự động thu thập lỗi mới)
     from models import ErrorDefinition
     known_defs = {(ed.error_code, ed.keyword) for ed in db.query(ErrorDefinition).all()}
-    KEYWORDS = ["DIEN_BIEN_LS", "TOMTAT_KQ", "NGAY_TH_YL", "MA_TTDV", "PP_DIEUTRI", "MA_BENH_CHINh", "CHAN_DOAN_RV", "NAM_QT", "THANG_QT", "NGAY_RA", "NGUOI_THUC_HIEN", "MA_LOAI_KCB", "XML1", "XML2", "XML3", "XML4", "XML5", "XML7", "XML8"]
+    KEYWORDS = [
+        "DIEN_BIEN_LS", "TOMTAT_KQ", "NGAY_TH_YL", "MA_TTDV", "PP_DIEUTRI", 
+        "MA_BENH_CHINH", "MA_BENH_KT", "CHAN_DOAN_RV", "CHAN_DOAN_VAO", "NAM_QT", "THANG_QT", 
+        "NGAY_RA", "NGAY_VAO", "NGAY_YL", "NGAY_KQ", "NGAY_CT", "NGAY_TTOAN", "NGUOI_THUC_HIEN", 
+        "MA_LOAI_KCB", "MA_BS_DOC_KQ", "KET_LUAN", "MA_BAC_SI", "MA_THUOC", "MA_VAT_TU", 
+        "CAN_NANG", "GT_THE_DEN", "GT_THE_TU", "MA_DKBD", "MA_NOI_DEN", "SO_NGAY_DTRI", 
+        "T_BNTT", "T_BNCCT", "T_BHTT", "THANH_TIEN_BH", "MA_GIUONG", "MA_NHOM", "TEN_DICH_VU", 
+        "TT_THAU", "THOI_DIEM_DBLS", "NGOAITRU_TUNGAY", "QT_BENHLY", "LAN_SINH", "MATINH_CU_TRU", 
+        "MA_THE_TAM", "NGAY_SINH_CON", "SO_CCCD_NND", "SO_CCCD", "HO_TEN", "MA_THE", "MA_DICH_VU",
+        "XML1", "XML2", "XML3", "XML4", "XML5", "XML7", "XML8", "XML9", "XML11", "XML13"
+    ]
 
     # 3. Quét từng hồ sơ trong CSDL HIS
     for _, row in df_sql.iterrows():
