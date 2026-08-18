@@ -245,66 +245,73 @@ class PortalAutomationService:
                 self.wait_portal_idle(page)
                 time.sleep(1.0)
 
-                # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" (Đảm bảo chọn chắc chắn)
-                log("Đang lọc trạng thái: Đã đề nghị thanh toán...")
+                # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" (Sửa triệt để click chọn)
+                log("Đang chọn trạng thái: Đã đề nghị thanh toán...")
                 status_selected = False
+                
+                # Cách 1: Sử dụng DevExpress Client-Side API chính thức để chọn item và kích hoạt sự kiện
                 try:
-                    page.wait_for_selector("#cb_TrangThaiTT_I, #cb_TrangThaiTT_B-1, #cb_TrangThaiTT", timeout=10000)
-                    
-                    btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, #cb_TrangThaiTT_I").first
-                    if btn_cb.is_visible(timeout=5000):
-                        btn_cb.click()
-                        time.sleep(0.6)
-                        
-                        page.wait_for_selector("#cb_TrangThaiTT_DDD_L_LBT, tr.dxeListBoxItemRow_EIS, td.dxeListBoxItem_EIS, .dxeListBoxItem", timeout=5000)
-                        
-                        item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
-                        if item.is_visible(timeout=3000):
-                            item.click()
-                            status_selected = True
-                            log("Đã chọn trạng thái: 'Đã đề nghị thanh toán' qua giao diện dropdown ✅")
-                except Exception as e:
-                    log(f"Lưu ý click dropdown trạng thái: {e}")
-
-                # Fallback bằng DevExpress Client-Side API nếu chưa chọn được
-                if not status_selected:
-                    try:
-                        js_res = page.evaluate("""() => {
-                            try {
-                                if (window.cb_TrangThaiTT && typeof window.cb_TrangThaiTT.SetText === 'function') {
-                                    window.cb_TrangThaiTT.SetText('Đã đề nghị thanh toán');
-                                    if (typeof window.cb_TrangThaiTT.SetValue === 'function') {
-                                        window.cb_TrangThaiTT.SetValue('2');
-                                    }
-                                    return true;
-                                }
-                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                if (cc) {
-                                    const cb = cc.GetByName('cb_TrangThaiTT');
-                                    if (cb) {
-                                        cb.SetText('Đã đề nghị thanh toán');
+                    js_res = page.evaluate("""() => {
+                        try {
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
+                            if (cb) {
+                                const count = cb.GetItemCount ? cb.GetItemCount() : 0;
+                                for (let i = 0; i < count; i++) {
+                                    const it = cb.GetItem(i);
+                                    if (it && it.text && it.text.includes('Đã đề nghị thanh toán')) {
+                                        cb.SetSelectedIndex(i);
+                                        if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
+                                        if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
                                         return true;
                                     }
                                 }
-                            } catch(err) {}
+                                cb.SetText('Đã đề nghị thanh toán');
+                                if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                                return true;
+                            }
+                        } catch(err) {}
+                        return false;
+                    }""")
+                    if js_res:
+                        status_selected = True
+                        log("Đã chọn trạng thái: 'Đã đề nghị thanh toán' qua DevExpress API ✅")
+                except Exception as js_err:
+                    log(f"Lưu ý JS API trạng thái: {js_err}")
+
+                # Cách 2: Mở dropdown và CLICK trực tiếp vào phần tử trong bảng
+                try:
+                    btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, td[id*='cb_TrangThaiTT_B-1']").first
+                    if btn_cb.is_visible(timeout=3000):
+                        btn_cb.click()
+                        time.sleep(0.6)
+                        
+                        # Chờ bảng danh sách popup xuất hiện
+                        page.wait_for_selector("#cb_TrangThaiTT_DDD_L_LBT, tr.dxeListBoxItemRow_EIS, td.dxeListBoxItem_EIS, .dxeListBoxItem", timeout=5000)
+                        
+                        # Click trực tiếp vào cell có chữ "Đã đề nghị thanh toán"
+                        item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"^Đã đề nghị thanh toán", re.IGNORECASE)).first
+                        if item.is_visible(timeout=3000):
+                            item.click(force=True)
+                            status_selected = True
+                            log("Đã click chọn item 'Đã đề nghị thanh toán' trên giao diện ✅")
+                except Exception as e:
+                    log(f"Lưu ý click dropdown trạng thái: {e}")
+
+                # Cách 3: JS dispatch click vào DOM item
+                if not status_selected:
+                    try:
+                        page.evaluate("""() => {
+                            const cells = Array.from(document.querySelectorAll('#cb_TrangThaiTT_DDD_L_LBT td, .dxeListBoxItem_EIS, .dxeListBoxItem'));
+                            const target = cells.find(c => c.textContent && c.textContent.trim().includes('Đã đề nghị thanh toán'));
+                            if (target) {
+                                target.click();
+                                return true;
+                            }
                             return false;
                         }""")
-                        if js_res:
-                            status_selected = True
-                            log("Đã thiết lập trạng thái: 'Đã đề nghị thanh toán' qua DevExpress API ✅")
-                    except Exception as js_err:
-                        log(f"Lưu ý JS API trạng thái: {js_err}")
-
-                try:
-                    cb_input = page.locator("#cb_TrangThaiTT_I").first
-                    if cb_input.is_visible(timeout=2000):
-                        current_val = cb_input.input_value()
-                        if "Đã đề nghị thanh toán" not in current_val:
-                            cb_input.click()
-                            cb_input.fill("Đã đề nghị thanh toán")
-                            cb_input.press("Enter")
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
 
                 self.wait_portal_idle(page)
                 time.sleep(0.8)
@@ -500,76 +507,107 @@ class PortalAutomationService:
                 except Exception as w_err:
                     log(f"Lưu ý chờ bảng: {w_err}")
 
-                # 3. LỌC THEO NGÀY: CLICK NÚT TODAY TRÊN POPUP LỊCH
-                log("Đang thiết lập ngày hôm nay bằng nút Today trên lịch DevExpress...")
+                # 3. LỌC THEO NGÀY: MỞ LỊCH TỪ NGÀY VÀ BẤM NÚT TODAY
+                log("Đang chọn 'Từ ngày' bằng cách mở lịch và bấm nút Today...")
+                
+                # Bước 3.1: Mở popup lịch Từ ngày (Đến ngày đã mặc định sẵn hôm nay)
+                opened_tu_ngay = False
+                tu_ngay_selectors = [
+                    "#deTuNgay_B-1Img",
+                    "#deTuNgay_B-1",
+                    "td:has-text('Từ ngày') ~ td .dxeButtonEditButton_EIS",
+                    "td:has-text('Từ ngày') ~ td img",
+                    "tr:has-text('Từ ngày') .dxeButtonEditButton_EIS",
+                    "tr:has-text('Từ ngày') img",
+                    "#deTuNgay_I",
+                    "#txtTuNgay_I",
+                    "input[name*='TuNgay']"
+                ]
+                for sel in tu_ngay_selectors:
+                    try:
+                        el = page.locator(sel).first
+                        if el.is_visible(timeout=2000):
+                            el.click()
+                            opened_tu_ngay = True
+                            log(f"Đã bấm mở lịch Từ ngày ({sel}) ✅")
+                            time.sleep(0.6)
+                            break
+                    except Exception:
+                        pass
+                
+                if not opened_tu_ngay:
+                    opened_tu_ngay = page.evaluate("""() => {
+                        const tds = Array.from(document.querySelectorAll('td, label, span')).filter(e => e.textContent && e.textContent.trim().startsWith('Từ ngày'));
+                        for (const td of tds) {
+                            const parent = td.closest('tr') || td.parentElement;
+                            if (parent) {
+                                const btn = parent.querySelector('img, td.dxeButtonEditButton_EIS, input');
+                                if (btn) { btn.click(); return true; }
+                            }
+                        }
+                        return false;
+                    }""")
+                    time.sleep(0.6)
 
-                # Bước 3.1: Mở lịch Từ ngày và bấm Today
+                # Bước 3.2: Bấm nút Today trên popup lịch của Từ ngày
+                log("Đang bấm nút 'Today' trên popup lịch...")
+                today_clicked = False
                 try:
-                    tu_ngay_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, #deTuNgay_I, #txtTuNgay_B-1, #TuNgay_B-1").first
-                    if tu_ngay_btn.is_visible(timeout=3000):
-                        tu_ngay_btn.click()
-                        time.sleep(0.5)
-                        today_clicked = False
-                        today_selectors = [
-                            "#deTuNgay_DDD_C_BT",
-                            "#deTuNgay_DDD_C .dxbButton:has-text('Today')",
-                            "span:has-text('Today')",
-                            "button:has-text('Today')",
-                            "td:has-text('Today')",
-                            ".dxbButton:has-text('Today')"
-                        ]
-                        for t_sel in today_selectors:
-                            try:
-                                t_btn = page.locator(t_sel).first
-                                if t_btn.is_visible(timeout=1000):
-                                    t_btn.click()
-                                    today_clicked = True
-                                    log("Đã bấm nút 'Today' cho Từ ngày ✅")
-                                    break
-                            except Exception:
-                                pass
-                        if not today_clicked:
-                            page.evaluate("""() => {
-                                const btns = Array.from(document.querySelectorAll('span, button, td, div')).filter(el => el.textContent && el.textContent.trim() === 'Today');
-                                if (btns.length > 0) btns[0].click();
-                            }""")
-                        time.sleep(0.6)
-                except Exception as de1_err:
-                    log(f"Lưu ý chọn Today Từ ngày: {de1_err}")
+                    page.wait_for_selector(".dxbButton:has-text('Today'), span:has-text('Today'), td:has-text('Today'), button:has-text('Today'), #deTuNgay_DDD_C_BT", timeout=5000)
+                except Exception:
+                    pass
 
-                # Bước 3.2: Mở lịch Đến ngày và bấm Today
+                today_selectors = [
+                    "#deTuNgay_DDD_C_BT",
+                    ".dxbButton:has-text('Today')",
+                    "span:has-text('Today')",
+                    "button:has-text('Today')",
+                    "td:has-text('Today')"
+                ]
+                for t_sel in today_selectors:
+                    try:
+                        t_btn = page.locator(t_sel).first
+                        if t_btn.is_visible(timeout=2000):
+                            t_btn.click(force=True)
+                            today_clicked = True
+                            log("Đã click nút 'Today' cho Từ ngày ✅")
+                            break
+                    except Exception:
+                        pass
+
+                if not today_clicked:
+                    today_clicked = page.evaluate("""() => {
+                        const btns = Array.from(document.querySelectorAll('span, button, td, div')).filter(el => el.textContent && el.textContent.trim() === 'Today');
+                        for (const b of btns) {
+                            if (b.offsetParent !== null) {
+                                b.click();
+                                return true;
+                            }
+                        }
+                        if (btns.length > 0) { btns[0].click(); return true; }
+                        return false;
+                    }""")
+                    if today_clicked:
+                        log("Đã click nút 'Today' qua JS fallback ✅")
+
+                # Đồng bộ bằng DevExpress Client API để đảm bảo chắc chắn cả 2 ô ngày đều là hôm nay
                 try:
-                    den_ngay_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, #deDenNgay_I, #txtDenNgay_B-1, #DenNgay_B-1").first
-                    if den_ngay_btn.is_visible(timeout=3000):
-                        den_ngay_btn.click()
-                        time.sleep(0.5)
-                        today_clicked = False
-                        today_selectors = [
-                            "#deDenNgay_DDD_C_BT",
-                            "#deDenNgay_DDD_C .dxbButton:has-text('Today')",
-                            "span:has-text('Today')",
-                            "button:has-text('Today')",
-                            "td:has-text('Today')",
-                            ".dxbButton:has-text('Today')"
-                        ]
-                        for t_sel in today_selectors:
-                            try:
-                                t_btn = page.locator(t_sel).first
-                                if t_btn.is_visible(timeout=1000):
-                                    t_btn.click()
-                                    today_clicked = True
-                                    log("Đã bấm nút 'Today' cho Đến ngày ✅")
-                                    break
-                            except Exception:
-                                pass
-                        if not today_clicked:
-                            page.evaluate("""() => {
-                                const btns = Array.from(document.querySelectorAll('span, button, td, div')).filter(el => el.textContent && el.textContent.trim() === 'Today');
-                                if (btns.length > 0) btns[0].click();
-                            }""")
-                        time.sleep(0.6)
-                except Exception as de2_err:
-                    log(f"Lưu ý chọn Today Đến ngày: {de2_err}")
+                    page.evaluate("""() => {
+                        try {
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            if (cc) {
+                                const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
+                                if (deTu && typeof deTu.SetDate === 'function') deTu.SetDate(new Date());
+                                const deDen = cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay');
+                                if (deDen && typeof deDen.SetDate === 'function') deDen.SetDate(new Date());
+                            }
+                        } catch(e) {}
+                    }""")
+                except Exception:
+                    pass
+
+                time.sleep(1.0)
+                self.wait_portal_idle(page)
 
                 # Bấm nút Tìm kiếm
                 log("Bấm Tìm kiếm dữ liệu...")

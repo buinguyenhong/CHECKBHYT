@@ -56,7 +56,20 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-08-18 10:10 - Antigravity (Tối ưu hóa Playwright RPA: Hợp nhất giao diện, Chờ chuẩn xác, Sửa chọn trạng thái Luồng B & Chọn ngày qua nút Today)
+## 2026-08-18 10:21 - Antigravity (Hotfix: Sửa click chọn trạng thái Luồng B & Mở lịch Từ ngày bấm Today Luồng C)
+
+### Mục tiêu
+- Luồng B: Khắc phục triệt để việc chỉ gõ/highlight trạng thái mà chưa click chọn chính thức trong dropdown DevExpress `#cb_TrangThaiTT` (kết hợp cả DevExpress Client API `SetSelectedIndex`/`ProcessItemClick` và click trực tiếp phần tử DOM).
+- Luồng C: Mở đúng popup lịch của ô `Từ ngày` bằng đa bộ chọn, click nút `Today` ở chân lịch để lấy ngày hôm nay trước khi nhấn `Tìm kiếm` (đồng bộ `deTuNgay` và `deDenNgay` là ngày hôm nay).
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py` [MODIFY]:
+  - Luồng B: Bổ sung gọi `ProcessItemClick` + `SetSelectedIndex` qua JS API kết hợp mở dropdown click cell mục tiêu.
+  - Luồng C: Định vị chính xác ô/icon mở lịch `Từ ngày`, chờ popup lịch mở ra rồi click `Today`, sau đó mới kích hoạt `Tìm kiếm`.
+
+### Kiểm tra
+- Chạy `scratch/test_portal_automation_logic.py` đạt 100% OK.
+
 
 ### Mục tiêu
 - Hợp nhất khu vực Tự động hóa Cổng BHYT trên WebApp thành 1 khối duy nhất, trực quan và tiện dụng, không phân tách rời rạc Server/Client.
