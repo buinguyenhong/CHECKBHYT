@@ -1105,3 +1105,21 @@ Nguyên tắc quan trọng:
 - Khi thay đổi trạng thái xử lý, phải xem cả màn hình admin, khoa, export, KPI và scheduler.
 - Khi đổi logic đối soát, nên có test mẫu cho `compare_service.process_comparison()`.
 - Sau mỗi thay đổi có ý nghĩa, phải cập nhật `AGENT_CHANGELOG.md` để phiên làm việc sau hiểu bối cảnh.
+
+## 19. Kiến trúc Tự động hóa Cổng BHYT (Playwright RPA & Local Web Bridge)
+
+Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT tích hợp trực tiếp trên WebApp với khả năng **tự động nhận diện môi trường đang sử dụng (Server hoặc Client)**:
+
+### 19.1. Cơ chế Tự động nhận diện (Local Web Bridge)
+- Khi người dùng bấm nút **"Chạy Luồng B"** hoặc **"Chạy Luồng C"** trên WebApp:
+  1. **Nếu đang ngồi tại Máy trạm (Client PC) và đã mở `Chay_RPA_May_Tram.bat`**: WebApp phát hiện Local Bridge tại `http://127.0.0.1:8765`, gửi lệnh điều khiển Chromium bật lên ngay trên màn hình máy trạm. Sau khi tải file, máy trạm tự đẩy file lên Server và đối soát tức thì.
+  2. **Nếu đang mở WebApp trực tiếp trên Máy chủ (Server)**: WebApp gọi API backend `/api/automation/flow-b` hoặc `/api/automation/flow-c` để chạy Chromium trên máy chủ.
+  3. **Nếu đang ở Máy trạm nhưng chưa mở Client Runner**: WebApp hiển thị thông báo hướng dẫn bật `Chay_RPA_May_Tram.bat` để mở Chromium tại chỗ, hoặc cho phép tùy chọn chạy tạm thời trên máy chủ.
+
+### 19.2. Cấu trúc mô-đun Tự động hóa
+- `web_app/services/portal_automation.py`: Thực thi RPA trên backend Server.
+- `client_runner/client_agent.py`: Thực thi RPA và Local HTTP Bridge trên Máy trạm Client.
+- `client_runner/Cai_Dat_May_Tram.bat`: Script cài đặt 1-click cho máy trạm (thư viện + Chromium).
+- `client_runner/Chay_RPA_May_Tram.bat`: Script khởi chạy Client Runner trên máy trạm.
+
+

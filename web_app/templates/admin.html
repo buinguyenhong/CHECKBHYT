@@ -1037,8 +1037,11 @@
                             <span>🤖</span> Tự động hóa Cổng BHYT (Playwright RPA)
                         </h3>
                         <span style="font-size:13px; color:var(--text-secondary); display:block; margin-top:4px; line-height:1.4;">
-                            Mở trình duyệt Chromium trực tiếp để tải danh sách đề nghị thanh toán và danh sách lỗi từ Cổng BHYT, tự động nạp file và kích hoạt đối soát ngay trên hệ thống.
+                            Tự động mở trình duyệt tải danh sách đề nghị thanh toán và danh sách lỗi từ Cổng BHYT, nạp file và kích hoạt đối soát tức thì.
                         </span>
+                        <div id="rpaEnvBadge" style="margin-top:6px; font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#94a3b8;"></span> Đang nhận diện môi trường thực thi...
+                        </div>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                         <button class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:10px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:7px; box-shadow:0 2px 8px rgba(37,99,235,0.3); cursor:pointer;" id="btnAutoFlowB" onclick="runPortalAutomation('B')">
@@ -1047,7 +1050,7 @@
                         <button class="btn" style="background:#8b5cf6; color:#fff; font-weight:700; padding:10px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:7px; box-shadow:0 2px 8px rgba(139,92,246,0.3); cursor:pointer;" id="btnAutoFlowC" onclick="runPortalAutomation('C')">
                             <span>⚠️</span> Chạy Luồng C (Tải DS lỗi 3176)
                         </button>
-                        <a href="/api/client/download-runner" class="btn" style="background:rgba(255,255,255,0.06); color:var(--text-secondary); border:1px solid var(--border-color); font-weight:600; padding:9px 14px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:12.5px;" title="Tải gói Client RPA Runner nếu muốn chạy riêng lẻ tại máy trạm khác">
+                        <a href="/api/client/download-runner" class="btn" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); font-weight:700; padding:10px 16px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:13px;" title="Tải gói Client RPA Runner để chạy Chromium trực tiếp trên màn hình Máy trạm này">
                             <span>💻</span> Gói Máy trạm (.zip)
                         </a>
                     </div>
@@ -2395,8 +2398,41 @@
     }
 
     let autoLogInterval = null;
+    let clientPingStatus = 'checking'; // 'local_server', 'client_connected', 'client_disconnected'
 
-    // Trigger Playwright Portal Automation for Flow B and Flow C
+    // Tự động nhận diện môi trường thực thi: Đang mở tại Máy chủ hay Máy trạm (Client)
+    async function checkClientEnvironment() {
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const envBadge = document.getElementById('rpaEnvBadge');
+        if (!envBadge) return;
+
+        if (isLocalhost) {
+            clientPingStatus = 'local_server';
+            envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981;"></span> <span style="color:#10b981;"><b>Máy chủ (Server Local)</b>: Chromium sẽ mở trực tiếp trên máy chủ này</span>`;
+            return;
+        }
+
+        // Kiểm tra xem Local Client Bridge có đang chạy tại http://127.0.0.1:8765 trên máy trạm này không
+        try {
+            const ctrl = new AbortController();
+            const tId = setTimeout(() => ctrl.abort(), 1200);
+            const res = await fetch('http://127.0.0.1:8765/api/ping', { signal: ctrl.signal });
+            clearTimeout(tId);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    clientPingStatus = 'client_connected';
+                    envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981; animation:pulse 2s infinite;"></span> <span style="color:#10b981;"><b>Đã kết nối Máy trạm Client</b>: Chromium sẽ mở ngay trên màn hình máy này!</span>`;
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        clientPingStatus = 'client_disconnected';
+        envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#f59e0b;"></span> <span style="color:#f59e0b;"><b>Máy trạm Client (Chưa bật Client Runner)</b></span>: <a href="/api/client/download-runner" style="color:#60a5fa; text-decoration:underline;">Tải gói máy trạm</a> hoặc mở <code>Chay_RPA_May_Tram.bat</code> để mở Chromium tại máy này.`;
+    }
+
+    // Trigger Playwright Portal Automation for Flow B and Flow C (Tự động thích ứng Server / Client)
     async function runPortalAutomation(flowType) {
         const fromDate = document.getElementById('sync_from').value;
         const toDate = document.getElementById('sync_to').value;
@@ -2407,80 +2443,201 @@
         }
 
         const flowLabel = flowType === 'B' ? 'Luồng B (Tải DS đã gửi & Đối soát B)' : 'Luồng C (Tải DS lỗi chi tiết & Đối soát C)';
-        const endpoint = flowType === 'B' ? '/api/automation/flow-b' : '/api/automation/flow-c';
         const btn = document.getElementById(flowType === 'B' ? 'btnAutoFlowB' : 'btnAutoFlowC');
         const originalText = btn.innerHTML;
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-        if (!confirm(`Bạn có chắc muốn kích hoạt ${flowLabel} cho khoảng ngày ${fromDate} đến ${toDate}?\n\nTrình duyệt sẽ tự động mở lên. Nếu cần nhập CAPTCHA, bạn chỉ cần gõ mã trên màn hình trình duyệt.`)) {
-            return;
+        // 1. Kiểm tra nhanh kết nối Local Client Runner tại 127.0.0.1:8765
+        let hasClientRunner = false;
+        try {
+            const ctrl = new AbortController();
+            const tId = setTimeout(() => ctrl.abort(), 1200);
+            const pingRes = await fetch('http://127.0.0.1:8765/api/ping', { signal: ctrl.signal });
+            clearTimeout(tId);
+            if (pingRes.ok) {
+                const pData = await pingRes.json();
+                if (pData.status === 'ok') hasClientRunner = true;
+            }
+        } catch (e) {
+            hasClientRunner = false;
+        }
+
+        let runMode = 'SERVER'; // 'CLIENT' hoặc 'SERVER'
+        if (hasClientRunner) {
+            runMode = 'CLIENT';
+        } else if (isLocalhost) {
+            runMode = 'SERVER';
+        } else {
+            // Đang ở Máy trạm nhưng chưa mở Client Runner
+            const choice = confirm(
+                `⚠️ BẠN ĐANG THAO TÁC TRÊN MÁY TRẠM (${window.location.hostname})\n\n` +
+                `👉 Để Chromium mở ngay trên màn hình máy này (tiện xem và gõ Captcha):\n` +
+                `   Vui lòng mở file "Chay_RPA_May_Tram.bat" trên máy này trước!\n\n` +
+                `• Bấm [OK]: Chạy Chromium từ xa trên MÁY CHỦ (Server).\n` +
+                `• Bấm [Cancel]: Hủy để bạn mở Client Runner trên máy trạm.`
+            );
+            if (!choice) return;
+            runMode = 'SERVER';
         }
 
         btn.disabled = true;
         btn.innerHTML = `<span>⏳</span> Đang chạy ${flowType}...`;
-        logToConsole(`=== BẮT ĐẦU TỰ ĐỘNG HÓA CỔNG BHYT: ${flowLabel} ===`);
 
-        // Bắt đầu theo dõi logs tự động hóa
-        if (autoLogInterval) clearInterval(autoLogInterval);
-        let lastLogCount = 0;
+        if (runMode === 'CLIENT') {
+            // ==========================================
+            // CHẾ ĐỘ 1: THỰC THI TRỰC TIẾP TẠI MÁY TRẠM (CLIENT)
+            // ==========================================
+            logToConsole(`=== BẮT ĐẦU TỰ ĐỘNG HÓA TẠI MÁY TRẠM (CLIENT): ${flowLabel} ===`);
+            logToConsole(`[Máy trạm] Đang khởi chạy Chromium trực tiếp trên màn hình máy này...`);
 
-        autoLogInterval = setInterval(async () => {
-            try {
-                const res = await fetch('/api/automation/logs');
-                if (res.ok) {
-                    const data = await res.json();
-                    const logs = data.logs || [];
-                    if (logs.length > lastLogCount) {
-                        for (let i = lastLogCount; i < logs.length; i++) {
-                            logToConsole(logs[i]);
+            if (autoLogInterval) clearInterval(autoLogInterval);
+            let lastLogIdx = 0;
+            autoLogInterval = setInterval(async () => {
+                try {
+                    const lRes = await fetch('http://127.0.0.1:8765/api/logs');
+                    if (lRes.ok) {
+                        const lData = await lRes.json();
+                        const cLogs = lData.logs || [];
+                        if (cLogs.length > lastLogIdx) {
+                            for (let i = lastLogIdx; i < cLogs.length; i++) {
+                                logToConsole(`[Máy trạm] ` + cLogs[i]);
+                            }
+                            lastLogIdx = cLogs.length;
                         }
-                        lastLogCount = logs.length;
                     }
-                }
-            } catch (e) {}
-        }, 1500);
+                } catch (e) {}
+            }, 1200);
 
-        try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ from_date: fromDate, to_date: toDate })
-            });
-
-            let data;
-            const text = await res.text();
             try {
-                data = JSON.parse(text);
-            } catch {
-                data = { status: 'error', detail: text || `Lỗi máy chủ HTTP ${res.status}` };
-            }
+                const endpointClient = `http://127.0.0.1:8765/api/run-flow-${flowType.toLowerCase()}`;
+                const startRes = await fetch(endpointClient, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from_date: fromDate,
+                        to_date: toDate,
+                        server_url: window.location.origin
+                    })
+                });
 
-            if (res.ok && data.status === 'success') {
-                logToConsole(`Tự động hóa ${flowLabel} HOÀN TẤT THÀNH CÔNG! ✅`);
-                alert(`Thành công! ${data.message || 'Đối soát hoàn tất.'}`);
+                if (!startRes.ok) {
+                    const errData = await startRes.json();
+                    throw new Error(errData.message || `Lỗi máy trạm HTTP ${startRes.status}`);
+                }
+
+                // Polling kiểm tra trạng thái hoàn thành từ máy trạm
+                await new Promise((resolve, reject) => {
+                    const pollInterval = setInterval(async () => {
+                        try {
+                            const stRes = await fetch('http://127.0.0.1:8765/api/status');
+                            if (stRes.ok) {
+                                const stData = await stRes.json();
+                                if (!stData.is_running) {
+                                    clearInterval(pollInterval);
+                                    if (stData.last_status && stData.last_status.status === 'error') {
+                                        reject(new Error(stData.last_status.message || 'Lỗi thực thi tại máy trạm'));
+                                    } else {
+                                        resolve(stData.last_status);
+                                    }
+                                }
+                            }
+                        } catch (pe) {}
+                    }, 2000);
+                });
+
+                if (autoLogInterval) clearInterval(autoLogInterval);
+                logToConsole(`Tự động hóa ${flowLabel} tại MÁY TRẠM HOÀN TẤT THÀNH CÔNG! ✅`);
+                alert(`Thành công! Đã tự động tải dữ liệu từ Cổng BHYT trên máy trạm và hoàn thành Đối soát trên Máy chủ!`);
+
                 updateGlobalKPIs();
                 if (activeTab === 'sql_data') fetchSqlData();
                 if (activeTab === 'loi') fetchLoiRecords();
                 if (activeTab === 'fail') fetchFailRecords();
                 if (activeTab === 'review') loadUnlockDeptList();
                 if (activeTab === 'reports') fetchDeptReport();
-            } else {
-                const errMsg = data.detail || (typeof data === 'string' ? data : 'Không thể thực thi tự động hóa');
-                logToConsole(`LỖI: ${errMsg}`);
-                alert(`Lỗi thực thi: ${errMsg}`);
-            }
-        } catch (e) {
-            logToConsole(`Lỗi kết nối khi chạy tự động hóa: ${e.message}`);
-            alert(`Lỗi kết nối máy chủ: ${e.message}`);
-        } finally {
 
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-            setTimeout(() => {
-                if (autoLogInterval) {
-                    clearInterval(autoLogInterval);
-                    autoLogInterval = null;
+            } catch (err) {
+                if (autoLogInterval) clearInterval(autoLogInterval);
+                logToConsole(`LỖI MÁY TRẠM: ${err.message}`);
+                alert(`Lỗi thực thi tại máy trạm: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                checkClientEnvironment();
+                setTimeout(() => {
+                    if (autoLogInterval) { clearInterval(autoLogInterval); autoLogInterval = null; }
+                }, 3000);
+            }
+
+        } else {
+            // ==========================================
+            // CHẾ ĐỘ 2: THỰC THI TRÊN MÁY CHỦ (SERVER)
+            // ==========================================
+            const endpoint = flowType === 'B' ? '/api/automation/flow-b' : '/api/automation/flow-c';
+            logToConsole(`=== BẮT ĐẦU TỰ ĐỘNG HÓA CỔNG BHYT TRÊN MÁY CHỦ (SERVER): ${flowLabel} ===`);
+
+            if (autoLogInterval) clearInterval(autoLogInterval);
+            let lastLogCount = 0;
+
+            autoLogInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/automation/logs');
+                    if (res.ok) {
+                        const data = await res.json();
+                        const logs = data.logs || [];
+                        if (logs.length > lastLogCount) {
+                            for (let i = lastLogCount; i < logs.length; i++) {
+                                logToConsole(logs[i]);
+                            }
+                            lastLogCount = logs.length;
+                        }
+                    }
+                } catch (e) {}
+            }, 1500);
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from_date: fromDate, to_date: toDate })
+                });
+
+                let data;
+                const text = await res.text();
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = { status: 'error', detail: text || `Lỗi máy chủ HTTP ${res.status}` };
                 }
-            }, 3000);
+
+                if (res.ok && data.status === 'success') {
+                    logToConsole(`Tự động hóa ${flowLabel} trên Máy chủ HOÀN TẤT THÀNH CÔNG! ✅`);
+                    alert(`Thành công! ${data.message || 'Đối soát hoàn tất.'}`);
+                    updateGlobalKPIs();
+                    if (activeTab === 'sql_data') fetchSqlData();
+                    if (activeTab === 'loi') fetchLoiRecords();
+                    if (activeTab === 'fail') fetchFailRecords();
+                    if (activeTab === 'review') loadUnlockDeptList();
+                    if (activeTab === 'reports') fetchDeptReport();
+                } else {
+                    const errMsg = data.detail || (typeof data === 'string' ? data : 'Không thể thực thi tự động hóa');
+                    logToConsole(`LỖI MÁY CHỦ: ${errMsg}`);
+                    alert(`Lỗi thực thi: ${errMsg}`);
+                }
+            } catch (e) {
+                logToConsole(`Lỗi kết nối khi chạy tự động hóa trên máy chủ: ${e.message}`);
+                alert(`Lỗi kết nối máy chủ: ${e.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                checkClientEnvironment();
+                setTimeout(() => {
+                    if (autoLogInterval) {
+                        clearInterval(autoLogInterval);
+                        autoLogInterval = null;
+                    }
+                }, 3000);
+            }
         }
     }
 
@@ -3950,6 +4107,8 @@
     checkXmlWatcherStatus();
     loadXmlConfig();
     setupXmlDragDrop();
+    checkClientEnvironment();
+    setInterval(checkClientEnvironment, 5000);
 </script>
 </body>
 </html>

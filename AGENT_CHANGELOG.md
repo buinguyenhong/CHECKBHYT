@@ -56,6 +56,51 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-18 19:38 - Antigravity (Tích hợp Local Web Bridge: WebApp tự động nhận diện và điều khiển RPA trên Máy chủ hoặc Máy trạm)
+
+### Mục tiêu
+- Tích hợp trực tiếp khả năng kích hoạt RPA Máy trạm từ giao diện WebApp theo yêu cầu: Người dùng chỉ cần bấm nút "Chạy Luồng B" hoặc "Chạy Luồng C" trên WebApp, hệ thống sẽ tự động nhận diện thiết bị đang sử dụng và mở Chromium ngay trên màn hình máy đó (dù đang ngồi tại Server hay Máy trạm Client).
+
+### Thay đổi
+- `client_runner/client_agent.py` [MODIFY]:
+  - Tích hợp `ThreadingHTTPServer` (Local Web Bridge) chạy ngầm tại cổng `127.0.0.1:8765` với đầy đủ CORS headers.
+  - Cung cấp các API cục bộ: `GET /api/ping`, `GET /api/logs`, `GET /api/status`, `POST /api/run-flow-b`, `POST /api/run-flow-c`.
+  - Hỗ trợ tham số `is_from_web=True` để cập nhật trạng thái thời gian thực và không làm treo luồng bằng modal messagebox chặn.
+- `web_app/templates/admin.html` [MODIFY]:
+  - Bổ sung `rpaEnvBadge` trên Card Tự động hóa, tự động ping và hiển thị trạng thái kết nối máy trạm / máy chủ thời gian thực (chu kỳ 5s).
+  - Nâng cấp hàm `runPortalAutomation()`:
+    * Nếu phát hiện Client Runner đang chạy tại `127.0.0.1:8765`: Tự động gọi API cục bộ máy trạm, mở Chromium trên màn hình máy trạm, stream log máy trạm về Log Console của WebApp và tự động đối soát trên Server.
+    * Nếu mở trực tiếp trên máy chủ (`localhost` / `127.0.0.1`): Gọi API backend `/api/automation/flow-b` hoặc `/api/automation/flow-c` trên Server.
+    * Nếu mở từ máy trạm nhưng chưa bật Client Runner: Bật thông báo hướng dẫn mở `Chay_RPA_May_Tram.bat` để mở Chromium tại chỗ, hoặc tùy chọn chạy từ xa trên Server.
+- `client_runner/Huong_Dan_Su_Dung.txt` [MODIFY]: Cập nhật hướng dẫn sử dụng tính năng tích hợp trực tiếp từ WebApp.
+- `AGENT_CHANGELOG.md` & `Project.md` [MODIFY]: Đồng bộ tài liệu kiến thức.
+
+### Nghiệp vụ ảnh hưởng
+- Người dùng không cần thao tác thủ công nhiều bước: Mọi thao tác điều khiển RPA Luồng B và Luồng C đều thực hiện tập trung 100% trên giao diện WebApp duy nhất.
+
+---
+
+## 2026-08-18 19:30 - Antigravity (Kiểm tra & Chuẩn hóa cơ chế thực thi RPA Luồng B & Luồng C giữa Server và Client)
+
+### Mục tiêu
+- Làm rõ và xử lý hiện tượng khi người dùng bấm nút "Chạy Luồng B" hoặc "Chạy Luồng C" trên giao diện WebApp (`admin.html`) từ trình duyệt máy trạm (Client PC) thì trình duyệt Chromium mở và chạy trên Máy chủ (Server).
+- Rà soát toàn diện mã nguồn tự động hóa cả 2 Luồng B và C trên cả Server (`portal_automation.py`) và Client (`client_runner/client_agent.py`), đảm bảo logic selector, DevExpress API, tải file và đối soát CSDL HIS hoạt động chính xác 100%.
+
+### Thay đổi
+- `web_app/templates/admin.html` [MODIFY]:
+  - Đổi nhãn nút rõ ràng: "Chạy Luồng B (Server)" và "Chạy Luồng C (Server)" kèm chú thích trực quan: Nút webapp thực thi backend trên Máy chủ Server; nếu ngồi tại Máy trạm Client thì dùng "Gói Máy trạm (.zip)".
+  - Nâng cấp hàm JS `runPortalAutomation()`: Kiểm tra nếu truy cập từ IP máy trạm (`window.location.hostname !== 'localhost'`) sẽ hiện popup thông báo rõ ràng cho người dùng biết Chromium sẽ mở trên Server, và hướng dẫn mở `Chay_RPA_May_Tram.bat` nếu muốn mở Chromium trực tiếp tại máy trạm.
+- `client_runner/client_agent.py` [MODIFY]:
+  - Đồng bộ logic chuẩn hóa tên cột (`MA_LK`, `MALOI`, `MOTALOI`, `Ngày ra`, `Tên bệnh nhân`, `Mã thẻ`) khi gom các file lỗi chi tiết `err_*.xlsx` thành `HoSoLoiChiTiet.xlsx` tương tự `portal_automation.py`.
+- `AGENT_CHANGELOG.md` & `Project.md` [MODIFY]: Cập nhật tài liệu kiến thức về kiến trúc chạy RPA Server vs Client Runner.
+
+### Nghiệp vụ ảnh hưởng
+- Phân định rõ 2 phương thức vận hành RPA:
+  1. **Phương thức 1 (Server RPA):** Kích hoạt trực tiếp từ WebApp backend, Chromium mở trên máy chủ.
+  2. **Phương thức 2 (Client RPA Runner):** Kích hoạt bằng `Chay_RPA_May_Tram.bat` trên máy trạm, Chromium mở trực tiếp trên màn hình máy trạm, tự động upload file và kích hoạt đối soát lên Server qua API.
+
+---
+
 ## 2026-08-18 11:12 - Antigravity (Fix: Sửa lỗi bộ lọc khoa phòng và tìm kiếm tại Tab 3 Danh sách dữ liệu lỗi)
 
 ### Mục tiêu

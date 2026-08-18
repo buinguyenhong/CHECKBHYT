@@ -7,12 +7,18 @@
    - Đợi hệ thống tự động tải các thư viện cần thiết và trình duyệt Chromium.
    - Khi hiện "CÀI ĐẶT THÀNH CÔNG 100%", nhấn phím bất kỳ để hoàn tất.
 
-2. CÁCH SỬ DỤNG HÀNG NGÀY:
-   - Nhấp đúp vào file "Chay_RPA_May_Tram.bat" để mở bảng điều khiển.
-   - Kiểm tra địa chỉ "Server LAN URL" (VD: http://192.168.1.15:8000).
-   - Bấm nút "Đồng bộ cấu hình từ Server" để lấy thông tin đăng nhập Cổng.
-   - Chọn khoảng ngày đối soát (Từ ngày - Đến ngày).
-   - Bấm "Chạy Luồng B" (Tải danh sách đã gửi) hoặc "Chạy Luồng C" (Tải DS lỗi 3176).
+2. CÁCH SỬ DỤNG HÀNG NGÀY (RẤT TIỆN LỢI):
+   - Cách 1 (TÍCH HỢP TRỰC TIẾP VÀO WEBAPP - KHUYÊN DÙNG):
+     * Chỉ cần nhấp đúp vào file "Chay_RPA_May_Tram.bat" để mở bảng điều khiển.
+     * Quay lại trình duyệt WebApp (trên máy trạm), hệ thống sẽ tự động hiện biểu tượng:
+       "🟢 Đã kết nối Máy trạm Client: Chromium sẽ mở ngay trên màn hình máy này!"
+     * Bạn chỉ cần bấm "Chạy Luồng B" hoặc "Chạy Luồng C" ngay trên giao diện WebApp,
+       trình duyệt Chromium sẽ tự động mở lên ngay trên màn hình máy trạm!
+
+   - Cách 2 (Chạy trực tiếp từ Bảng điều khiển Máy trạm):
+     * Mở "Chay_RPA_May_Tram.bat".
+     * Kiểm tra địa chỉ "Server LAN URL" (VD: http://192.168.1.15:8000).
+     * Chọn khoảng ngày và bấm "Chạy Luồng B" hoặc "Chạy Luồng C".
 
 3. LƯU Ý KHI ĐĂNG NHẬP:
    - Khi trình duyệt Chromium mở lên, form đăng nhập đã được điền sẵn.

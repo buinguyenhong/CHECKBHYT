@@ -6,6 +6,9 @@ import glob
 import json
 import datetime
 import requests
+import threading
+import urllib.parse
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import pandas as pd
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -31,13 +34,133 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 SESSION_FILE = os.path.join(SESSION_DIR, "portal_storage_state.json")
 
+ACTIVE_CLIENT_GUI = None
+
+
+class ClientAgentHTTPHandler(BaseHTTPRequestHandler):
+    """
+    HTTP Server cục bộ lắng nghe tại 127.0.0.1:8765 cho phép WebApp trên trình duyệt
+    tự động phát hiện và kích hoạt Chromium trực tiếp trên màn hình Máy trạm.
+    """
+    def log_message(self, format, *args):
+        pass  # Tắt log stdout mặc định
+
+    def end_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def do_GET(self):
+        global ACTIVE_CLIENT_GUI
+        url_parsed = urllib.parse.urlparse(self.path)
+        path = url_parsed.path
+
+        if path == '/api/ping':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            is_running = ACTIVE_CLIENT_GUI.is_running if ACTIVE_CLIENT_GUI else False
+            res = {
+                "status": "ok",
+                "app": "CheckBHYT Client Runner",
+                "version": "2.0",
+                "is_running": is_running,
+                "server_url": ACTIVE_CLIENT_GUI.server_url.get() if ACTIVE_CLIENT_GUI else ""
+            }
+            self.wfile.write(json.dumps(res, ensure_ascii=False).encode('utf-8'))
+
+        elif path == '/api/logs':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            logs = ACTIVE_CLIENT_GUI.recent_logs[-80:] if ACTIVE_CLIENT_GUI else []
+            res = {"logs": logs}
+            self.wfile.write(json.dumps(res, ensure_ascii=False).encode('utf-8'))
+
+        elif path == '/api/status':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            if ACTIVE_CLIENT_GUI:
+                res = {
+                    "is_running": ACTIVE_CLIENT_GUI.is_running,
+                    "last_status": ACTIVE_CLIENT_GUI.last_status
+                }
+            else:
+                res = {"is_running": False, "last_status": {"status": "idle"}}
+            self.wfile.write(json.dumps(res, ensure_ascii=False).encode('utf-8'))
+
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        global ACTIVE_CLIENT_GUI
+        url_parsed = urllib.parse.urlparse(self.path)
+        path = url_parsed.path
+
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else "{}"
+        try:
+            body = json.loads(post_data)
+        except Exception:
+            body = {}
+
+        if path in ['/api/run-flow-b', '/api/run-flow-c']:
+            if not ACTIVE_CLIENT_GUI:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": "Client GUI chưa sẵn sàng."}, ensure_ascii=False).encode('utf-8'))
+                return
+
+            if ACTIVE_CLIENT_GUI.is_running:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "busy", "message": "Tiến trình RPA đang chạy trên máy trạm. Vui lòng chờ hoàn thành."}, ensure_ascii=False).encode('utf-8'))
+                return
+
+            from_d = body.get("from_date", "").strip()
+            to_d = body.get("to_date", "").strip()
+            srv = body.get("server_url", "").strip()
+
+            if path == '/api/run-flow-b':
+                ACTIVE_CLIENT_GUI.trigger_flow_from_web('B', from_d, to_d, srv)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "started", "flow": "B", "message": "Đã khởi chạy Luồng B trên máy trạm!"}, ensure_ascii=False).encode('utf-8'))
+            else:
+                ACTIVE_CLIENT_GUI.trigger_flow_from_web('C', from_d, to_d, srv)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "started", "flow": "C", "message": "Đã khởi chạy Luồng C trên máy trạm!"}, ensure_ascii=False).encode('utf-8'))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
 
 class ClientRPAGui:
     def __init__(self, root):
+        global ACTIVE_CLIENT_GUI
+        ACTIVE_CLIENT_GUI = self
+
         self.root = root
-        self.root.title("CheckBHYT - Client RPA Runner")
+        self.root.title("CheckBHYT - Client RPA Runner (Local Web Bridge)")
         self.root.geometry("680x750")
         self.root.resizable(False, False)
+
+        # Trạng thái thời gian thực phục vụ WebApp Bridge
+        self.is_running = False
+        self.recent_logs = []
+        self.last_status = {"status": "idle", "flow": None, "message": "Sẵn sàng", "error": None}
 
         # Màu sắc Glassmorphic Dark-Theme
         self.bg_color = "#0b1329"
@@ -63,6 +186,45 @@ class ClientRPAGui:
 
         self.load_config()
         self.create_widgets()
+        self.start_http_bridge()
+
+    def start_http_bridge(self):
+        """Khởi chạy HTTP Bridge Server nền tại cổng 8765"""
+        def run_server():
+            try:
+                server = ThreadingHTTPServer(('127.0.0.1', 8765), ClientAgentHTTPHandler)
+                server.serve_forever()
+            except Exception as e:
+                self.log(f"Lưu ý Local Bridge (Port 8765): {e}")
+
+        t = threading.Thread(target=run_server, daemon=True)
+        t.start()
+
+    def trigger_flow_from_web(self, flow_type: str, from_d: str, to_d: str, server_url: str):
+        """WebApp kích hoạt chạy Luồng B hoặc C từ xa trên máy trạm này"""
+        if from_d:
+            self.root.after(0, lambda: self.from_date.set(from_d))
+        if to_d:
+            self.root.after(0, lambda: self.to_date.set(to_d))
+        if server_url:
+            self.root.after(0, lambda: self.server_url.set(server_url))
+
+        self.save_config()
+        self.root.after(0, lambda: self.btn_flow_b.configure(state=tk.DISABLED))
+        self.root.after(0, lambda: self.btn_flow_c.configure(state=tk.DISABLED))
+
+        self.is_running = True
+        self.last_status = {
+            "status": "running",
+            "flow": flow_type,
+            "message": f"Đang chạy Luồng {flow_type} từ WebApp...",
+            "error": None
+        }
+
+        if flow_type == 'B':
+            threading.Thread(target=self._run_flow_b_worker, kwargs={"is_from_web": True}, daemon=True).start()
+        else:
+            threading.Thread(target=self._run_flow_c_worker, kwargs={"is_from_web": True}, daemon=True).start()
 
     def load_config(self):
         if os.path.exists(CONFIG_FILE):
@@ -289,14 +451,18 @@ class ClientRPAGui:
         self.save_config()
         self.btn_flow_b.configure(state=tk.DISABLED)
         self.btn_flow_c.configure(state=tk.DISABLED)
-        threading.Thread(target=self._run_flow_b_worker, daemon=True).start()
+        self.is_running = True
+        self.last_status = {"status": "running", "flow": "B", "message": "Đang khởi chạy Luồng B...", "error": None}
+        threading.Thread(target=self._run_flow_b_worker, kwargs={"is_from_web": False}, daemon=True).start()
 
-    def _run_flow_b_worker(self):
+    def _run_flow_b_worker(self, is_from_web: bool = False):
         from playwright.sync_api import sync_playwright
         from_d = self.from_date.get().strip()
         to_d = self.to_date.get().strip()
         srv = self.server_url.get().strip().rstrip("/")
 
+        self.is_running = True
+        self.last_status = {"status": "running", "flow": "B", "message": f"Đang chạy Luồng B (Từ {from_d} đến {to_d})...", "error": None}
         self.log(f"=== BẮT ĐẦU LUỒNG B (TỪ {from_d} ĐẾN {to_d}) ===")
 
         try:
@@ -498,7 +664,6 @@ class ClientRPAGui:
                     dl.save_as(dest_file)
                     context.storage_state(path=SESSION_FILE)
                     self.log(f"Đã tải thành công: {dest_file} ✅")
-
                 finally:
                     context.close()
                     browser.close()
@@ -518,33 +683,45 @@ class ClientRPAGui:
 
             if r_sync.status_code == 200:
                 res_data = r_sync.json()
+                self.last_status = {"status": "success", "flow": "B", "message": res_data.get('message', 'Thành công'), "error": None}
                 self.log("=== ĐỐI SOÁT B HOÀN TẤT THÀNH CÔNG! ✅ ===")
                 self.log(f"Kết quả: {res_data.get('message', 'Thành công')}")
-                messagebox.showinfo("Thành công", f"Đã hoàn thành Đối soát B trên máy chủ!\n{res_data.get('message', '')}")
+                if not is_from_web:
+                    messagebox.showinfo("Thành công", f"Đã hoàn thành Đối soát B trên máy chủ!\n{res_data.get('message', '')}")
             else:
-                self.log(f"Lỗi đối soát: {r_sync.text}")
-                messagebox.showerror("Lỗi đối soát", f"Máy chủ trả về lỗi: {r_sync.text}")
+                err_text = r_sync.text
+                self.last_status = {"status": "error", "flow": "B", "message": f"Máy chủ trả về lỗi: {err_text}", "error": err_text}
+                self.log(f"Lỗi đối soát: {err_text}")
+                if not is_from_web:
+                    messagebox.showerror("Lỗi đối soát", f"Máy chủ trả về lỗi: {err_text}")
 
         except Exception as e:
+            self.last_status = {"status": "error", "flow": "B", "message": str(e), "error": str(e)}
             self.log(f"LỖI THỰC THI: {e}")
-            messagebox.showerror("Lỗi", f"Lỗi Luồng B: {e}")
+            if not is_from_web:
+                messagebox.showerror("Lỗi", f"Lỗi Luồng B: {e}")
         finally:
-            self.btn_flow_b.configure(state=tk.NORMAL)
-            self.btn_flow_c.configure(state=tk.NORMAL)
+            self.is_running = False
+            self.root.after(0, lambda: self.btn_flow_b.configure(state=tk.NORMAL))
+            self.root.after(0, lambda: self.btn_flow_c.configure(state=tk.NORMAL))
 
     def start_flow_c(self):
         import threading
         self.save_config()
         self.btn_flow_b.configure(state=tk.DISABLED)
         self.btn_flow_c.configure(state=tk.DISABLED)
-        threading.Thread(target=self._run_flow_c_worker, daemon=True).start()
+        self.is_running = True
+        self.last_status = {"status": "running", "flow": "C", "message": "Đang khởi chạy Luồng C...", "error": None}
+        threading.Thread(target=self._run_flow_c_worker, kwargs={"is_from_web": False}, daemon=True).start()
 
-    def _run_flow_c_worker(self):
+    def _run_flow_c_worker(self, is_from_web: bool = False):
         from playwright.sync_api import sync_playwright
         from_d = self.from_date.get().strip()
         to_d = self.to_date.get().strip()
         srv = self.server_url.get().strip().rstrip("/")
 
+        self.is_running = True
+        self.last_status = {"status": "running", "flow": "C", "message": f"Đang chạy Luồng C (Từ {from_d} đến {to_d})...", "error": None}
         self.log(f"=== BẮT ĐẦU LUỒNG C (TỪ {from_d} ĐẾN {to_d}) ===")
 
         # Xóa temp cũ
@@ -758,11 +935,17 @@ class ClientRPAGui:
                             except Exception:
                                 pass
 
+                    if not searched:
+                        page.evaluate("""() => {
+                            const btns = Array.from(document.querySelectorAll('#btnTimKiem, #bt_TimKiem, .dxbButton, span, td')).filter(el => el.textContent && el.textContent.trim() === 'Tìm kiếm');
+                            if (btns.length > 0) btns[0].click();
+                        }""")
+
                     self.log("Đang chờ tải danh sách hồ sơ...")
                     wait_grid(45)
 
-                    # Chọn 100 dòng
-                    self.log("Thiết lập 100 bản ghi/trang...")
+                    # 4. Hiển thị 100 dòng / trang
+                    self.log("Thiết lập hiển thị 100 bản ghi/trang...")
                     try:
                         p_img = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg")
                         if p_img.is_visible(timeout=5000):
@@ -772,60 +955,72 @@ class ClientRPAGui:
                             wait_grid(45)
                     except Exception: pass
 
-                    # Lọc cột lỗi = 1
-                    self.log("Lọc các hồ sơ có lỗi (cột lỗi = 1)...")
+                    # 5. Lọc cột lỗi = 1
+                    self.log("Lọc danh sách các hồ sơ có lỗi (cột lỗi = 1)...")
                     try:
-                        col5 = page.locator("#gvDSKetQuaGuiHoso_DXFREditorcol5_I")
-                        if col5.is_visible(timeout=5000):
-                            col5.click(force=True)
-                            col5.fill("1")
-                            col5.press("Enter")
+                        c5 = page.locator("#gvDSKetQuaGuiHoso_DXFREditorcol5_I")
+                        if c5.is_visible(timeout=5000):
+                            c5.click(force=True)
+                            c5.fill("1")
+                            c5.press("Enter")
                             wait_grid(45)
                     except Exception: pass
 
-                    # Tải các gói lỗi
+                    # 6. Tải từng file chi tiết
                     total_dl = 0
                     p_idx = 1
                     while True:
-                        self.log(f"Quét danh sách gói lỗi Trang {p_idx}...")
+                        self.log(f"Quét danh sách hồ sơ lỗi tại Trang {p_idx}...")
                         wait_grid(30)
-                        row_links = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'] td a, #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS td a").all()
-                        if not row_links: row_links = page.locator("#gvDSKetQuaGuiHoso td a").all()
+                        links = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'] td a, #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS td a, #gvDSKetQuaGuiHoso td a").all()
+                        self.log(f"Tìm thấy {len(links)} gói lỗi trên trang {p_idx}.")
+                        if not links: break
 
-                        self.log(f"Tìm thấy {len(row_links)} gói trên trang {p_idx}.")
-                        if len(row_links) == 0: break
-
-                        for idx, link in enumerate(row_links):
+                        for idx, link in enumerate(links):
                             try:
+                                l_txt = link.inner_text()
+                                self.log(f"[{idx+1}/{len(links)}] Mở gói: {l_txt[:25]}...")
                                 link.click()
                                 time.sleep(1.5)
+
                                 exp_btn = page.locator("span").filter(has_text="Xuất Excel").first
                                 if exp_btn.is_visible(timeout=5000):
                                     with page.expect_download(timeout=60000) as d_info:
                                         exp_btn.click()
-                                    dl = d_info.value
-                                    t_path = os.path.join(TEMP_DIR, f"err_p{p_idx}_{idx+1}.xlsx")
-                                    dl.save_as(t_path)
+                                    d = d_info.value
+                                    t_path = os.path.join(TEMP_DIR, f"err_p{p_idx}_{idx+1}_{int(time.time()*1000)}.xlsx")
+                                    d.save_as(t_path)
                                     total_dl += 1
                                     self.log(f"  -> Đã tải tệp lỗi #{total_dl} ✅")
 
-                                # Đóng popup an toàn
+                                # Đóng popup
+                                closed = False
                                 try:
-                                    page.evaluate("""() => {
-                                        const pop = window.PopupNhanChiTietLoiHS || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('PopupNhanChiTietLoiHS'));
-                                        if (pop && typeof pop.Hide === 'function') pop.Hide();
+                                    closed = page.evaluate("""() => {
+                                        try {
+                                            const pop = window.PopupNhanChiTietLoiHS || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('PopupNhanChiTietLoiHS'));
+                                            if (pop && typeof pop.Hide === 'function') {
+                                                pop.Hide();
+                                                return true;
+                                            }
+                                        } catch(e) {}
+                                        return false;
                                     }""")
-                                except Exception:
-                                    pass
+                                except Exception: pass
 
-                                try:
-                                    c_el = page.locator(".dxpc-closeBtn, img[alt*='Close']").first
-                                    if c_el.is_visible(timeout=1000): c_el.click(force=True)
-                                except Exception:
-                                    pass
+                                if not closed:
+                                    for c_s in [".dxpc-closeBtn", "img[alt*='Close']", "img[title*='Close']"]:
+                                        try:
+                                            ce = page.locator(c_s).first
+                                            if ce.is_visible(timeout=1000):
+                                                ce.click(force=True)
+                                                closed = True
+                                                break
+                                        except Exception: pass
+
                                 time.sleep(0.6)
-                            except Exception as e_row:
-                                self.log(f"Lỗi tải dòng #{idx+1}: {e_row}")
+                            except Exception as re:
+                                self.log(f"  Lỗi tải dòng #{idx+1}: {re}")
                                 try:
                                     page.evaluate("""() => {
                                         if (window.PopupNhanChiTietLoiHS && typeof window.PopupNhanChiTietLoiHS.Hide === 'function') window.PopupNhanChiTietLoiHS.Hide();
@@ -852,16 +1047,35 @@ class ClientRPAGui:
             # Gom file
             merged_file = os.path.join(TEMP_DIR, "HoSoLoiChiTiet.xlsx")
             files = glob.glob(os.path.join(TEMP_DIR, "err_*.xlsx")) + glob.glob(os.path.join(TEMP_DIR, "err_*.xls"))
-            if files:
-                dfs = [pd.read_excel(f) for f in files if os.path.getsize(f) > 0]
-                if dfs:
-                    comb = pd.concat(dfs, ignore_index=True).drop_duplicates()
-                    comb.to_excel(merged_file, index=False)
-                    self.log(f"Tổng hợp thành công {len(comb)} dòng lỗi chi tiết vào {merged_file}.")
+            all_dfs = []
+            for f in files:
+                try:
+                    if os.path.getsize(f) > 0:
+                        df_item = pd.read_excel(f)
+                        if not df_item.empty:
+                            col_map = {}
+                            for c in df_item.columns:
+                                c_str = str(c).strip().upper()
+                                if "MA_LK" in c_str or "MÃ LIÊN KẾT" in c_str or "MÃ LK" in c_str:
+                                    col_map[c] = "MA_LK"
+                                elif "MALOI" in c_str or "MÃ LỖI" in c_str:
+                                    col_map[c] = "MALOI"
+                                elif "MOTALOI" in c_str or "MÔ TẢ" in c_str or "NỘI DUNG LỖI" in c_str or "CHI TIẾT LỖI" in c_str:
+                                    col_map[c] = "MOTALOI"
+                                elif "NGAY_RA" in c_str or "NGÀY RA" in c_str:
+                                    col_map[c] = "Ngày ra"
+                            df_item = df_item.rename(columns=col_map)
+                            all_dfs.append(df_item)
+                except Exception as ef:
+                    self.log(f"Lỗi đọc file con {os.path.basename(f)}: {ef}")
+
+            if all_dfs:
+                comb = pd.concat(all_dfs, ignore_index=True).drop_duplicates()
+                comb.to_excel(merged_file, index=False)
+                self.log(f"Tổng hợp thành công {len(comb)} dòng lỗi chi tiết vào {merged_file} ✅")
             else:
                 self.log("Không có gói lỗi nào được tải về trong khoảng ngày này.")
-                # Tạo file rỗng
-                pd.DataFrame(columns=["MA_LK", "MALOI", "MOTALOI", "Ngày ra"]).to_excel(merged_file, index=False)
+                pd.DataFrame(columns=["MA_LK", "MALOI", "MOTALOI", "Ngày ra", "Tên bệnh nhân", "Mã thẻ"]).to_excel(merged_file, index=False)
 
             # Upload lên server
             self.log(f"Đang đẩy file {merged_file} lên máy chủ {srv}...")
@@ -878,19 +1092,27 @@ class ClientRPAGui:
 
             if r_sync.status_code == 200:
                 res_data = r_sync.json()
+                self.last_status = {"status": "success", "flow": "C", "message": res_data.get('message', 'Thành công'), "error": None}
                 self.log("=== ĐỐI SOÁT C HOÀN TẤT THÀNH CÔNG! ✅ ===")
                 self.log(f"Kết quả: {res_data.get('message', 'Thành công')}")
-                messagebox.showinfo("Thành công", f"Đã hoàn thành Đối soát C trên máy chủ!\n{res_data.get('message', '')}")
+                if not is_from_web:
+                    messagebox.showinfo("Thành công", f"Đã hoàn thành Đối soát C trên máy chủ!\n{res_data.get('message', '')}")
             else:
-                self.log(f"Lỗi đối soát: {r_sync.text}")
-                messagebox.showerror("Lỗi đối soát", f"Máy chủ trả về lỗi: {r_sync.text}")
+                err_text = r_sync.text
+                self.last_status = {"status": "error", "flow": "C", "message": f"Máy chủ trả về lỗi: {err_text}", "error": err_text}
+                self.log(f"Lỗi đối soát: {err_text}")
+                if not is_from_web:
+                    messagebox.showerror("Lỗi đối soát", f"Máy chủ trả về lỗi: {err_text}")
 
         except Exception as e:
+            self.last_status = {"status": "error", "flow": "C", "message": str(e), "error": str(e)}
             self.log(f"LỖI THỰC THI: {e}")
-            messagebox.showerror("Lỗi", f"Lỗi Luồng C: {e}")
+            if not is_from_web:
+                messagebox.showerror("Lỗi", f"Lỗi Luồng C: {e}")
         finally:
-            self.btn_flow_b.configure(state=tk.NORMAL)
-            self.btn_flow_c.configure(state=tk.NORMAL)
+            self.is_running = False
+            self.root.after(0, lambda: self.btn_flow_b.configure(state=tk.NORMAL))
+            self.root.after(0, lambda: self.btn_flow_c.configure(state=tk.NORMAL))
 
 
 if __name__ == "__main__":
