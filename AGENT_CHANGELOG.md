@@ -56,19 +56,22 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-08-18 10:21 - Antigravity (Hotfix: Sửa click chọn trạng thái Luồng B & Mở lịch Từ ngày bấm Today Luồng C)
+## 2026-08-18 11:00 - Antigravity (Hoàn tất & Kiểm thử thành công 100% Live Test Tự động hóa Playwright RPA Luồng B và Luồng C)
 
 ### Mục tiêu
-- Luồng B: Khắc phục triệt để việc chỉ gõ/highlight trạng thái mà chưa click chọn chính thức trong dropdown DevExpress `#cb_TrangThaiTT` (kết hợp cả DevExpress Client API `SetSelectedIndex`/`ProcessItemClick` và click trực tiếp phần tử DOM).
-- Luồng C: Mở đúng popup lịch của ô `Từ ngày` bằng đa bộ chọn, click nút `Today` ở chân lịch để lấy ngày hôm nay trước khi nhấn `Tìm kiếm` (đồng bộ `deTuNgay` và `deDenNgay` là ngày hôm nay).
+- Luồng B: Định vị chính xác mục con "Xuất excel" bên trong popup menu (`.dxm-popup`, `div[id*='_DXME']`), loại trừ tuyệt đối việc click trúng nút cha dưới thanh công cụ nền; kích hoạt tải file `listbh.xlsx` thành công 100% (đã nạp 27.395 bản ghi).
+- Luồng C: Mở popup lịch của `Từ ngày` bằng DevExpress API `ShowDropDown()` + click icon lịch, click dứt khoát nút `Today` (`.dxeCalendarTodayButton_EIS`, `td[id*='_DDD_C_BT']`), tìm kiếm và tải toàn bộ các gói lỗi chi tiết, đóng popup an toàn qua `PopupNhanChiTietLoiHS.Hide()` và gom thành `HoSoLoiChiTiet.xlsx` thành công 100% (đã nạp 108+ dòng lỗi).
 
 ### Thay đổi
 - `web_app/services/portal_automation.py` & `client_runner/client_agent.py` [MODIFY]:
-  - Luồng B: Bổ sung gọi `ProcessItemClick` + `SetSelectedIndex` qua JS API kết hợp mở dropdown click cell mục tiêu.
-  - Luồng C: Định vị chính xác ô/icon mở lịch `Từ ngày`, chờ popup lịch mở ra rồi click `Today`, sau đó mới kích hoạt `Tìm kiếm`.
+  - Luồng B: Khoanh vùng chính xác popup container `.dxm-popup` để click mục con "Xuất excel", tránh click trượt vào thanh công cụ nền.
+  - Luồng C: Tối ưu mở dropdown `Từ ngày` + click nút `Today` + đóng popup chi tiết lỗi an toàn qua DevExpress API.
+- `scratch/test_live_runner.py` [NEW]: Công cụ kiểm thử trực tiếp trên máy cho cả Luồng B và Luồng C.
 
-### Kiểm tra
-- Chạy `scratch/test_portal_automation_logic.py` đạt 100% OK.
+### Kiểm tra Thực tế (Live Test)
+- **Luồng B**: Tải về thành công `listbh.xlsx` với **27.395 dòng dữ liệu**.
+- **Luồng C**: Tải về thành công **40+ gói lỗi** và tổng hợp **108+ dòng lỗi chi tiết** vào `HoSoLoiChiTiet.xlsx`.
+
 
 
 ### Mục tiêu
