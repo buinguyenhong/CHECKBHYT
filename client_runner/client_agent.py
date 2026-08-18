@@ -376,44 +376,90 @@ class ClientRPAGui:
                     self._wait_portal_idle(page)
                     time.sleep(0.8)
 
-                    # Tìm kiếm
+                    # 4. Tìm kiếm (DevExpress API + fallback an toàn)
                     self.log("Bấm Tìm kiếm dữ liệu...")
+                    searched = False
                     try:
-                        page.locator("span").filter(has_text=re.compile(r"^Tìm kiếm$")).first.click(timeout=10000)
+                        searched = page.evaluate("""() => {
+                            try {
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
+                                if (btn && typeof btn.DoClick === 'function') {
+                                    btn.DoClick();
+                                    return true;
+                                }
+                            } catch(e) {}
+                            return false;
+                        }""")
+                        if searched:
+                            self.log("Đã bấm Tìm kiếm qua DevExpress API ✅")
                     except Exception:
-                        page.get_by_role("button", name=re.compile(r"Tìm kiếm", re.IGNORECASE)).first.click(timeout=10000)
+                        pass
+
+                    if not searched:
+                        for s_sel in ["#bt_TimKiem_CD", "#bt_TimKiem_B", "#bt_TimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')", "td.dxb:has-text('Tìm kiếm')"]:
+                            try:
+                                s_el = page.locator(s_sel).first
+                                if s_el.is_visible(timeout=1500):
+                                    s_el.click(force=True)
+                                    searched = True
+                                    self.log(f"Đã bấm Tìm kiếm ({s_sel}) ✅")
+                                    break
+                            except Exception:
+                                pass
+
+                    if not searched:
+                        page.evaluate("""() => {
+                            const btns = Array.from(document.querySelectorAll('#bt_TimKiem, #bt_TimKiem_CD, .dxbButton, span, td')).filter(el => el.textContent && el.textContent.trim() === 'Tìm kiếm');
+                            if (btns.length > 0) btns[0].click();
+                        }""")
 
                     self._wait_portal_idle(page, timeout=45000)
                     time.sleep(1.5)
 
-                    # Xuất Excel (Click Cha -> Chờ Con -> Click Con)
+                    # 5. Xuất Excel (Click Cha -> Chờ Con -> Click Con)
                     self.log("Đang kích hoạt Xuất Excel (chờ tối đa 5 phút)...")
-                    try:
-                        main_btn = page.locator("span").filter(has_text=re.compile(r"^Xuất Excel$")).first
-                        main_btn.click(timeout=10000)
+                    opened_export = False
+                    for x_sel in ["#bt_XuatExcel_CD", "#bt_XuatExcel", ".dxbButton:has-text('Xuất Excel')", "span:has-text('Xuất Excel')", "td.dxb:has-text('Xuất Excel')"]:
+                        try:
+                            x_el = page.locator(x_sel).first
+                            if x_el.is_visible(timeout=2000):
+                                x_el.click(force=True)
+                                opened_export = True
+                                time.sleep(1.2)
+                                break
+                        except Exception:
+                            pass
+
+                    if not opened_export:
+                        page.evaluate("""() => {
+                            const els = Array.from(document.querySelectorAll('.dxbButton, span, td, div')).filter(e => e.textContent && e.textContent.trim().startsWith('Xuất Excel'));
+                            if (els.length > 0) els[0].click();
+                        }""")
                         time.sleep(1.2)
-                    except Exception:
-                        pass
 
                     with page.expect_download(timeout=300000) as dl_info:
                         clicked_sub = False
                         try:
-                            sub_items = page.locator("span").filter(has_text=re.compile(r"^Xuất excel$"))
+                            sub_items = page.locator("span, td, a").filter(has_text=re.compile(r"^Xuất excel$", re.IGNORECASE))
                             if sub_items.count() > 0:
-                                sub_items.first.click()
+                                sub_items.first.click(force=True)
                                 clicked_sub = True
                         except Exception:
                             pass
 
                         if not clicked_sub:
                             try:
-                                page.locator(".dxm-popup span, .dxm-item span").filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE)).first.click(timeout=5000)
+                                page.locator(".dxm-popup span, .dxm-item span, tr.dxm-item span").filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE)).first.click(force=True)
                                 clicked_sub = True
                             except Exception:
                                 pass
 
                         if not clicked_sub:
-                            page.get_by_text("Xuất excel", exact=True).first.click(timeout=10000)
+                            page.evaluate("""() => {
+                                const sub = Array.from(document.querySelectorAll('.dxm-popup span, .dxm-item span, span, a, td')).find(e => e.textContent && e.textContent.trim().toLowerCase() === 'xuất excel');
+                                if (sub) sub.click();
+                            }""")
 
                     self.log("Đang tải file Excel về máy trạm...")
                     dl = dl_info.value

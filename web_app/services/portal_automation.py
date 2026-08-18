@@ -245,21 +245,21 @@ class PortalAutomationService:
                 self.wait_portal_idle(page)
                 time.sleep(1.0)
 
-                # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" (Sửa triệt để click chọn)
+                # 3. Chọn Trạng thái: "Đã đề nghị thanh toán"
                 log("Đang chọn trạng thái: Đã đề nghị thanh toán...")
                 status_selected = False
                 
-                # Cách 1: Sử dụng DevExpress Client-Side API chính thức để chọn item và kích hoạt sự kiện
+                # Cách 1: Sử dụng DevExpress Client-Side API chính thức
                 try:
                     js_res = page.evaluate("""() => {
                         try {
                             const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
                             const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
                             if (cb) {
-                                const count = cb.GetItemCount ? cb.GetItemCount() : 0;
+                                const count = typeof cb.GetItemCount === 'function' ? cb.GetItemCount() : 0;
                                 for (let i = 0; i < count; i++) {
                                     const it = cb.GetItem(i);
-                                    if (it && it.text && it.text.includes('Đã đề nghị thanh toán')) {
+                                    if (it && it.text && it.text.trim().toLowerCase().includes('đã đề nghị thanh toán')) {
                                         cb.SetSelectedIndex(i);
                                         if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
                                         if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
@@ -267,6 +267,7 @@ class PortalAutomationService:
                                     }
                                 }
                                 cb.SetText('Đã đề nghị thanh toán');
+                                if (typeof cb.SetValue === 'function') cb.SetValue('2');
                                 if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
                                 return true;
                             }
@@ -283,14 +284,11 @@ class PortalAutomationService:
                 try:
                     btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, td[id*='cb_TrangThaiTT_B-1']").first
                     if btn_cb.is_visible(timeout=3000):
-                        btn_cb.click()
+                        btn_cb.click(force=True)
                         time.sleep(0.6)
                         
-                        # Chờ bảng danh sách popup xuất hiện
-                        page.wait_for_selector("#cb_TrangThaiTT_DDD_L_LBT, tr.dxeListBoxItemRow_EIS, td.dxeListBoxItem_EIS, .dxeListBoxItem", timeout=5000)
-                        
-                        # Click trực tiếp vào cell có chữ "Đã đề nghị thanh toán"
-                        item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"^Đã đề nghị thanh toán", re.IGNORECASE)).first
+                        # Click trực tiếp vào cell có chữ "Đã đề nghị thanh toán" trong popup table
+                        item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
                         if item.is_visible(timeout=3000):
                             item.click(force=True)
                             status_selected = True
@@ -298,30 +296,59 @@ class PortalAutomationService:
                 except Exception as e:
                     log(f"Lưu ý click dropdown trạng thái: {e}")
 
-                # Cách 3: JS dispatch click vào DOM item
-                if not status_selected:
-                    try:
-                        page.evaluate("""() => {
-                            const cells = Array.from(document.querySelectorAll('#cb_TrangThaiTT_DDD_L_LBT td, .dxeListBoxItem_EIS, .dxeListBoxItem'));
-                            const target = cells.find(c => c.textContent && c.textContent.trim().includes('Đã đề nghị thanh toán'));
-                            if (target) {
-                                target.click();
-                                return true;
-                            }
-                            return false;
-                        }""")
-                    except Exception:
-                        pass
-
                 self.wait_portal_idle(page)
                 time.sleep(0.8)
 
-                # 4. Bấm Tìm kiếm
+                # 4. Bấm Tìm kiếm (Sửa triệt để không click vào hidden input dxb-hb)
                 log("Bấm Tìm kiếm dữ liệu...")
+                searched = False
+                
+                # Cách 1: DevExpress API DoClick
                 try:
-                    page.locator("span").filter(has_text=re.compile(r"^Tìm kiếm$")).first.click(timeout=10000)
+                    searched = page.evaluate("""() => {
+                        try {
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
+                            if (btn && typeof btn.DoClick === 'function') {
+                                btn.DoClick();
+                                return true;
+                            }
+                        } catch(e) {}
+                        return false;
+                    }""")
+                    if searched:
+                        log("Đã kích hoạt nút Tìm kiếm qua DevExpress DoClick API ✅")
                 except Exception:
-                    page.get_by_role("button", name=re.compile(r"Tìm kiếm", re.IGNORECASE)).first.click(timeout=10000)
+                    pass
+
+                # Cách 2: Click vào table hoặc span hiển thị của nút Tìm kiếm
+                if not searched:
+                    search_selectors = [
+                        "#bt_TimKiem_CD",
+                        "#bt_TimKiem_B",
+                        "#bt_TimKiem",
+                        "#btnTimKiem_CD",
+                        "#btnTimKiem",
+                        ".dxbButton:has-text('Tìm kiếm')",
+                        "span:has-text('Tìm kiếm')",
+                        "td.dxb:has-text('Tìm kiếm')"
+                    ]
+                    for s_sel in search_selectors:
+                        try:
+                            s_el = page.locator(s_sel).first
+                            if s_el.is_visible(timeout=1500):
+                                s_el.click(force=True)
+                                searched = True
+                                log(f"Đã bấm nút Tìm kiếm ({s_sel}) ✅")
+                                break
+                        except Exception:
+                            pass
+
+                if not searched:
+                    page.evaluate("""() => {
+                        const btns = Array.from(document.querySelectorAll('#bt_TimKiem, #bt_TimKiem_CD, .dxbButton, span, td')).filter(el => el.textContent && el.textContent.trim() === 'Tìm kiếm');
+                        if (btns.length > 0) btns[0].click();
+                    }""")
                 
                 self.wait_portal_idle(page, timeout=45000)
                 time.sleep(1.5)
@@ -330,20 +357,39 @@ class PortalAutomationService:
                 log("Đang kích hoạt Xuất Excel danh sách đã gửi (hỗ trợ tối đa 5 phút vào ngày cao điểm)...")
                 
                 # Bước 5.1: Click nút cha "Xuất Excel"
-                try:
-                    main_btn = page.locator("span").filter(has_text=re.compile(r"^Xuất Excel$")).first
-                    main_btn.click(timeout=10000)
+                opened_export = False
+                export_selectors = [
+                    "#bt_XuatExcel_CD",
+                    "#bt_XuatExcel",
+                    ".dxbButton:has-text('Xuất Excel')",
+                    "span:has-text('Xuất Excel')",
+                    "td.dxb:has-text('Xuất Excel')"
+                ]
+                for x_sel in export_selectors:
+                    try:
+                        x_el = page.locator(x_sel).first
+                        if x_el.is_visible(timeout=2000):
+                            x_el.click(force=True)
+                            opened_export = True
+                            time.sleep(1.2)
+                            break
+                    except Exception:
+                        pass
+                
+                if not opened_export:
+                    page.evaluate("""() => {
+                        const els = Array.from(document.querySelectorAll('.dxbButton, span, td, div')).filter(e => e.textContent && e.textContent.trim().startsWith('Xuất Excel'));
+                        if (els.length > 0) els[0].click();
+                    }""")
                     time.sleep(1.2)
-                except Exception as e:
-                    log(f"Lưu ý click nút Xuất Excel: {e}")
 
                 # Bước 5.2: Chờ và Click chính xác vào mục con "Xuất excel"
                 with page.expect_download(timeout=300000) as download_info:
                     clicked_sub = False
                     try:
-                        sub_items = page.locator("span").filter(has_text=re.compile(r"^Xuất excel$"))
+                        sub_items = page.locator("span, td, a").filter(has_text=re.compile(r"^Xuất excel$", re.IGNORECASE))
                         if sub_items.count() > 0:
-                            sub_items.first.click()
+                            sub_items.first.click(force=True)
                             clicked_sub = True
                     except Exception:
                         pass
@@ -351,13 +397,16 @@ class PortalAutomationService:
                     if not clicked_sub:
                         try:
                             popup_item = page.locator(".dxm-popup span, .dxm-item span, tr.dxm-item span").filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE)).first
-                            popup_item.click(timeout=5000)
+                            popup_item.click(force=True)
                             clicked_sub = True
                         except Exception as ex:
                             log(f"Lưu ý click popup item: {ex}")
 
                     if not clicked_sub:
-                        page.get_by_text("Xuất excel", exact=True).first.click(timeout=10000)
+                        page.evaluate("""() => {
+                            const sub = Array.from(document.querySelectorAll('.dxm-popup span, .dxm-item span, span, a, td')).find(e => e.textContent && e.textContent.trim().toLowerCase() === 'xuất excel');
+                            if (sub) sub.click();
+                        }""")
 
                 log("Cổng BHYT đã tạo tệp Excel xong! Đang tải về máy...")
                 download = download_info.value
