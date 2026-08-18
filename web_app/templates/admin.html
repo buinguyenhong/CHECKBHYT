@@ -2814,6 +2814,9 @@
                     `;
                     tbody.appendChild(tr);
                 });
+                
+                // Áp dụng bộ lọc ngay nếu đang có chọn khoa hoặc tìm kiếm
+                filterLoiTable();
             } else {
                 const text = await res.text();
                 let detail = "Không thể tải danh sách dữ liệu lỗi.";
@@ -2840,16 +2843,33 @@
         rows.forEach(row => {
             if (row.cells.length < 14) return;
             
-            const maLk = row.cells[1].textContent.toLowerCase();
-            const hoTen = row.cells[2].textContent.toLowerCase();
-            const maThe = row.cells[3].textContent.toLowerCase();
-            const tenKhoaRaw = row.cells[5].textContent;
+            const maLk = (row.cells[1]?.textContent || '').toLowerCase().trim();
+            const hoTen = (row.cells[2]?.textContent || '').toLowerCase().trim();
+            const maThe = (row.cells[3]?.textContent || '').toLowerCase().trim();
+            const ngayRa = (row.cells[4]?.textContent || '').toLowerCase().trim();
+            const tenKhoaRaw = (row.cells[7]?.textContent || '').trim();
             const tenKhoa = tenKhoaRaw.toLowerCase();
-            const maLoi = row.cells[7].textContent.toLowerCase();
-            const moTaLoi = row.cells[8].textContent.toLowerCase();
+            const loaiCa = (row.cells[8]?.textContent || '').toLowerCase().trim();
+            const maLoi = (row.cells[9]?.textContent || '').toLowerCase().trim();
+            const moTaLoi = (row.cells[10]?.textContent || '').toLowerCase().trim();
+            const nguyenNhan = (row.cells[11]?.textContent || '').toLowerCase().trim();
+            const huongXuLy = (row.cells[12]?.textContent || '').toLowerCase().trim();
+            const ghiChu = (row.cells[13]?.textContent || '').toLowerCase().trim();
             
-            const matchesQuery = maLk.includes(query) || hoTen.includes(query) || maThe.includes(query) || tenKhoa.includes(query) || maLoi.includes(query) || moTaLoi.includes(query);
-            const matchesDept = (selectedDept === 'All') || (tenKhoaRaw === selectedDept);
+            const matchesQuery = query === '' || 
+                maLk.includes(query) || 
+                hoTen.includes(query) || 
+                maThe.includes(query) || 
+                ngayRa.includes(query) ||
+                tenKhoa.includes(query) || 
+                loaiCa.includes(query) ||
+                maLoi.includes(query) || 
+                moTaLoi.includes(query) ||
+                nguyenNhan.includes(query) ||
+                huongXuLy.includes(query) ||
+                ghiChu.includes(query);
+                
+            const matchesDept = (selectedDept === 'All') || (tenKhoaRaw === selectedDept) || (tenKhoa === selectedDept.toLowerCase());
             
             const visible = matchesQuery && matchesDept;
             row.style.display = visible ? '' : 'none';
@@ -2857,7 +2877,8 @@
         });
         
         if (query !== "" || selectedDept !== "All") {
-            document.getElementById('loiCountText').innerText = `${visibleCount} (lọc từ ${rows.length})`;
+            const actualRows = Array.from(rows).filter(r => r.cells.length >= 14);
+            document.getElementById('loiCountText').innerText = `${visibleCount} (lọc từ ${actualRows.length})`;
         } else {
             const actualRows = Array.from(rows).filter(r => r.cells.length >= 14);
             document.getElementById('loiCountText').innerText = actualRows.length;

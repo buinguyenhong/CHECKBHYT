@@ -56,7 +56,16 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-08-18 11:00 - Antigravity (Hoàn tất & Kiểm thử thành công 100% Live Test Tự động hóa Playwright RPA Luồng B và Luồng C)
+## 2026-08-18 11:12 - Antigravity (Fix: Sửa lỗi bộ lọc khoa phòng và tìm kiếm tại Tab 3 Danh sách dữ liệu lỗi)
+
+### Mục tiêu
+- Khắc phục lỗi khi chọn khoa phòng trong dropdown `loi_filter_dept` tại Tab 3 nhưng bảng không hiển thị được dữ liệu do lệch chỉ số cột (hàm `filterLoiTable` đọc `cells[5]` - Tổng tiền thay vì `cells[7]` - Tên khoa).
+
+### Thay đổi
+- `web_app/templates/admin.html` [MODIFY]:
+  - Sửa lại toàn bộ chỉ số cột trong `filterLoiTable()`: Cột 1 (Mã LK), 2 (Họ tên), 3 (Mã thẻ), 4 (Ngày ra viện), 7 (Tên khoa), 8 (Loại ca), 9 (Mã lỗi), 10 (Mô tả lỗi), 11 (Nguyên nhân), 12 (Hướng xử lý), 13 (Ghi chú).
+  - Tự động áp dụng `filterLoiTable()` ngay sau khi nạp xong dữ liệu `fetchLoiRecords()`.
+
 
 ### Mục tiêu
 - Luồng B: Định vị chính xác mục con "Xuất excel" bên trong popup menu (`.dxm-popup`, `div[id*='_DXME']`), loại trừ tuyệt đối việc click trúng nút cha dưới thanh công cụ nền; kích hoạt tải file `listbh.xlsx` thành công 100% (đã nạp 27.395 bản ghi).
