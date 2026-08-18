@@ -658,33 +658,53 @@ class PortalAutomationService:
                 time.sleep(1.0)
                 self.wait_portal_idle(page)
 
-                # Bấm nút Tìm kiếm
+                # Bấm nút Tìm kiếm (DevExpress API + fallback)
                 log("Bấm Tìm kiếm dữ liệu...")
                 searched = False
-                search_selectors = [
-                    "#btnTimKiem",
-                    "#btnSearch",
-                    ".dxbButton:has-text('Tìm kiếm')",
-                    "input[value*='Tìm kiếm']",
-                    "button:has-text('Tìm kiếm')",
-                    "span:has-text('Tìm kiếm')",
-                    "a:has-text('Tìm kiếm')"
-                ]
-                for s_sel in search_selectors:
-                    try:
-                        s_btn = page.locator(s_sel).first
-                        if s_btn.is_visible(timeout=2000):
-                            s_btn.click()
-                            searched = True
-                            break
-                    except Exception:
-                        pass
+                try:
+                    searched = page.evaluate("""() => {
+                        try {
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            const btn = window.btnTimKiem || window.bt_TimKiem || (cc ? (cc.GetByName('btnTimKiem') || cc.GetByName('bt_TimKiem')) : null);
+                            if (btn && typeof btn.DoClick === 'function') {
+                                btn.DoClick();
+                                return true;
+                            }
+                        } catch(e) {}
+                        return false;
+                    }""")
+                    if searched:
+                        log("Đã kích hoạt nút Tìm kiếm qua DevExpress DoClick API ✅")
+                except Exception:
+                    pass
 
                 if not searched:
-                    try:
-                        page.get_by_role("button", name=re.compile(r"Tìm kiếm", re.IGNORECASE)).first.click(timeout=5000)
-                    except Exception:
-                        pass
+                    search_selectors = [
+                        "#btnTimKiem_CD",
+                        "#btnTimKiem_B",
+                        "#btnTimKiem",
+                        "#bt_TimKiem_CD",
+                        "#bt_TimKiem",
+                        ".dxbButton:has-text('Tìm kiếm')",
+                        "span:has-text('Tìm kiếm')",
+                        "td.dxb:has-text('Tìm kiếm')"
+                    ]
+                    for s_sel in search_selectors:
+                        try:
+                            s_btn = page.locator(s_sel).first
+                            if s_btn.is_visible(timeout=2000):
+                                s_btn.click(force=True)
+                                searched = True
+                                log(f"Đã bấm nút Tìm kiếm ({s_sel}) ✅")
+                                break
+                        except Exception:
+                            pass
+
+                if not searched:
+                    page.evaluate("""() => {
+                        const btns = Array.from(document.querySelectorAll('#btnTimKiem, #bt_TimKiem, .dxbButton, span, td')).filter(el => el.textContent && el.textContent.trim() === 'Tìm kiếm');
+                        if (btns.length > 0) btns[0].click();
+                    }""")
 
                 def wait_for_grid_data(timeout=45):
                     """Chờ máy chủ DevExpress trả về dữ liệu hoặc thông báo không có dữ liệu"""

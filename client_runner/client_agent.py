@@ -682,8 +682,36 @@ class ClientRPAGui:
                     self._wait_portal_idle(page)
 
                     # Bấm tìm kiếm
-                    try: page.locator(".dxbButton:has-text('Tìm kiếm'), #btnTimKiem, span:has-text('Tìm kiếm')").first.click(timeout=5000)
-                    except Exception: pass
+                    searched = False
+                    try:
+                        searched = page.evaluate("""() => {
+                            try {
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                const btn = window.btnTimKiem || window.bt_TimKiem || (cc ? (cc.GetByName('btnTimKiem') || cc.GetByName('bt_TimKiem')) : null);
+                                if (btn && typeof btn.DoClick === 'function') {
+                                    btn.DoClick();
+                                    return true;
+                                }
+                            } catch(e) {}
+                            return false;
+                        }""")
+                        if searched:
+                            self.log("Đã bấm Tìm kiếm qua DevExpress API ✅")
+                    except Exception:
+                        pass
+
+                    if not searched:
+                        for s_sel in ["#btnTimKiem_CD", "#btnTimKiem_B", "#btnTimKiem", "#bt_TimKiem_CD", "#bt_TimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')"]:
+                            try:
+                                s_btn = page.locator(s_sel).first
+                                if s_btn.is_visible(timeout=2000):
+                                    s_btn.click(force=True)
+                                    searched = True
+                                    self.log(f"Đã bấm Tìm kiếm ({s_sel}) ✅")
+                                    break
+                            except Exception:
+                                pass
+
                     self.log("Đang chờ tải danh sách hồ sơ...")
                     wait_grid(45)
 
