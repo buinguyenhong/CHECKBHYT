@@ -34,6 +34,32 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 SESSION_FILE = os.path.join(SESSION_DIR, "portal_storage_state.json")
 
+def parse_date_info(date_val):
+    """Parse date string into components and standard formats."""
+    if not date_val:
+        d_obj = datetime.date.today()
+    elif isinstance(date_val, (datetime.date, datetime.datetime)):
+        d_obj = date_val if isinstance(date_val, datetime.date) else date_val.date()
+    else:
+        clean = str(date_val).strip().replace('-', '/').replace('.', '/')
+        d_obj = None
+        for fmt in ["%Y/%m/%d", "%d/%m/%Y", "%Y%m%d"]:
+            try:
+                d_obj = datetime.datetime.strptime(clean, fmt).date()
+                break
+            except Exception:
+                pass
+        if not d_obj:
+            d_obj = datetime.date.today()
+            
+    return {
+        "year": d_obj.year,
+        "month": d_obj.month, # 1-12
+        "day": d_obj.day,
+        "d_str": d_obj.strftime("%d/%m/%Y"), # 01/08/2026
+        "iso": d_obj.strftime("%Y-%m-%d")    # 2026-08-01
+    }
+
 ACTIVE_CLIENT_GUI = None
 
 
@@ -795,113 +821,68 @@ class ClientRPAGui:
                         self._wait_portal_idle(page)
                     except Exception: pass
 
-                    # 3. LỌC THEO NGÀY: MỞ LỊCH TỪ NGÀY VÀ BẤM NÚT TODAY
-                    self.log("Đang mở lịch 'Từ ngày' để bấm nút Today...")
-                    
-                    opened_tu_ngay = False
+                    # 3. LỌC THEO KHOẢNG NGÀY: TỪ NGÀY - ĐẾN NGÀY (CHÍNH XÁC THEO YÊU CẦU)
+                    p_from = parse_date_info(from_d)
+                    p_to = parse_date_info(to_d)
+                    self.log(f"Thiết lập khoảng ngày tìm kiếm: {p_from['d_str']} đến {p_to['d_str']}...")
+
+                    # 3.1. Thiết lập ngày bằng DevExpress Client API
                     try:
-                        opened_tu_ngay = page.evaluate("""() => {
+                        page.evaluate("""({f_y, f_m, f_d, f_str, t_y, t_m, t_d, t_str}) => {
                             try {
                                 const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
                                 if (cc) {
-                                    const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
-                                    if (deTu && typeof deTu.ShowDropDown === 'function') {
-                                        deTu.ShowDropDown();
-                                        return true;
+                                    const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay') || window.deTuNgay || window.txtTuNgay;
+                                    if (deTu) {
+                                        if (typeof deTu.SetDate === 'function') deTu.SetDate(new Date(f_y, f_m - 1, f_d));
+                                        if (typeof deTu.SetText === 'function') deTu.SetText(f_str);
+                                    }
+                                    const deDen = cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay') || window.deDenNgay || window.txtDenNgay;
+                                    if (deDen) {
+                                        if (typeof deDen.SetDate === 'function') deDen.SetDate(new Date(t_y, t_m - 1, t_d));
+                                        if (typeof deDen.SetText === 'function') deDen.SetText(t_str);
                                     }
                                 }
+                                // Direct DOM inputs fallback
+                                const setDomVal = (sel, val) => {
+                                    const inputs = Array.from(document.querySelectorAll(sel));
+                                    for (const inp of inputs) {
+                                        inp.value = val;
+                                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                        inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                        inp.dispatchEvent(new Event('blur', { bubbles: true }));
+                                    }
+                                };
+                                setDomVal('#deTuNgay_I, #txtTuNgay_I, input[name*="TuNgay"]', f_str);
+                                setDomVal('#deDenNgay_I, #txtDenNgay_I, input[name*="DenNgay"]', t_str);
                             } catch(e) {}
-                            return false;
-                        }""")
-                        if opened_tu_ngay:
-                            self.log("Đã mở popup lịch Từ ngày qua DevExpress ShowDropDown() ✅")
-                            time.sleep(0.8)
-                    except Exception:
-                        pass
+                        }""", {
+                            "f_y": p_from["year"], "f_m": p_from["month"], "f_d": p_from["day"], "f_str": p_from["d_str"],
+                            "t_y": p_to["year"], "t_m": p_to["month"], "t_d": p_to["day"], "t_str": p_to["d_str"]
+                        })
+                    except Exception as e_date:
+                        self.log(f"Lưu ý thiết lập ngày API: {e_date}")
 
-                    if not opened_tu_ngay:
-                        for sel in ["td:has-text('Từ ngày') ~ td img", "td:has-text('Từ ngày') ~ td .dxeButtonEditButton_EIS", "tr:has-text('Từ ngày') img", "tr:has-text('Từ ngày') .dxeButtonEditButton_EIS", "#deTuNgay_B-1Img", "#deTuNgay_B-1", "#deTuNgay_I", "#txtTuNgay_I", "input[name*='TuNgay']", "table[id*='TuNgay'] td[id*='B-1']"]:
-                            try:
-                                el = page.locator(sel).first
-                                if el.is_visible(timeout=1500):
-                                    el.click(force=True)
-                                    opened_tu_ngay = True
-                                    self.log(f"Đã mở lịch Từ ngày ({sel}) ✅")
-                                    time.sleep(0.8)
-                                    break
-                            except Exception:
-                                pass
-
-                    if not opened_tu_ngay:
-                        opened_tu_ngay = page.evaluate("""() => {
-                            const tds = Array.from(document.querySelectorAll('td, label, span')).filter(e => e.textContent && e.textContent.trim().startsWith('Từ ngày'));
-                            for (const td of tds) {
-                                const parent = td.closest('tr') || td.parentElement;
-                                if (parent) {
-                                    const btn = parent.querySelector('img, td.dxeButtonEditButton_EIS, input');
-                                    if (btn) { btn.click(); return true; }
-                                }
-                            }
-                            return false;
-                        }""")
-                        time.sleep(0.8)
-
-                    # Bấm nút Today
-                    self.log("Đang bấm nút 'Today' trên popup lịch...")
-                    today_clicked = False
+                    # 3.2. Điền trực tiếp vào input nếu hiển thị
                     try:
-                        page.wait_for_selector(".dxeCalendarTodayButton_EIS, td[id*='_BT'], table[id*='_BT'], .dxbButton:has-text('Today'), span:has-text('Today'), td:has-text('Today')", timeout=5000)
+                        tu_inp = page.locator("#deTuNgay_I, #txtTuNgay_I, input[name*='TuNgay']").first
+                        if tu_inp.is_visible(timeout=1500):
+                            tu_inp.click(force=True)
+                            tu_inp.fill(p_from["d_str"])
+                            tu_inp.press("Tab")
                     except Exception:
                         pass
 
-                    for t_sel in [".dxeCalendarTodayButton_EIS", "td[id*='_DDD_C_BT']", "table[id*='_DDD_C_BT']", "#deTuNgay_DDD_C_BT", ".dxbButton:has-text('Today')", "span:has-text('Today')", "td:has-text('Today')", "div:has-text('Today')", "button:has-text('Today')"]:
-                        try:
-                            t_btn = page.locator(t_sel).first
-                            if t_btn.is_visible(timeout=1500):
-                                t_btn.click(force=True)
-                                today_clicked = True
-                                self.log(f"Đã click nút 'Today' ({t_sel}) ✅")
-                                break
-                        except Exception:
-                            pass
-
-                    if not today_clicked:
-                        today_clicked = page.evaluate("""() => {
-                            const todayBtn = document.querySelector('.dxeCalendarTodayButton_EIS, td[id*="_BT"], table[id*="_BT"]');
-                            if (todayBtn) {
-                                todayBtn.click();
-                                return true;
-                            }
-                            const btns = Array.from(document.querySelectorAll('span, button, td, div, a')).filter(el => el.textContent && el.textContent.trim().toLowerCase() === 'today');
-                            for (const b of btns) {
-                                if (b.offsetParent !== null) {
-                                    b.click();
-                                    return true;
-                                }
-                            }
-                            if (btns.length > 0) { btns[0].click(); return true; }
-                            return false;
-                        }""")
-                        if today_clicked:
-                            self.log("Đã click nút 'Today' qua JS fallback ✅")
-
-                    # Đồng bộ DevExpress API cho chắc chắn cả 2 ô là ngày hôm nay
                     try:
-                        page.evaluate("""() => {
-                            try {
-                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                if (cc) {
-                                    const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
-                                    if (deTu && typeof deTu.SetDate === 'function') deTu.SetDate(new Date());
-                                    const deDen = cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay');
-                                    if (deDen && typeof deDen.SetDate === 'function') deDen.SetDate(new Date());
-                                }
-                            } catch(e) {}
-                        }""")
+                        den_inp = page.locator("#deDenNgay_I, #txtDenNgay_I, input[name*='DenNgay']").first
+                        if den_inp.is_visible(timeout=1500):
+                            den_inp.click(force=True)
+                            den_inp.fill(p_to["d_str"])
+                            den_inp.press("Tab")
                     except Exception:
                         pass
 
-                    time.sleep(1.0)
+                    time.sleep(0.8)
                     self._wait_portal_idle(page)
 
                     # Bấm tìm kiếm
@@ -948,25 +929,14 @@ class ClientRPAGui:
                     self.log("Thiết lập hiển thị 100 bản ghi/trang...")
                     try:
                         p_img = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg")
-                        if p_img.is_visible(timeout=5000):
+                        if p_img.is_visible(timeout=4000):
                             p_img.click()
                             time.sleep(0.5)
-                            page.get_by_text("100", exact=True).click(timeout=5000)
+                            page.get_by_text("100", exact=True).click(timeout=4000)
                             wait_grid(45)
                     except Exception: pass
 
-                    # 5. Lọc cột lỗi = 1
-                    self.log("Lọc danh sách các hồ sơ có lỗi (cột lỗi = 1)...")
-                    try:
-                        c5 = page.locator("#gvDSKetQuaGuiHoso_DXFREditorcol5_I")
-                        if c5.is_visible(timeout=5000):
-                            c5.click(force=True)
-                            c5.fill("1")
-                            c5.press("Enter")
-                            wait_grid(45)
-                    except Exception: pass
-
-                    # 6. Tải từng file chi tiết
+                    # 5. Tải từng file chi tiết (Quét tất cả các gói có liên kết lỗi)
                     total_dl = 0
                     p_idx = 1
                     while True:

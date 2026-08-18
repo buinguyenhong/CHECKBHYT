@@ -56,6 +56,25 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-19 06:18 - Antigravity (Fix: Sửa lỗi Luồng C không tải được gói lỗi do ép ngày Today và bộ lọc cột 5)
+
+### Mục tiêu
+- Khắc phục hiện tượng khi chạy Luồng C từ khoảng ngày đã chọn (ví dụ `01/08/2026` đến `18/08/2026`), hệ thống báo `"Tìm thấy 0 gói hồ sơ trên trang 1"` và `"Không có lỗi chi tiết nào cần xử lý"`.
+
+### Nguyên nhân
+1. Mã nguồn Luồng C trước đó bị gán cứng thao tác mở popup lịch `Từ ngày` và click nút `Today` (`deTuNgay_DDD_C_BT`), khiến `Từ ngày` bị chuyển thành ngày hiện tại (`19/08/2026`), làm Cổng BHYT chỉ tìm kiếm các gói gửi trong ngày hôm nay thay vì khoảng ngày người dùng chọn.
+2. Bước lọc cột số 5 (`col5_input.fill("1")`) chỉ lọc những dòng có chuỗi `"1"`, có thể bỏ sót các gói có 2, 3, 5, 20... lỗi hoặc gây lỗi lọc rỗng.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` [MODIFY]:
+  - Bổ sung hàm `parse_date_info()` chuẩn hóa ngày tháng linh hoạt (`yyyy-mm-dd`, `dd/mm/yyyy`, v.v.).
+  - Sửa `run_flow_c()`: Thiết lập chính xác `deTuNgay` và `deDenNgay` theo tham số `from_date` và `to_date` người dùng truyền vào (sử dụng DevExpress Client API `SetDate()` / `SetText()` + DOM input).
+  - Bỏ bước ép nút `Today` và bỏ bộ lọc cứng cột 5; quét trực tiếp tất cả các gói hồ sơ có liên kết chi tiết lỗi trên từng trang.
+- `client_runner/client_agent.py` [MODIFY]: Đồng bộ logic chọn ngày và quét gói lỗi cho Client RPA Runner.
+- `AGENT_CHANGELOG.md` & `Project.md` [MODIFY]: Cập nhật tài liệu.
+
+---
+
 ## 2026-08-18 20:15 - Antigravity (Quét & Cập nhật toàn bộ các loại lỗi mới từ thư mục XuatHoSoLoi vào Danh mục Hướng dẫn lỗi)
 
 ### Mục tiêu
