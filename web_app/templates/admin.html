@@ -1029,43 +1029,27 @@
                 </label>
             </div>
 
-            <!-- CLIENT RPA SECTION -->
-            <div style="margin-bottom:20px; padding:16px 20px; background:linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%); border:1px solid rgba(16, 185, 129, 0.3); border-radius:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                    <div>
-                        <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <span>💻</span> Tự động hóa tại Máy trạm (Client PC Runner)
+            <!-- UNIFIED PORTAL AUTOMATION SECTION -->
+            <div style="margin-bottom:20px; padding:18px 22px; background:linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%); border:1px solid rgba(59, 130, 246, 0.3); border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                    <div style="flex:1; min-width:280px;">
+                        <h3 style="margin:0; font-size:16.5px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <span>🤖</span> Tự động hóa Cổng BHYT (Playwright RPA)
                         </h3>
-                        <span style="font-size:12.5px; color:var(--text-secondary); display:block; margin-top:3px;">
-                            Dành cho máy trạm trong mạng LAN: Mở Chromium trực tiếp trên màn hình máy tính của bạn để nhập Captcha, tự động tải và đẩy file lên Server đối soát tức thì.
+                        <span style="font-size:13px; color:var(--text-secondary); display:block; margin-top:4px; line-height:1.4;">
+                            Mở trình duyệt Chromium trực tiếp để tải danh sách đề nghị thanh toán và danh sách lỗi từ Cổng BHYT, tự động nạp file và kích hoạt đối soát ngay trên hệ thống.
                         </span>
                     </div>
-                    <div>
-                        <a href="/api/client/download-runner" class="btn" style="background:#10b981; color:#fff; font-weight:700; padding:10px 20px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(16,185,129,0.35);">
-                            <span>📥</span> Tải Bộ Công Cụ Client RPA (.zip)
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <button class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:10px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:7px; box-shadow:0 2px 8px rgba(37,99,235,0.3); cursor:pointer;" id="btnAutoFlowB" onclick="runPortalAutomation('B')">
+                            <span>📥</span> Chạy Luồng B (Tải DS đã gửi)
+                        </button>
+                        <button class="btn" style="background:#8b5cf6; color:#fff; font-weight:700; padding:10px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:7px; box-shadow:0 2px 8px rgba(139,92,246,0.3); cursor:pointer;" id="btnAutoFlowC" onclick="runPortalAutomation('C')">
+                            <span>⚠️</span> Chạy Luồng C (Tải DS lỗi 3176)
+                        </button>
+                        <a href="/api/client/download-runner" class="btn" style="background:rgba(255,255,255,0.06); color:var(--text-secondary); border:1px solid var(--border-color); font-weight:600; padding:9px 14px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:12.5px;" title="Tải gói Client RPA Runner nếu muốn chạy riêng lẻ tại máy trạm khác">
+                            <span>💻</span> Gói Máy trạm (.zip)
                         </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AUTOMATION RPA SERVER SECTION -->
-            <div style="margin-bottom:20px; padding:16px 20px; background:linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%); border:1px solid rgba(139, 92, 246, 0.3); border-radius:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
-                    <div>
-                        <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <span>🤖</span> Tự động hóa trực tiếp trên Server (Server RPA)
-                        </h3>
-                        <span style="font-size:12.5px; color:var(--text-secondary); display:block; margin-top:3px;">
-                            Dành cho IT khi ngồi trực tiếp tại máy chủ Server: Trình duyệt mở trên Server, tự động tải và đối soát nội bộ.
-                        </span>
-                    </div>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <button class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:9px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(37,99,235,0.3);" id="btnAutoFlowB" onclick="runPortalAutomation('B')">
-                            <span>📥</span> Chạy Luồng B trên Server
-                        </button>
-                        <button class="btn" style="background:#8b5cf6; color:#fff; font-weight:700; padding:9px 18px; border-radius:8px; border:none; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(139,92,246,0.3);" id="btnAutoFlowC" onclick="runPortalAutomation('C')">
-                            <span>⚠️</span> Chạy Luồng C trên Server
-                        </button>
                     </div>
                 </div>
             </div>

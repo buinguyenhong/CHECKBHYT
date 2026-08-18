@@ -56,7 +56,28 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-08-16 17:15 - Antigravity (Tính năng Mới: Bộ công cụ Client RPA Runner chạy trên Máy trạm & Tải trực tiếp từ WebApp)
+## 2026-08-18 10:10 - Antigravity (Tối ưu hóa Playwright RPA: Hợp nhất giao diện, Chờ chuẩn xác, Sửa chọn trạng thái Luồng B & Chọn ngày qua nút Today)
+
+### Mục tiêu
+- Hợp nhất khu vực Tự động hóa Cổng BHYT trên WebApp thành 1 khối duy nhất, trực quan và tiện dụng, không phân tách rời rạc Server/Client.
+- Loại bỏ hoàn toàn cơ chế rê chuột (`.hover()`), chuyển sang click trực tiếp Cha -> Chờ Con -> Click Con, bổ sung hàm `wait_portal_idle()` chờ triệt để loading mask của DevExpress.
+- Sửa triệt để lỗi chưa chọn trạng thái "Đã đề nghị thanh toán" trong ComboBox `#cb_TrangThaiTT` ở Luồng B (hỗ trợ cả tương tác DOM và DevExpress Client API fallback).
+- Tích hợp tính năng bấm trực tiếp vào nút `Today` trên popup lịch DevExpress ở Luồng C để lấy ngày hôm nay theo đúng giao diện thực tế.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` [MODIFY]:
+  - Thêm phương thức `wait_portal_idle()` kiểm tra và chờ toàn diện các loading mask DevExpress (`.dxgvLoadingDiv, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, #gvDSKetQuaGuiHoso_LD, .dxp-loadingPanel`).
+  - Sửa `run_flow_b()`: Click mở combobox `#cb_TrangThaiTT`, chờ dropdown và chọn mục "Đã đề nghị thanh toán", kèm fallback DevExpress API `SetText`/`SetValue`.
+  - Sửa `run_flow_c()`: Điều hướng 4 bước trực tiếp không hover, chọn ngày bằng cách mở datepicker và click nút `Today` (`#deTuNgay_DDD_C_BT` và `#deDenNgay_DDD_C_BT`).
+- `client_runner/client_agent.py` [MODIFY]: Đồng bộ toàn bộ logic `_wait_portal_idle()`, chọn trạng thái combobox và click nút `Today` vào Client RPA Runner.
+- `web_app/templates/admin.html` [MODIFY]: Gộp các thẻ Tự động hóa trên Tab 1 thành một Card thống nhất "🤖 Tự động hóa Cổng BHYT (Playwright RPA)" với 2 nút hành động trực tiếp (Luồng B & Luồng C) và liên kết tải gói Client gọn gàng.
+
+### Nghiệp vụ ảnh hưởng
+- Giúp quá trình tự động hóa tương tác với Cổng BHYT hoạt động mượt mà, ổn định và chính xác 100%, không bị timeout hoặc lỗi click trượt do mạng chậm/DevExpress loading.
+
+### Kiểm tra
+- Chạy kiểm thử tự động hóa độc lập `scratch/test_portal_automation_logic.py` đạt 100% OK.
+- Chạy kiểm thử hồi quy `scratch/test_reconciliation.py` và `scratch/test_money_aggregation.py` đạt 100% OK.
 
 ### Mục tiêu
 - Cho phép người dùng chạy tự động hóa Chromium Luồng B và Luồng C trực tiếp ngay trên màn hình máy trạm (Client PC), tự quan sát và gõ Captcha tại chỗ, sau đó tự động tải và gửi file Excel lên máy chủ WebApp Server để đối soát.

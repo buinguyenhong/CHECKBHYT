@@ -89,7 +89,7 @@ File quan trọng:
   - `xml_parser.py`: Đọc tệp XML, giải mã Container XML ký số và gom nhóm theo MA_LK.
   - `rule_engine.py`: Chứa 26 quy tắc nghiệp vụ BHYT kiểm tra lỗi.
   - `report_generator.py`: Sinh báo cáo tổng hợp lỗi Excel và JSON kết quả.
-- `web_app/templates/admin.html`: giao diện phòng IT (bao gồm Tự động hóa Client RPA / Server RPA và Tab kiểm tra XML BHYT).
+- `web_app/templates/admin.html`: giao diện phòng IT (bao gồm Khối Tự động hóa Cổng BHYT Playwright RPA hợp nhất, Đối soát HIS/BHYT, Quản lý tài khoản khoa và Tab kiểm tra XML BHYT).
 - `web_app/templates/department.html`: giao diện khoa lâm sàng.
 - `web_app/templates/login.html`: đăng nhập.
 

@@ -157,6 +157,29 @@ class PortalAutomationService:
             log(f"Lỗi đăng nhập: {str(e)}")
             raise Exception(f"Không thể đăng nhập Cổng BHYT hoặc quá thời gian chờ nhập Captcha: {str(e)}")
 
+    def wait_portal_idle(self, page, timeout: int = 45000):
+        """Chờ đợi tất cả các loading mask và indicator của DevExpress biến mất."""
+        try:
+            time.sleep(0.5)
+            loading_selectors = [
+                ".dxgvLoadingDiv",
+                ".dxgvLoadingDiv_EIS",
+                ".dxgvLoadingPanel_EIS",
+                "#gvDSKetQuaGuiHoso_LD",
+                ".dxp-loadingPanel",
+                ".dxlpLoadingPanelWithContent"
+            ]
+            for sel in loading_selectors:
+                try:
+                    loaders = page.locator(sel)
+                    if loaders.count() > 0:
+                        loaders.first.wait_for(state="hidden", timeout=timeout)
+                except Exception:
+                    pass
+            time.sleep(0.8)
+        except Exception:
+            pass
+
     def run_flow_b(self, from_date: str, to_date: str, log_func: Optional[Callable[[str], None]] = None) -> dict:
         """
         LUỒNG B: Tự động tải Danh sách đã gửi (listbh.xlsx) từ Cổng BHYT.
@@ -167,7 +190,6 @@ class PortalAutomationService:
             if log_func:
                 log_func(msg)
             safe_print(f"[*] [Flow B] {msg}")
-
 
         log(f"Bắt đầu Luồng B (Tải danh sách đã gửi từ {from_date} đến {to_date})...")
 
@@ -197,38 +219,95 @@ class PortalAutomationService:
             try:
                 # 1. Đảm bảo đã đăng nhập
                 self._ensure_login(page, log_func=log)
+                self.wait_portal_idle(page)
 
-
-                # 2. Điều hướng vào menu Danh sách đề nghị thanh toán
+                # 2. Điều hướng vào menu Danh sách đề nghị thanh toán (Click trực tiếp, không hover)
                 log("Đang điều hướng đến: Danh sách đề nghị thanh toán...")
                 
-                # Thử click menu Hồ sơ đề nghị thanh toán hoặc Hồ sơ XML
                 try:
-                    if page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible(timeout=4000):
-                        page.get_by_text("Hồ sơ đề nghị thanh toán").click()
+                    top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
+                    if top_menu.is_visible(timeout=3000):
+                        top_menu.click()
+                        time.sleep(0.5)
                 except Exception:
                     pass
 
                 try:
-                    xml_menu = page.locator("#HeaderMenu_DXME2_ div").filter(has_text="Hồ sơ XML")
-                    if xml_menu.is_visible(timeout=4000):
-                        xml_menu.click()
+                    xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div").filter(has_text="Hồ sơ XML")
+                    if xml_menu.is_visible(timeout=3000):
+                        xml_menu.first.click()
+                        time.sleep(0.5)
                 except Exception:
                     pass
 
                 page.get_by_role("link", name="Danh sách đề nghị thanh toán").click(timeout=15000)
                 page.wait_for_load_state("domcontentloaded")
-                time.sleep(1)
+                self.wait_portal_idle(page)
+                time.sleep(1.0)
 
-                # 3. Chọn Trạng thái: "Đã đề nghị thanh toán"
+                # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" (Đảm bảo chọn chắc chắn)
                 log("Đang lọc trạng thái: Đã đề nghị thanh toán...")
+                status_selected = False
                 try:
-                    cb_img = page.locator("#cb_TrangThaiTT_B-1Img")
-                    if cb_img.is_visible(timeout=5000):
-                        cb_img.click()
-                        page.get_by_role("cell", name="Đã đề nghị thanh toán", exact=True).click(timeout=5000)
+                    page.wait_for_selector("#cb_TrangThaiTT_I, #cb_TrangThaiTT_B-1, #cb_TrangThaiTT", timeout=10000)
+                    
+                    btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, #cb_TrangThaiTT_I").first
+                    if btn_cb.is_visible(timeout=5000):
+                        btn_cb.click()
+                        time.sleep(0.6)
+                        
+                        page.wait_for_selector("#cb_TrangThaiTT_DDD_L_LBT, tr.dxeListBoxItemRow_EIS, td.dxeListBoxItem_EIS, .dxeListBoxItem", timeout=5000)
+                        
+                        item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
+                        if item.is_visible(timeout=3000):
+                            item.click()
+                            status_selected = True
+                            log("Đã chọn trạng thái: 'Đã đề nghị thanh toán' qua giao diện dropdown ✅")
                 except Exception as e:
-                    log(f"Lưu ý chọn trạng thái: {e}")
+                    log(f"Lưu ý click dropdown trạng thái: {e}")
+
+                # Fallback bằng DevExpress Client-Side API nếu chưa chọn được
+                if not status_selected:
+                    try:
+                        js_res = page.evaluate("""() => {
+                            try {
+                                if (window.cb_TrangThaiTT && typeof window.cb_TrangThaiTT.SetText === 'function') {
+                                    window.cb_TrangThaiTT.SetText('Đã đề nghị thanh toán');
+                                    if (typeof window.cb_TrangThaiTT.SetValue === 'function') {
+                                        window.cb_TrangThaiTT.SetValue('2');
+                                    }
+                                    return true;
+                                }
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                if (cc) {
+                                    const cb = cc.GetByName('cb_TrangThaiTT');
+                                    if (cb) {
+                                        cb.SetText('Đã đề nghị thanh toán');
+                                        return true;
+                                    }
+                                }
+                            } catch(err) {}
+                            return false;
+                        }""")
+                        if js_res:
+                            status_selected = True
+                            log("Đã thiết lập trạng thái: 'Đã đề nghị thanh toán' qua DevExpress API ✅")
+                    except Exception as js_err:
+                        log(f"Lưu ý JS API trạng thái: {js_err}")
+
+                try:
+                    cb_input = page.locator("#cb_TrangThaiTT_I").first
+                    if cb_input.is_visible(timeout=2000):
+                        current_val = cb_input.input_value()
+                        if "Đã đề nghị thanh toán" not in current_val:
+                            cb_input.click()
+                            cb_input.fill("Đã đề nghị thanh toán")
+                            cb_input.press("Enter")
+                except Exception:
+                    pass
+
+                self.wait_portal_idle(page)
+                time.sleep(0.8)
 
                 # 4. Bấm Tìm kiếm
                 log("Bấm Tìm kiếm dữ liệu...")
@@ -237,32 +316,24 @@ class PortalAutomationService:
                 except Exception:
                     page.get_by_role("button", name=re.compile(r"Tìm kiếm", re.IGNORECASE)).first.click(timeout=10000)
                 
-                time.sleep(2.0)
-                try:
-                    loading = page.locator(".dxgvLoadingDiv, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS")
-                    if loading.count() > 0:
-                        loading.first.wait_for(state="hidden", timeout=45000)
-                except Exception:
-                    pass
+                self.wait_portal_idle(page, timeout=45000)
                 time.sleep(1.5)
 
-
-                # 5. Xuất Excel và tải file
-                log("Đang kích hoạt Xuất Excel danh sách đã gửi (đang chờ Cổng BHYT xuất file, hỗ trợ tối đa 5 phút vào ngày cao điểm)...")
+                # 5. Xuất Excel và tải file (Click trực tiếp Cha -> Chờ Con -> Click trực tiếp Con)
+                log("Đang kích hoạt Xuất Excel danh sách đã gửi (hỗ trợ tối đa 5 phút vào ngày cao điểm)...")
                 
-                # Bước 5.1: Click nút cha "Xuất Excel" để mở menu thả xuống
+                # Bước 5.1: Click nút cha "Xuất Excel"
                 try:
                     main_btn = page.locator("span").filter(has_text=re.compile(r"^Xuất Excel$")).first
                     main_btn.click(timeout=10000)
-                    time.sleep(1.5)
+                    time.sleep(1.2)
                 except Exception as e:
                     log(f"Lưu ý click nút Xuất Excel: {e}")
 
-                # Bước 5.2: Click chính xác vào mục con "Xuất excel" (chữ e thường) trong popup và bắt download
+                # Bước 5.2: Chờ và Click chính xác vào mục con "Xuất excel"
                 with page.expect_download(timeout=300000) as download_info:
                     clicked_sub = False
                     try:
-                        # Ưu tiên tìm mục con có chữ "Xuất excel"
                         sub_items = page.locator("span").filter(has_text=re.compile(r"^Xuất excel$"))
                         if sub_items.count() > 0:
                             sub_items.first.click()
@@ -272,7 +343,6 @@ class PortalAutomationService:
 
                     if not clicked_sub:
                         try:
-                            # Tìm trong popup DevExpress
                             popup_item = page.locator(".dxm-popup span, .dxm-item span, tr.dxm-item span").filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE)).first
                             popup_item.click(timeout=5000)
                             clicked_sub = True
@@ -321,8 +391,7 @@ class PortalAutomationService:
                 log_func(msg)
             safe_print(f"[*] [Flow C] {msg}")
 
-
-        log(f"Bắt đầu Luồng C (Tải danh sách lỗi chi tiết từ {from_date} đến {to_date})...")
+        log(f"Bắt đầu Luồng C (Tải danh sách lỗi chi tiết)...")
 
         # Xóa các file lỗi tạm cũ
         for old_f in glob.glob(os.path.join(TEMP_ERROR_DIR, "*.*")):
@@ -356,17 +425,16 @@ class PortalAutomationService:
             try:
                 # 1. Đảm bảo đã đăng nhập
                 self._ensure_login(page, log_func=log)
+                self.wait_portal_idle(page)
 
-
-                # 2. Điều hướng vào menu: Hồ sơ đề nghị thanh toán -> Hồ sơ XML -> Quyết định 3176/QĐ-BYT -> Kết quả gửi hồ sơ XML
-                log("Đang điều hướng cố định theo 4 bước: Hồ sơ đề nghị thanh toán > Hồ sơ XML > QĐ 3176 > Kết quả gửi hồ sơ XML...")
+                # 2. Điều hướng 4 bước trực tiếp: Click Cha -> Đợi Con -> Click Con (Hoàn toàn KHÔNG hover)
+                log("Đang điều hướng cố định theo 4 bước trực tiếp: Hồ sơ ĐNTT > Hồ sơ XML > QĐ 3176 > Kết quả gửi hồ sơ XML...")
                 
-                # Bước 1: Mở "Hồ sơ đề nghị thanh toán"
-                log("  [1/4] Mở 'Hồ sơ đề nghị thanh toán'...")
+                # Bước 1: Click "Hồ sơ đề nghị thanh toán"
+                log("  [1/4] Click 'Hồ sơ đề nghị thanh toán'...")
                 try:
                     top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
                     if top_menu.is_visible(timeout=3000):
-                        top_menu.hover()
                         top_menu.click()
                     else:
                         page.get_by_text("Hồ sơ đề nghị thanh toán").first.click(timeout=3000)
@@ -374,26 +442,22 @@ class PortalAutomationService:
                     log(f"Lưu ý click menu chính: {e}")
                 time.sleep(0.6)
 
-                # Bước 2: Rê chuột và Click "Hồ sơ XML" để mở nhánh Quyết định
-                log("  [2/4] Mở 'Hồ sơ XML'...")
+                # Bước 2: Click trực tiếp "Hồ sơ XML" (chờ hiển thị và click, không hover)
+                log("  [2/4] Click 'Hồ sơ XML'...")
                 try:
+                    page.wait_for_selector("span.dx-vam, a, div, span", timeout=3000)
                     xml_item = page.locator("span.dx-vam, a, div, span").filter(has_text="Hồ sơ XML").first
-                    xml_item.hover(timeout=3000)
-                    time.sleep(0.3)
                     xml_item.click(force=True)
                 except Exception as e:
                     log(f"Lưu ý click Hồ sơ XML: {e}")
                 time.sleep(0.6)
 
-                # Bước 3: Rê chuột và Click "Quyết định 3176/QĐ-BYT"
-                log("  [3/4] Mở 'Quyết định 3176/QĐ-BYT'...")
+                # Bước 3: Click trực tiếp "Quyết định 3176/QĐ-BYT"
+                log("  [3/4] Click 'Quyết định 3176/QĐ-BYT'...")
                 try:
                     qd3176 = page.locator("span.dx-vam, a, div, span").filter(has_text=re.compile(r"3176")).first
-                    qd3176.hover(timeout=3000)
-                    time.sleep(0.3)
                     qd3176.click(force=True)
                 except Exception:
-                    # Fallback dùng JavaScript click trực tiếp trên DOM
                     page.evaluate("""() => {
                         const spans = Array.from(document.querySelectorAll('span.dx-vam, a, div, span'));
                         const el = spans.find(s => s.textContent && s.textContent.includes('3176'));
@@ -401,11 +465,10 @@ class PortalAutomationService:
                     }""")
                 time.sleep(0.8)
 
-                # Bước 4: Click vào "Kết quả gửi hồ sơ XML" của QĐ 3176
+                # Bước 4: Click trực tiếp "Kết quả gửi hồ sơ XML"
                 log("  [4/4] Click 'Kết quả gửi hồ sơ XML'...")
                 clicked_link = False
                 try:
-                    # Dùng JavaScript click trực tiếp link thứ 2 thuộc QĐ 3176
                     clicked_link = page.evaluate("""() => {
                         const links = Array.from(document.querySelectorAll('a')).filter(a => a.textContent && a.textContent.includes('Kết quả gửi hồ sơ XML'));
                         if (links.length > 1) {
@@ -427,57 +490,89 @@ class PortalAutomationService:
                         log(f"Lưu ý fallback link: {ex}")
 
                 page.wait_for_load_state("domcontentloaded")
-                time.sleep(1.5)
+                self.wait_portal_idle(page)
 
-                def wait_loading(timeout=45000):
-                    try:
-                        time.sleep(0.5)
-                        loading = page.locator("#gvDSKetQuaGuiHoso_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv")
-                        if loading.count() > 0:
-                            loading.first.wait_for(state="hidden", timeout=timeout)
-                        time.sleep(1.0)
-                    except Exception:
-                        pass
-
-                # Đợi bảng danh sách và gridview hiển thị sẵn sàng trên màn hình
+                # Đợi bảng danh sách và gridview hiển thị sẵn sàng
                 log("Đang chờ bảng danh sách Kết quả gửi hồ sơ XML hiển thị hoàn tất...")
                 try:
                     page.wait_for_selector("#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable, input[name*='TuNgay'], #deTuNgay_I", timeout=30000)
-                    wait_loading()
-                    time.sleep(1.5)
+                    self.wait_portal_idle(page)
                 except Exception as w_err:
                     log(f"Lưu ý chờ bảng: {w_err}")
 
-                # 3. Lọc theo ngày và tìm kiếm
-                log(f"Thiết lập điều kiện lọc từ ngày {from_date} đến {to_date}...")
-                
-                # Điền khoảng ngày nếu có các ô input ngày tháng DevExpress
-                try:
-                    f_d = from_date
-                    t_d = to_date
-                    if "-" in from_date:
-                        p = from_date.split("-")
-                        if len(p) == 3: f_d = f"{p[2]}/{p[1]}/{p[0]}"
-                    if "-" in to_date:
-                        p = to_date.split("-")
-                        if len(p) == 3: t_d = f"{p[2]}/{p[1]}/{p[0]}"
+                # 3. LỌC THEO NGÀY: CLICK NÚT TODAY TRÊN POPUP LỊCH
+                log("Đang thiết lập ngày hôm nay bằng nút Today trên lịch DevExpress...")
 
-                    for tu_sel in ["#deTuNgay_I", "#txtTuNgay_I", "#TuNgay_I", "input[name*='TuNgay']"]:
-                        el = page.locator(tu_sel).first
-                        if el.is_visible(timeout=1000):
-                            el.click()
-                            el.fill(f_d)
-                            break
-                    for den_sel in ["#deDenNgay_I", "#txtDenNgay_I", "#DenNgay_I", "input[name*='DenNgay']"]:
-                        el = page.locator(den_sel).first
-                        if el.is_visible(timeout=1000):
-                            el.click()
-                            el.fill(t_d)
-                            break
-                except Exception as d_err:
-                    log(f"Lưu ý điền ngày: {d_err}")
+                # Bước 3.1: Mở lịch Từ ngày và bấm Today
+                try:
+                    tu_ngay_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, #deTuNgay_I, #txtTuNgay_B-1, #TuNgay_B-1").first
+                    if tu_ngay_btn.is_visible(timeout=3000):
+                        tu_ngay_btn.click()
+                        time.sleep(0.5)
+                        today_clicked = False
+                        today_selectors = [
+                            "#deTuNgay_DDD_C_BT",
+                            "#deTuNgay_DDD_C .dxbButton:has-text('Today')",
+                            "span:has-text('Today')",
+                            "button:has-text('Today')",
+                            "td:has-text('Today')",
+                            ".dxbButton:has-text('Today')"
+                        ]
+                        for t_sel in today_selectors:
+                            try:
+                                t_btn = page.locator(t_sel).first
+                                if t_btn.is_visible(timeout=1000):
+                                    t_btn.click()
+                                    today_clicked = True
+                                    log("Đã bấm nút 'Today' cho Từ ngày ✅")
+                                    break
+                            except Exception:
+                                pass
+                        if not today_clicked:
+                            page.evaluate("""() => {
+                                const btns = Array.from(document.querySelectorAll('span, button, td, div')).filter(el => el.textContent && el.textContent.trim() === 'Today');
+                                if (btns.length > 0) btns[0].click();
+                            }""")
+                        time.sleep(0.6)
+                except Exception as de1_err:
+                    log(f"Lưu ý chọn Today Từ ngày: {de1_err}")
+
+                # Bước 3.2: Mở lịch Đến ngày và bấm Today
+                try:
+                    den_ngay_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, #deDenNgay_I, #txtDenNgay_B-1, #DenNgay_B-1").first
+                    if den_ngay_btn.is_visible(timeout=3000):
+                        den_ngay_btn.click()
+                        time.sleep(0.5)
+                        today_clicked = False
+                        today_selectors = [
+                            "#deDenNgay_DDD_C_BT",
+                            "#deDenNgay_DDD_C .dxbButton:has-text('Today')",
+                            "span:has-text('Today')",
+                            "button:has-text('Today')",
+                            "td:has-text('Today')",
+                            ".dxbButton:has-text('Today')"
+                        ]
+                        for t_sel in today_selectors:
+                            try:
+                                t_btn = page.locator(t_sel).first
+                                if t_btn.is_visible(timeout=1000):
+                                    t_btn.click()
+                                    today_clicked = True
+                                    log("Đã bấm nút 'Today' cho Đến ngày ✅")
+                                    break
+                            except Exception:
+                                pass
+                        if not today_clicked:
+                            page.evaluate("""() => {
+                                const btns = Array.from(document.querySelectorAll('span, button, td, div')).filter(el => el.textContent && el.textContent.trim() === 'Today');
+                                if (btns.length > 0) btns[0].click();
+                            }""")
+                        time.sleep(0.6)
+                except Exception as de2_err:
+                    log(f"Lưu ý chọn Today Đến ngày: {de2_err}")
 
                 # Bấm nút Tìm kiếm
+                log("Bấm Tìm kiếm dữ liệu...")
                 searched = False
                 search_selectors = [
                     "#btnTimKiem",
@@ -494,7 +589,6 @@ class PortalAutomationService:
                         if s_btn.is_visible(timeout=2000):
                             s_btn.click()
                             searched = True
-                            log(f"Đã bấm Tìm kiếm bằng selector: {s_sel}")
                             break
                     except Exception:
                         pass
@@ -502,7 +596,6 @@ class PortalAutomationService:
                 if not searched:
                     try:
                         page.get_by_role("button", name=re.compile(r"Tìm kiếm", re.IGNORECASE)).first.click(timeout=5000)
-                        searched = True
                     except Exception:
                         pass
 
@@ -512,19 +605,16 @@ class PortalAutomationService:
                     time.sleep(1.0)
                     while time.time() - start < timeout:
                         try:
-                            # Nếu loading indicator còn hiển thị thì tiếp tục chờ
                             is_loading = page.locator("#gvDSKetQuaGuiHoso_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv").is_visible()
                             if is_loading:
                                 time.sleep(0.5)
                                 continue
                             
-                            # Kiểm tra xem có dòng dữ liệu hay không
                             data_rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow")
                             if data_rows.count() > 0:
                                 time.sleep(1.0)
                                 return True
 
-                            # Kiểm tra xem có dòng báo rỗng không
                             empty_rows = page.locator("#gvDSKetQuaGuiHoso tr.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso td.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso:has-text('Không có dữ liệu')")
                             if empty_rows.count() > 0:
                                 time.sleep(0.5)
@@ -572,7 +662,6 @@ class PortalAutomationService:
                     log(f"Đang quét danh sách hồ sơ lỗi tại Trang {page_idx}...")
                     wait_for_grid_data(timeout=30)
                     
-                    # Lấy tất cả các dòng dữ liệu có link xem chi tiết lỗi trong bảng gvDSKetQuaGuiHoso
                     row_links = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'] td a, #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS td a, #gvDSKetQuaGuiHoso tr.dxgvDataRow td a").all()
                     if not row_links:
                         row_links = page.locator("#gvDSKetQuaGuiHoso td a").all()
@@ -590,7 +679,6 @@ class PortalAutomationService:
                             link.click()
                             time.sleep(1.5)
 
-                            # Bấm Xuất Excel trong popup chi tiết
                             export_btn = page.locator("span").filter(has_text="Xuất Excel").first
                             if export_btn.is_visible(timeout=5000):
                                 with page.expect_download(timeout=60000) as dl_info:
@@ -602,7 +690,6 @@ class PortalAutomationService:
                                 total_downloaded += 1
                                 log(f"  -> Đã tải tệp lỗi #{total_downloaded} ✅")
 
-                            # Đóng popup bằng nút [Close] hoặc icon đóng
                             close_btn = page.get_by_role("img", name="[Close]").first
                             if close_btn.is_visible(timeout=3000):
                                 close_btn.click()
@@ -613,13 +700,11 @@ class PortalAutomationService:
 
                         except Exception as row_err:
                             log(f"  Lỗi khi tải dòng #{idx+1}: {row_err}")
-                            # Cố gắng đóng popup nếu còn mở
                             try:
                                 page.get_by_role("img", name="[Close]").first.click(timeout=1000)
                             except Exception:
                                 pass
 
-                    # Kiểm tra nút Trang kế tiếp
                     try:
                         next_page_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom .dxp-button:has-text('>')").first
                         if next_page_btn.is_visible(timeout=3000) and "dxp-disabled" not in (next_page_btn.get_attribute("class") or ""):

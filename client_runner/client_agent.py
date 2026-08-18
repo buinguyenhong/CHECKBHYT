@@ -270,6 +270,20 @@ class ClientRPAGui:
         except Exception as e:
             raise Exception(f"Lỗi đăng nhập Cổng: {e}")
 
+    def _wait_portal_idle(self, page, timeout=45000):
+        try:
+            time.sleep(0.5)
+            for sel in [".dxgvLoadingDiv", ".dxgvLoadingDiv_EIS", ".dxgvLoadingPanel_EIS", "#gvDSKetQuaGuiHoso_LD", ".dxp-loadingPanel"]:
+                try:
+                    loaders = page.locator(sel)
+                    if loaders.count() > 0:
+                        loaders.first.wait_for(state="hidden", timeout=timeout)
+                except Exception:
+                    pass
+            time.sleep(0.8)
+        except Exception:
+            pass
+
     def start_flow_b(self):
         import threading
         self.save_config()
@@ -294,27 +308,64 @@ class ClientRPAGui:
 
                 try:
                     self._ensure_login(page)
+                    self._wait_portal_idle(page)
 
-                    # Điều hướng
+                    # Điều hướng trực tiếp
                     self.log("Đang mở Danh sách đề nghị thanh toán...")
                     try:
                         top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                        if top_menu.is_visible(timeout=3000): top_menu.click()
+                        if top_menu.is_visible(timeout=3000):
+                            top_menu.click()
+                            time.sleep(0.5)
                     except Exception:
                         pass
                     page.get_by_role("link", name="Danh sách đề nghị thanh toán").click(timeout=15000)
                     page.wait_for_load_state("domcontentloaded")
+                    self._wait_portal_idle(page)
                     time.sleep(1.0)
 
-                    # Lọc trạng thái
+                    # Lọc trạng thái chắc chắn
                     self.log("Lọc trạng thái: Đã đề nghị thanh toán...")
+                    status_selected = False
                     try:
-                        cb = page.locator("#cb_TrangThaiTT_B-1Img")
-                        if cb.is_visible(timeout=5000):
-                            cb.click()
-                            page.get_by_role("cell", name="Đã đề nghị thanh toán", exact=True).click(timeout=5000)
+                        page.wait_for_selector("#cb_TrangThaiTT_I, #cb_TrangThaiTT_B-1", timeout=10000)
+                        btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, #cb_TrangThaiTT_I").first
+                        if btn_cb.is_visible(timeout=5000):
+                            btn_cb.click()
+                            time.sleep(0.6)
+                            page.wait_for_selector("#cb_TrangThaiTT_DDD_L_LBT, tr.dxeListBoxItemRow_EIS, td.dxeListBoxItem_EIS", timeout=5000)
+                            item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
+                            if item.is_visible(timeout=3000):
+                                item.click()
+                                status_selected = True
+                                self.log("Đã chọn trạng thái: 'Đã đề nghị thanh toán' qua dropdown ✅")
                     except Exception as e:
-                        self.log(f"Lưu ý trạng thái: {e}")
+                        self.log(f"Lưu ý dropdown: {e}")
+
+                    if not status_selected:
+                        try:
+                            js_res = page.evaluate("""() => {
+                                try {
+                                    if (window.cb_TrangThaiTT && typeof window.cb_TrangThaiTT.SetText === 'function') {
+                                        window.cb_TrangThaiTT.SetText('Đã đề nghị thanh toán');
+                                        if (typeof window.cb_TrangThaiTT.SetValue === 'function') window.cb_TrangThaiTT.SetValue('2');
+                                        return true;
+                                    }
+                                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                    if (cc) {
+                                        const cb = cc.GetByName('cb_TrangThaiTT');
+                                        if (cb) { cb.SetText('Đã đề nghị thanh toán'); return true; }
+                                    }
+                                } catch(e) {}
+                                return false;
+                            }""")
+                            if js_res:
+                                status_selected = True
+                                self.log("Đã chọn trạng thái qua API ✅")
+                        except Exception:
+                            pass
+
+                    self._wait_portal_idle(page)
 
                     # Tìm kiếm
                     self.log("Bấm Tìm kiếm dữ liệu...")
@@ -323,28 +374,36 @@ class ClientRPAGui:
                     except Exception:
                         page.get_by_role("button", name=re.compile(r"Tìm kiếm", re.IGNORECASE)).first.click(timeout=10000)
 
-                    time.sleep(2.0)
-                    try:
-                        loading = page.locator(".dxgvLoadingDiv, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS")
-                        if loading.count() > 0: loading.first.wait_for(state="hidden", timeout=45000)
-                    except Exception:
-                        pass
+                    self._wait_portal_idle(page, timeout=45000)
                     time.sleep(1.5)
 
-                    # Xuất Excel
+                    # Xuất Excel (Click Cha -> Chờ Con -> Click Con)
                     self.log("Đang kích hoạt Xuất Excel (chờ tối đa 5 phút)...")
                     try:
-                        page.locator("span").filter(has_text=re.compile(r"^Xuất Excel$")).first.click(timeout=10000)
-                        time.sleep(1.5)
+                        main_btn = page.locator("span").filter(has_text=re.compile(r"^Xuất Excel$")).first
+                        main_btn.click(timeout=10000)
+                        time.sleep(1.2)
                     except Exception:
                         pass
 
                     with page.expect_download(timeout=300000) as dl_info:
+                        clicked_sub = False
                         try:
                             sub_items = page.locator("span").filter(has_text=re.compile(r"^Xuất excel$"))
-                            if sub_items.count() > 0: sub_items.first.click()
-                            else: page.locator(".dxm-popup span").filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE)).first.click(timeout=5000)
+                            if sub_items.count() > 0:
+                                sub_items.first.click()
+                                clicked_sub = True
                         except Exception:
+                            pass
+
+                        if not clicked_sub:
+                            try:
+                                page.locator(".dxm-popup span, .dxm-item span").filter(has_text=re.compile(r"Xuất excel", re.IGNORECASE)).first.click(timeout=5000)
+                                clicked_sub = True
+                            except Exception:
+                                pass
+
+                        if not clicked_sub:
                             page.get_by_text("Xuất excel", exact=True).first.click(timeout=10000)
 
                     self.log("Đang tải file Excel về máy trạm...")
@@ -416,8 +475,9 @@ class ClientRPAGui:
 
                 try:
                     self._ensure_login(page)
+                    self._wait_portal_idle(page)
 
-                    # 4 bước điều hướng
+                    # 4 bước điều hướng trực tiếp (Không hover)
                     self.log("Điều hướng: Hồ sơ ĐNTT > Hồ sơ XML > QĐ 3176 > Kết quả gửi XML...")
                     try:
                         top = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
@@ -427,14 +487,12 @@ class ClientRPAGui:
 
                     try:
                         xml_item = page.locator("span.dx-vam, a, div, span").filter(has_text="Hồ sơ XML").first
-                        xml_item.hover(timeout=3000)
                         xml_item.click(force=True)
                     except Exception: pass
                     time.sleep(0.6)
 
                     try:
                         qd = page.locator("span.dx-vam, a, div, span").filter(has_text=re.compile(r"3176")).first
-                        qd.hover(timeout=3000)
                         qd.click(force=True)
                     except Exception:
                         page.evaluate("""() => {
@@ -450,7 +508,7 @@ class ClientRPAGui:
                         else if (links.length === 1) links[0].click();
                     }""")
                     page.wait_for_load_state("domcontentloaded")
-                    time.sleep(1.5)
+                    self._wait_portal_idle(page)
 
                     def wait_grid(timeout=45):
                         start = time.time()
@@ -471,25 +529,58 @@ class ClientRPAGui:
                     self.log("Chờ bảng kết quả hiển thị...")
                     try:
                         page.wait_for_selector("#gvDSKetQuaGuiHoso", timeout=30000)
-                        wait_grid(30)
+                        self._wait_portal_idle(page)
                     except Exception: pass
 
-                    # Điền ngày
-                    self.log(f"Thiết lập khoảng ngày: {from_d} đến {to_d}...")
-                    f_d, t_d = from_d, to_d
-                    if "-" in from_d:
-                        p_ = from_d.split("-")
-                        if len(p_) == 3: f_d = f"{p_[2]}/{p_[1]}/{p_[0]}"
-                    if "-" in to_d:
-                        p_ = to_d.split("-")
-                        if len(p_) == 3: t_d = f"{p_[2]}/{p_[1]}/{p_[0]}"
+                    # Chọn ngày qua nút Today trên lịch DevExpress
+                    self.log("Đang chọn ngày bằng nút Today trên popup lịch...")
+                    try:
+                        tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, #deTuNgay_I").first
+                        if tu_btn.is_visible(timeout=2000):
+                            tu_btn.click()
+                            time.sleep(0.5)
+                            today_found = False
+                            for t_sel in ["#deTuNgay_DDD_C_BT", "span:has-text('Today')", "button:has-text('Today')", "td:has-text('Today')"]:
+                                try:
+                                    t_el = page.locator(t_sel).first
+                                    if t_el.is_visible(timeout=1000):
+                                        t_el.click()
+                                        today_found = True
+                                        self.log("Đã chọn Today Từ ngày ✅")
+                                        break
+                                except Exception: pass
+                            if not today_found:
+                                page.evaluate("""() => {
+                                    const btns = Array.from(document.querySelectorAll('span, button, td')).filter(e => e.textContent && e.textContent.trim() === 'Today');
+                                    if (btns.length > 0) btns[0].click();
+                                }""")
+                            time.sleep(0.5)
+                    except Exception as e:
+                        self.log(f"Lưu ý Today Từ ngày: {e}")
 
-                    for tu_sel in ["#deTuNgay_I", "#txtTuNgay_I", "#TuNgay_I", "input[name*='TuNgay']"]:
-                        el = page.locator(tu_sel).first
-                        if el.is_visible(timeout=1000): el.click(); el.fill(f_d); break
-                    for den_sel in ["#deDenNgay_I", "#txtDenNgay_I", "#DenNgay_I", "input[name*='DenNgay']"]:
-                        el = page.locator(den_sel).first
-                        if el.is_visible(timeout=1000): el.click(); el.fill(t_d); break
+                    try:
+                        den_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, #deDenNgay_I").first
+                        if den_btn.is_visible(timeout=2000):
+                            den_btn.click()
+                            time.sleep(0.5)
+                            today_found = False
+                            for t_sel in ["#deDenNgay_DDD_C_BT", "span:has-text('Today')", "button:has-text('Today')", "td:has-text('Today')"]:
+                                try:
+                                    t_el = page.locator(t_sel).first
+                                    if t_el.is_visible(timeout=1000):
+                                        t_el.click()
+                                        today_found = True
+                                        self.log("Đã chọn Today Đến ngày ✅")
+                                        break
+                                except Exception: pass
+                            if not today_found:
+                                page.evaluate("""() => {
+                                    const btns = Array.from(document.querySelectorAll('span, button, td')).filter(e => e.textContent && e.textContent.trim() === 'Today');
+                                    if (btns.length > 0) btns[0].click();
+                                }""")
+                            time.sleep(0.5)
+                    except Exception as e:
+                        self.log(f"Lưu ý Today Đến ngày: {e}")
 
                     # Bấm tìm kiếm
                     try: page.locator(".dxbButton:has-text('Tìm kiếm'), #btnTimKiem, span:has-text('Tìm kiếm')").first.click(timeout=5000)
