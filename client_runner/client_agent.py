@@ -778,11 +778,29 @@ class ClientRPAGui:
                                     total_dl += 1
                                     self.log(f"  -> Đã tải tệp lỗi #{total_dl} ✅")
 
-                                try: page.get_by_role("img", name="[Close]").first.click(timeout=3000)
-                                except Exception: page.locator(".dxpc-closeBtn").first.click(timeout=3000)
-                                time.sleep(0.8)
+                                # Đóng popup an toàn
+                                try:
+                                    page.evaluate("""() => {
+                                        const pop = window.PopupNhanChiTietLoiHS || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('PopupNhanChiTietLoiHS'));
+                                        if (pop && typeof pop.Hide === 'function') pop.Hide();
+                                    }""")
+                                except Exception:
+                                    pass
+
+                                try:
+                                    c_el = page.locator(".dxpc-closeBtn, img[alt*='Close']").first
+                                    if c_el.is_visible(timeout=1000): c_el.click(force=True)
+                                except Exception:
+                                    pass
+                                time.sleep(0.6)
                             except Exception as e_row:
                                 self.log(f"Lỗi tải dòng #{idx+1}: {e_row}")
+                                try:
+                                    page.evaluate("""() => {
+                                        if (window.PopupNhanChiTietLoiHS && typeof window.PopupNhanChiTietLoiHS.Hide === 'function') window.PopupNhanChiTietLoiHS.Hide();
+                                    }""")
+                                except Exception:
+                                    pass
 
                         try:
                             next_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom .dxp-button:has-text('>')").first

@@ -830,18 +830,43 @@ class PortalAutomationService:
                                 total_downloaded += 1
                                 log(f"  -> Đã tải tệp lỗi #{total_downloaded} ✅")
 
-                            close_btn = page.get_by_role("img", name="[Close]").first
-                            if close_btn.is_visible(timeout=3000):
-                                close_btn.click()
-                            else:
-                                page.locator(".dxpc-closeBtn, .dxWeb_pcCloseButton_Youthful").first.click(timeout=3000)
+                            # Đóng popup chi tiết lỗi an toàn
+                            closed_popup = False
+                            try:
+                                closed_popup = page.evaluate("""() => {
+                                    try {
+                                        const pop = window.PopupNhanChiTietLoiHS || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('PopupNhanChiTietLoiHS'));
+                                        if (pop && typeof pop.Hide === 'function') {
+                                            pop.Hide();
+                                            return true;
+                                        }
+                                    } catch(e) {}
+                                    return false;
+                                }""")
+                            except Exception:
+                                pass
+
+                            if not closed_popup:
+                                for c_sel in [".dxpc-closeBtn", "img[alt*='Close']", "img[title*='Close']", ".dxWeb_pcCloseButton_Youthful"]:
+                                    try:
+                                        c_el = page.locator(c_sel).first
+                                        if c_el.is_visible(timeout=1000):
+                                            c_el.click(force=True)
+                                            closed_popup = True
+                                            break
+                                    except Exception:
+                                        pass
                             
-                            time.sleep(0.8)
+                            time.sleep(0.6)
 
                         except Exception as row_err:
                             log(f"  Lỗi khi tải dòng #{idx+1}: {row_err}")
                             try:
-                                page.get_by_role("img", name="[Close]").first.click(timeout=1000)
+                                page.evaluate("""() => {
+                                    if (window.PopupNhanChiTietLoiHS && typeof window.PopupNhanChiTietLoiHS.Hide === 'function') {
+                                        window.PopupNhanChiTietLoiHS.Hide();
+                                    }
+                                }""")
                             except Exception:
                                 pass
 
