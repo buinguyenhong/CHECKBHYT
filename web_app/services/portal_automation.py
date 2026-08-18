@@ -612,68 +612,137 @@ class PortalAutomationService:
                 except Exception as w_err:
                     log(f"Lưu ý chờ bảng: {w_err}")
 
-                # 3. LỌC THEO KHOẢNG NGÀY: TỪ NGÀY - ĐẾN NGÀY (CHÍNH XÁC THEO YÊU CẦU)
-                p_from = parse_date_info(from_date)
-                p_to = parse_date_info(to_date)
-                log(f"Thiết lập khoảng ngày tìm kiếm: {p_from['d_str']} đến {p_to['d_str']}...")
-
-                # 3.1. Thiết lập ngày bằng DevExpress Client API
+                # 3. LỌC THEO NGÀY: MỞ LỊCH TỪ NGÀY VÀ BẤM NÚT TODAY (Lấy toàn bộ hồ sơ gửi trong ngày)
+                log("Đang mở lịch 'Từ ngày' để bấm nút Today...")
+                
+                # Bước 3.1: Mở popup lịch Từ ngày
+                opened_tu_ngay = False
                 try:
-                    page.evaluate("""({f_y, f_m, f_d, f_str, t_y, t_m, t_d, t_str}) => {
+                    opened_tu_ngay = page.evaluate("""() => {
                         try {
                             const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
                             if (cc) {
-                                const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay') || window.deTuNgay || window.txtTuNgay;
-                                if (deTu) {
-                                    if (typeof deTu.SetDate === 'function') deTu.SetDate(new Date(f_y, f_m - 1, f_d));
-                                    if (typeof deTu.SetText === 'function') deTu.SetText(f_str);
-                                }
-                                const deDen = cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay') || window.deDenNgay || window.txtDenNgay;
-                                if (deDen) {
-                                    if (typeof deDen.SetDate === 'function') deDen.SetDate(new Date(t_y, t_m - 1, t_d));
-                                    if (typeof deDen.SetText === 'function') deDen.SetText(t_str);
+                                const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
+                                if (deTu && typeof deTu.ShowDropDown === 'function') {
+                                    deTu.ShowDropDown();
+                                    return true;
                                 }
                             }
-                            // Direct DOM inputs fallback
-                            const setDomVal = (sel, val) => {
-                                const inputs = Array.from(document.querySelectorAll(sel));
-                                for (const inp of inputs) {
-                                    inp.value = val;
-                                    inp.dispatchEvent(new Event('input', { bubbles: true }));
-                                    inp.dispatchEvent(new Event('change', { bubbles: true }));
-                                    inp.dispatchEvent(new Event('blur', { bubbles: true }));
-                                }
-                            };
-                            setDomVal('#deTuNgay_I, #txtTuNgay_I, input[name*="TuNgay"]', f_str);
-                            setDomVal('#deDenNgay_I, #txtDenNgay_I, input[name*="DenNgay"]', t_str);
                         } catch(e) {}
-                    }""", {
-                        "f_y": p_from["year"], "f_m": p_from["month"], "f_d": p_from["day"], "f_str": p_from["d_str"],
-                        "t_y": p_to["year"], "t_m": p_to["month"], "t_d": p_to["day"], "t_str": p_to["d_str"]
-                    })
-                except Exception as e_date:
-                    log(f"Lưu ý thiết lập ngày API: {e_date}")
-
-                # 3.2. Điền trực tiếp vào input nếu DevExpress input hiển thị
-                try:
-                    tu_inp = page.locator("#deTuNgay_I, #txtTuNgay_I, input[name*='TuNgay']").first
-                    if tu_inp.is_visible(timeout=1500):
-                        tu_inp.click(force=True)
-                        tu_inp.fill(p_from["d_str"])
-                        tu_inp.press("Tab")
+                        return false;
+                    }""")
+                    if opened_tu_ngay:
+                        log("Đã mở popup lịch Từ ngày qua DevExpress ShowDropDown() ✅")
+                        time.sleep(0.8)
                 except Exception:
                     pass
 
+                if not opened_tu_ngay:
+                    tu_ngay_selectors = [
+                        "td:has-text('Từ ngày') ~ td img",
+                        "td:has-text('Từ ngày') ~ td .dxeButtonEditButton_EIS",
+                        "tr:has-text('Từ ngày') img",
+                        "tr:has-text('Từ ngày') .dxeButtonEditButton_EIS",
+                        "#deTuNgay_B-1Img",
+                        "#deTuNgay_B-1",
+                        "#deTuNgay_I",
+                        "#txtTuNgay_I",
+                        "input[name*='TuNgay']",
+                        "table[id*='TuNgay'] td[id*='B-1']"
+                    ]
+                    for sel in tu_ngay_selectors:
+                        try:
+                            el = page.locator(sel).first
+                            if el.is_visible(timeout=1500):
+                                el.click(force=True)
+                                opened_tu_ngay = True
+                                log(f"Đã click mở lịch Từ ngày ({sel}) ✅")
+                                time.sleep(0.8)
+                                break
+                        except Exception:
+                            pass
+                
+                if not opened_tu_ngay:
+                    opened_tu_ngay = page.evaluate("""() => {
+                        const tds = Array.from(document.querySelectorAll('td, label, span')).filter(e => e.textContent && e.textContent.trim().startsWith('Từ ngày'));
+                        for (const td of tds) {
+                            const parent = td.closest('tr') || td.parentElement;
+                            if (parent) {
+                                const btn = parent.querySelector('img, td.dxeButtonEditButton_EIS, input');
+                                if (btn) { btn.click(); return true; }
+                            }
+                        }
+                        return false;
+                    }""")
+                    time.sleep(0.8)
+
+                # Bước 3.2: Bấm nút Today trên popup lịch của Từ ngày
+                log("Đang bấm nút 'Today' trên popup lịch...")
+                today_clicked = False
                 try:
-                    den_inp = page.locator("#deDenNgay_I, #txtDenNgay_I, input[name*='DenNgay']").first
-                    if den_inp.is_visible(timeout=1500):
-                        den_inp.click(force=True)
-                        den_inp.fill(p_to["d_str"])
-                        den_inp.press("Tab")
+                    page.wait_for_selector(".dxeCalendarTodayButton_EIS, td[id*='_BT'], table[id*='_BT'], .dxbButton:has-text('Today'), span:has-text('Today'), td:has-text('Today')", timeout=5000)
                 except Exception:
                     pass
 
-                time.sleep(0.8)
+                today_selectors = [
+                    ".dxeCalendarTodayButton_EIS",
+                    "td[id*='_DDD_C_BT']",
+                    "table[id*='_DDD_C_BT']",
+                    "#deTuNgay_DDD_C_BT",
+                    ".dxbButton:has-text('Today')",
+                    "span:has-text('Today')",
+                    "td:has-text('Today')",
+                    "div:has-text('Today')",
+                    "button:has-text('Today')"
+                ]
+                for t_sel in today_selectors:
+                    try:
+                        t_btn = page.locator(t_sel).first
+                        if t_btn.is_visible(timeout=1500):
+                            t_btn.click(force=True)
+                            today_clicked = True
+                            log(f"Đã click nút 'Today' ({t_sel}) ✅")
+                            break
+                    except Exception:
+                        pass
+
+                if not today_clicked:
+                    today_clicked = page.evaluate("""() => {
+                        const todayBtn = document.querySelector('.dxeCalendarTodayButton_EIS, td[id*="_BT"], table[id*="_BT"]');
+                        if (todayBtn) {
+                            todayBtn.click();
+                            return true;
+                        }
+                        const btns = Array.from(document.querySelectorAll('span, button, td, div, a')).filter(el => el.textContent && el.textContent.trim().toLowerCase() === 'today');
+                        for (const b of btns) {
+                            if (b.offsetParent !== null) {
+                                b.click();
+                                return true;
+                            }
+                        }
+                        if (btns.length > 0) { btns[0].click(); return true; }
+                        return false;
+                    }""")
+                    if today_clicked:
+                        log("Đã click nút 'Today' qua JS fallback ✅")
+
+                # Đồng bộ bằng DevExpress Client API để đảm bảo chắc chắn cả 2 ô ngày đều là hôm nay
+                try:
+                    page.evaluate("""() => {
+                        try {
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            if (cc) {
+                                const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
+                                if (deTu && typeof deTu.SetDate === 'function') deTu.SetDate(new Date());
+                                const deDen = cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay');
+                                if (deDen && typeof deDen.SetDate === 'function') deDen.SetDate(new Date());
+                            }
+                        } catch(e) {}
+                    }""")
+                except Exception:
+                    pass
+
+                time.sleep(1.0)
                 self.wait_portal_idle(page)
 
                 # Bấm nút Tìm kiếm (DevExpress API + fallback)
@@ -737,7 +806,7 @@ class PortalAutomationService:
                             
                             data_rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow")
                             if data_rows.count() > 0:
-                                time.sleep(1.0)
+                                time.sleep(0.8)
                                 return True
 
                             empty_rows = page.locator("#gvDSKetQuaGuiHoso tr.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso td.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso:has-text('Không có dữ liệu')")
@@ -752,21 +821,42 @@ class PortalAutomationService:
                 # Bấm Tìm kiếm và chờ kết quả
                 log("Đang chờ máy chủ Cổng BHYT xử lý và tải danh sách hồ sơ...")
                 wait_for_grid_data(timeout=45)
+                self.wait_portal_idle(page)
+                time.sleep(1.5)
 
-                # 4. Chọn số lượng hiển thị 100 dòng / trang
+                # 4. Chọn số lượng hiển thị 100 dòng / trang (Chờ xong callback trước khi lọc)
                 log("Thiết lập hiển thị 100 bản ghi/trang...")
                 try:
                     pager_img = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg")
                     if pager_img.is_visible(timeout=4000):
                         pager_img.click()
-                        time.sleep(0.5)
+                        time.sleep(0.6)
                         page.get_by_text("100", exact=True).click(timeout=4000)
                         log("Đang chờ tải lại 100 bản ghi/trang...")
                         wait_for_grid_data(timeout=45)
+                        self.wait_portal_idle(page)
+                        time.sleep(1.5)
                 except Exception as e:
                     log(f"Lưu ý chọn 100 dòng: {e}")
 
-                # 5. Lặp qua các trang và tải từng file chi tiết (Quét tất cả các gói có liên kết lỗi)
+                # 5. Lọc cột lỗi có giá trị = 1 để lấy toàn bộ các ca lỗi
+                log("Lọc danh sách các hồ sơ có lỗi (cột lỗi = 1)...")
+                try:
+                    col5_input = page.locator("#gvDSKetQuaGuiHoso_DXFREditorcol5_I, input[id*='DXFREditorcol5'], input[name*='DXFREditorcol5']")
+                    if col5_input.first.is_visible(timeout=4000):
+                        col5_input.first.click(force=True)
+                        time.sleep(0.3)
+                        col5_input.first.fill("1")
+                        time.sleep(0.3)
+                        col5_input.first.press("Enter")
+                        log("Đang chờ áp dụng bộ lọc cột lỗi = 1...")
+                        wait_for_grid_data(timeout=45)
+                        self.wait_portal_idle(page)
+                        time.sleep(1.5)
+                except Exception as e:
+                    log(f"Lưu ý lọc cột lỗi: {e}")
+
+                # 6. Lặp qua các trang và tải từng file chi tiết
                 total_downloaded = 0
                 page_idx = 1
 
