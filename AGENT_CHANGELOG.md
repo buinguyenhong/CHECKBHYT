@@ -56,19 +56,18 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-08-19 06:28 - Antigravity (Tối ưu hóa quy trình Luồng C: Giữ nút Today cho ngày gửi và khắc phục nghẽn DevExpress callback khi lọc lỗi 1)
+## 2026-08-20 08:00 - Antigravity (Nâng cấp Luồng C: Tự động nhận diện động cột lỗi, xử lý ngày thông minh và tải gói lỗi chính xác)
 
 ### Mục tiêu
-- Đảm bảo Luồng C tìm kiếm đúng các gói hồ sơ gửi trong ngày (Today) và lọc chính xác các ca có lỗi (cột lỗi = 1) trên bảng `#gvDSKetQuaGuiHoso`.
-- Khắc phục nguyên nhân callback DevExpress bị nghẽn (race condition) giữa thao tác chọn 100 bản ghi/trang và nhập bộ lọc `col5=1`.
+- Khắc phục triệt để hiện tượng Luồng C báo `"Không tìm thấy gói hồ sơ lỗi nào trên trang này"` và `"Tìm thấy 0 gói hồ sơ trên trang 1"`.
 
-### Cơ chế & Khắc phục
-1. **Ngày tìm kiếm:** Giữ nguyên quy trình chuẩn bấm nút `Today` trên popup lịch `Từ ngày` và `Đến ngày` vì ngày gửi hồ sơ XML lên cổng là ngày hôm nay (`Today`).
-2. **Xử lý bất đồng bộ DevExpress Grid:**
-   - Sau khi chọn hiển thị 100 bản ghi/trang, tiến hành chờ callback hoàn tất (`wait_for_grid_data` + `wait_portal_idle` + `sleep`).
-   - Sau khi grid đã ổn định 100 dòng mới bắt đầu nhập `1` vào trường AutoFilterRow `#gvDSKetQuaGuiHoso_DXFREditorcol5_I` và `Enter`.
-   - Chờ bộ lọc áp dụng xong trước khi bắt đầu duyệt và tải các gói lỗi chi tiết.
-3. Đồng bộ trên cả `web_app/services/portal_automation.py` và `client_runner/client_agent.py`.
+### Nguyên nhân kỹ thuật & Cải tiến
+1. **Tránh nghẽn Callback AutoFilterRow:** Thay vì phụ thuộc vào việc nhập chuỗi `1` vào ô lọc cột DevExpress (dễ gây lỗi race-condition callback hoặc gõ nhầm cột khi thứ tự cột thay đổi), hệ thống chuyển sang **phân tích DOM thời gian thực**.
+2. **Tự động nhận diện cột lỗi:** Quét tiêu đề các cột của DevExpress GridView để xác định chính xác cột chứa lỗi (`errColIdx`).
+3. **Quét trực tiếp từng dòng dữ liệu:** Duyệt qua tất cả các dòng dữ liệu hiển thị trên bảng, tự động nhận diện dòng có số lỗi `= 1` (hoặc `> 0`) hoặc có liên kết mở popup chi tiết lỗi (`PopupNhanChiTietLoiHS`).
+4. **Tải và đóng popup an toàn:** Mở từng gói lỗi -> Tải file Excel `err_*.xlsx` -> Đóng popup -> Lặp tiếp cho đến hết tất cả các dòng và chuyển trang.
+5. **Xử lý ngày tìm kiếm:** Đặt ngày `Từ ngày` & `Đến ngày` linh hoạt theo khoảng ngày đã chọn và nút `Today` có log hiển thị rõ ràng trên giao diện thời gian thực.
+6. Đồng bộ hóa cả `web_app/services/portal_automation.py` và `client_runner/client_agent.py`.
 
 ---
 

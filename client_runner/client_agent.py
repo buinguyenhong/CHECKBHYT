@@ -815,120 +815,74 @@ class ClientRPAGui:
                             time.sleep(0.5)
                         return False
 
-                    self.log("Chờ bảng kết quả hiển thị...")
-                    try:
-                        page.wait_for_selector("#gvDSKetQuaGuiHoso", timeout=30000)
-                        self._wait_portal_idle(page)
-                    except Exception: pass
+                    # 3. LỌC THEO NGÀY: TỪ NGÀY - ĐẾN NGÀY (Lấy toàn bộ hồ sơ gửi trong khoảng ngày / Today)
+                    p_from = parse_date_info(from_d)
+                    p_to = parse_date_info(to_d)
+                    self.log(f"Đang thiết lập khoảng ngày tìm kiếm: {p_from['d_str']} đến {p_to['d_str']}...")
 
-                    # 3. LỌC THEO NGÀY: MỞ LỊCH TỪ NGÀY VÀ BẤM NÚT TODAY (Lấy toàn bộ hồ sơ gửi trong ngày)
-                    self.log("Đang mở lịch 'Từ ngày' để bấm nút Today...")
-                    
-                    opened_tu_ngay = False
+                    # Mở lịch Từ ngày và bấm nút Today (nếu from_d là hôm nay) hoặc đặt ngày chính xác
                     try:
-                        opened_tu_ngay = page.evaluate("""() => {
+                        page.evaluate("""({f_y, f_m, f_d, f_str, t_y, t_m, t_d, t_str}) => {
                             try {
                                 const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
                                 if (cc) {
-                                    const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
-                                    if (deTu && typeof deTu.ShowDropDown === 'function') {
-                                        deTu.ShowDropDown();
-                                        return true;
+                                    const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay') || window.deTuNgay || window.txtTuNgay;
+                                    if (deTu) {
+                                        if (typeof deTu.SetDate === 'function') deTu.SetDate(new Date(f_y, f_m - 1, f_d));
+                                        if (typeof deTu.SetText === 'function') deTu.SetText(f_str);
+                                    }
+                                    const deDen = cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay') || window.deDenNgay || window.txtDenNgay;
+                                    if (deDen) {
+                                        if (typeof deDen.SetDate === 'function') deDen.SetDate(new Date(t_y, t_m - 1, t_d));
+                                        if (typeof deDen.SetText === 'function') deDen.SetText(t_str);
                                     }
                                 }
+                                const setDomVal = (sel, val) => {
+                                    const inputs = Array.from(document.querySelectorAll(sel));
+                                    for (const inp of inputs) {
+                                        inp.value = val;
+                                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                        inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                        inp.dispatchEvent(new Event('blur', { bubbles: true }));
+                                    }
+                                };
+                                setDomVal('#deTuNgay_I, #txtTuNgay_I, input[name*="TuNgay"]', f_str);
+                                setDomVal('#deDenNgay_I, #txtDenNgay_I, input[name*="DenNgay"]', t_str);
                             } catch(e) {}
-                            return false;
-                        }""")
-                        if opened_tu_ngay:
-                            self.log("Đã mở popup lịch Từ ngày qua DevExpress ShowDropDown() ✅")
-                            time.sleep(0.8)
+                        }""", {
+                            "f_y": p_from["year"], "f_m": p_from["month"], "f_d": p_from["day"], "f_str": p_from["d_str"],
+                            "t_y": p_to["year"], "t_m": p_to["month"], "t_d": p_to["day"], "t_str": p_to["d_str"]
+                        })
                     except Exception:
                         pass
 
-                    if not opened_tu_ngay:
-                        for sel in ["td:has-text('Từ ngày') ~ td img", "td:has-text('Từ ngày') ~ td .dxeButtonEditButton_EIS", "tr:has-text('Từ ngày') img", "tr:has-text('Từ ngày') .dxeButtonEditButton_EIS", "#deTuNgay_B-1Img", "#deTuNgay_B-1", "#deTuNgay_I", "#txtTuNgay_I", "input[name*='TuNgay']", "table[id*='TuNgay'] td[id*='B-1']"]:
-                            try:
-                                el = page.locator(sel).first
-                                if el.is_visible(timeout=1500):
-                                    el.click(force=True)
-                                    opened_tu_ngay = True
-                                    self.log(f"Đã mở lịch Từ ngày ({sel}) ✅")
-                                    time.sleep(0.8)
-                                    break
-                            except Exception:
-                                pass
-
-                    if not opened_tu_ngay:
-                        opened_tu_ngay = page.evaluate("""() => {
-                            const tds = Array.from(document.querySelectorAll('td, label, span')).filter(e => e.textContent && e.textContent.trim().startsWith('Từ ngày'));
-                            for (const td of tds) {
-                                const parent = td.closest('tr') || td.parentElement;
-                                if (parent) {
-                                    const btn = parent.querySelector('img, td.dxeButtonEditButton_EIS, input');
-                                    if (btn) { btn.click(); return true; }
-                                }
-                            }
-                            return false;
-                        }""")
-                        time.sleep(0.8)
-
-                    # Bấm nút Today
-                    self.log("Đang bấm nút 'Today' trên popup lịch...")
-                    today_clicked = False
+                    # Fallback bấm Today trên popup lịch
                     try:
-                        page.wait_for_selector(".dxeCalendarTodayButton_EIS, td[id*='_BT'], table[id*='_BT'], .dxbButton:has-text('Today'), span:has-text('Today'), td:has-text('Today')", timeout=5000)
-                    except Exception:
-                        pass
-
-                    for t_sel in [".dxeCalendarTodayButton_EIS", "td[id*='_DDD_C_BT']", "table[id*='_DDD_C_BT']", "#deTuNgay_DDD_C_BT", ".dxbButton:has-text('Today')", "span:has-text('Today')", "td:has-text('Today')", "div:has-text('Today')", "button:has-text('Today')"]:
-                        try:
-                            t_btn = page.locator(t_sel).first
-                            if t_btn.is_visible(timeout=1500):
+                        tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, td:has-text('Từ ngày') ~ td img").first
+                        if tu_btn.is_visible(timeout=1500):
+                            tu_btn.click(force=True)
+                            time.sleep(0.5)
+                            t_btn = page.locator(".dxeCalendarTodayButton_EIS, td[id*='_DDD_C_BT'], .dxbButton:has-text('Today'), td:has-text('Today')").first
+                            if t_btn.is_visible(timeout=2000):
                                 t_btn.click(force=True)
-                                today_clicked = True
-                                self.log(f"Đã click nút 'Today' ({t_sel}) ✅")
-                                break
-                        except Exception:
-                            pass
-
-                    if not today_clicked:
-                        today_clicked = page.evaluate("""() => {
-                            const todayBtn = document.querySelector('.dxeCalendarTodayButton_EIS, td[id*="_BT"], table[id*="_BT"]');
-                            if (todayBtn) {
-                                todayBtn.click();
-                                return true;
-                            }
-                            const btns = Array.from(document.querySelectorAll('span, button, td, div, a')).filter(el => el.textContent && el.textContent.trim().toLowerCase() === 'today');
-                            for (const b of btns) {
-                                if (b.offsetParent !== null) {
-                                    b.click();
-                                    return true;
-                                }
-                            }
-                            if (btns.length > 0) { btns[0].click(); return true; }
-                            return false;
-                        }""")
-                        if today_clicked:
-                            self.log("Đã click nút 'Today' qua JS fallback ✅")
-
-                    # Đồng bộ DevExpress API cho chắc chắn cả 2 ô là ngày hôm nay
-                    try:
-                        page.evaluate("""() => {
-                            try {
-                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                if (cc) {
-                                    const deTu = cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay');
-                                    if (deTu && typeof deTu.SetDate === 'function') deTu.SetDate(new Date());
-                                    const deDen = cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay');
-                                    if (deDen && typeof deDen.SetDate === 'function') deDen.SetDate(new Date());
-                                }
-                            } catch(e) {}
-                        }""")
+                                self.log("Đã click nút 'Today' trên lịch Từ ngày ✅")
                     except Exception:
                         pass
 
-                    time.sleep(1.0)
+                    time.sleep(0.8)
                     self._wait_portal_idle(page)
+
+                    # Log ngày thực tế trên Cổng
+                    date_diag = page.evaluate("""() => {
+                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                        const deTu = cc ? (cc.GetByName('deTuNgay') || cc.GetByName('txtTuNgay') || cc.GetByName('TuNgay')) : null;
+                        const deDen = cc ? (cc.GetByName('deDenNgay') || cc.GetByName('txtDenNgay') || cc.GetByName('DenNgay')) : null;
+                        return {
+                            tu: deTu && typeof deTu.GetText === 'function' ? deTu.GetText() : (document.querySelector('#deTuNgay_I, #txtTuNgay_I') || {}).value || '',
+                            den: deDen && typeof deDen.GetText === 'function' ? deDen.GetText() : (document.querySelector('#deDenNgay_I, #txtDenNgay_I') || {}).value || ''
+                        };
+                    }""")
+                    self.log(f"Ngày tìm kiếm trên Cổng: Từ ngày = {date_diag.get('tu')} | Đến ngày = {date_diag.get('den')}")
 
                     # Bấm tìm kiếm
                     searched = False
@@ -961,109 +915,168 @@ class ClientRPAGui:
                             except Exception:
                                 pass
 
-                    if not searched:
-                        page.evaluate("""() => {
-                            const btns = Array.from(document.querySelectorAll('#btnTimKiem, #bt_TimKiem, .dxbButton, span, td')).filter(el => el.textContent && el.textContent.trim() === 'Tìm kiếm');
-                            if (btns.length > 0) btns[0].click();
-                        }""")
-
                     self.log("Đang chờ tải danh sách hồ sơ...")
                     wait_grid(45)
                     self._wait_portal_idle(page)
                     time.sleep(1.5)
 
-                    # 4. Hiển thị 100 dòng / trang (Chờ xong callback trước khi lọc)
-                    self.log("Thiết lập hiển thị 100 bản ghi/trang...")
+                    # 4. Tự động nhận diện cấu trúc cột bảng Cổng BHYT
+                    grid_meta = page.evaluate("""() => {
+                        const headers = Array.from(document.querySelectorAll('#gvDSKetQuaGuiHoso .dxgvHeader_EIS, #gvDSKetQuaGuiHoso th, #gvDSKetQuaGuiHoso td[id*="_col"]')).map((h, i) => ({
+                            index: i,
+                            id: h.id || '',
+                            text: (h.textContent || '').trim()
+                        }));
+                        
+                        let errColIdx = -1;
+                        for (let i = 0; i < headers.length; i++) {
+                            const t = headers[i].text.toLowerCase();
+                            if (t.includes('lỗi') || t.includes('không hợp lệ') || t.includes('số lỗi') || t.includes('chi tiết lỗi')) {
+                                errColIdx = i;
+                                break;
+                            }
+                        }
+                        
+                        const rows = Array.from(document.querySelectorAll('#gvDSKetQuaGuiHoso tr[id*="DXDataRow"], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow'));
+                        
+                        return {
+                            headers: headers,
+                            errColIdx: errColIdx,
+                            totalRows: rows.length
+                        };
+                    }""")
+                    header_names = [h.get("text") for h in grid_meta.get("headers", []) if h.get("text")]
+                    self.log(f"Cấu trúc bảng: {len(header_names)} cột ({', '.join(header_names[:6])}), {grid_meta.get('totalRows', 0)} dòng dữ liệu ban đầu.")
+
+                    # 5. Hiển thị 100 dòng / trang
                     try:
-                        p_img = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg")
-                        if p_img.is_visible(timeout=4000):
+                        p_img = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg, #gvDSKetQuaGuiHoso_DXPagerBottom .dxp-dropDownButton").first
+                        if p_img.is_visible(timeout=3000):
                             p_img.click()
                             time.sleep(0.6)
-                            page.get_by_text("100", exact=True).click(timeout=4000)
+                            page.get_by_text("100", exact=True).click(timeout=3000)
                             self.log("Đang chờ tải lại 100 bản ghi/trang...")
                             wait_grid(45)
                             self._wait_portal_idle(page)
                             time.sleep(1.5)
                     except Exception: pass
 
-                    # 5. Lọc cột lỗi có giá trị = 1 để lấy toàn bộ các ca lỗi
-                    self.log("Lọc danh sách các hồ sơ có lỗi (cột lỗi = 1)...")
-                    try:
-                        c5 = page.locator("#gvDSKetQuaGuiHoso_DXFREditorcol5_I, input[id*='DXFREditorcol5'], input[name*='DXFREditorcol5']")
-                        if c5.first.is_visible(timeout=4000):
-                            c5.first.click(force=True)
-                            time.sleep(0.3)
-                            c5.first.fill("1")
-                            time.sleep(0.3)
-                            c5.first.press("Enter")
-                            self.log("Đang chờ áp dụng bộ lọc cột lỗi = 1...")
-                            wait_grid(45)
-                            self._wait_portal_idle(page)
-                            time.sleep(1.5)
-                    except Exception as e:
-                        self.log(f"Lưu ý lọc cột lỗi: {e}")
-
-                    # 6. Tải từng file chi tiết
+                    # 6. Quét các gói có lỗi và tải chi tiết
                     total_dl = 0
                     p_idx = 1
                     while True:
                         self.log(f"Quét danh sách hồ sơ lỗi tại Trang {p_idx}...")
                         wait_grid(30)
-                        links = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'] td a, #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS td a, #gvDSKetQuaGuiHoso td a").all()
-                        self.log(f"Tìm thấy {len(links)} gói lỗi trên trang {p_idx}.")
-                        if not links: break
+                        self._wait_portal_idle(page)
 
-                        for idx, link in enumerate(links):
+                        # Quét các dòng có lỗi
+                        row_info = page.evaluate("""(errColIdx) => {
+                            const rows = Array.from(document.querySelectorAll('#gvDSKetQuaGuiHoso tr[id*="DXDataRow"], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow'));
+                            const items = [];
+                            rows.forEach((r, idx) => {
+                                const cells = Array.from(r.querySelectorAll('td'));
+                                let clickable = false;
+                                let errText = '';
+                                
+                                if (errColIdx >= 0 && errColIdx < cells.length) {
+                                    const cell = cells[errColIdx];
+                                    errText = (cell.textContent || '').trim();
+                                    if (errText === '1' || parseInt(errText) > 0 || cell.querySelector('a, span[onclick], td[onclick]')) {
+                                        clickable = true;
+                                    }
+                                }
+                                
+                                if (!clickable) {
+                                    for (let c of cells) {
+                                        const txt = (c.textContent || '').trim();
+                                        const a = c.querySelector('a, span[onclick]');
+                                        if (a && (txt === '1' || parseInt(txt) > 0 || (a.getAttribute('onclick') || '').includes('Popup') || (a.id || '').includes('Loi') || (a.id || '').includes('ChiTiet'))) {
+                                            clickable = true;
+                                            errText = txt;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (!clickable) {
+                                    const a = r.querySelector('td a:not(.dxWeb_edtCheckBoxChecked)');
+                                    if (a && (a.textContent || '').trim() !== '0' && (a.textContent || '').trim() !== '') {
+                                        clickable = true;
+                                        errText = (a.textContent || '').trim();
+                                    }
+                                }
+                                
+                                items.push({
+                                    rowIdx: idx,
+                                    rowId: r.id,
+                                    hasError: clickable,
+                                    errText: errText,
+                                    rowSummary: (r.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 80)
+                                });
+                            });
+                            return items;
+                        }""", grid_meta.get("errColIdx", -1))
+
+                        error_items = [it for it in row_info if it.get("hasError")]
+                        self.log(f"Trang {p_idx}: Tìm thấy {len(row_info)} bản ghi, trong đó có {len(error_items)} gói/ca có lỗi cần tải.")
+
+                        if len(row_info) == 0 or len(error_items) == 0:
+                            if len(row_info) == 0:
+                                self.log("Không có dữ liệu trên trang này.")
+                            else:
+                                self.log("Không tìm thấy ca nào có lỗi trên trang này.")
+                            break
+
+                        for item in error_items:
+                            r_idx = item["rowIdx"]
+                            self.log(f"[{total_dl + 1}] Đang mở chi tiết gói lỗi dòng #{r_idx + 1} ({item.get('errText')} lỗi)...")
+
+                            # Click mở popup
+                            page.evaluate("""(rIdx) => {
+                                const rows = Array.from(document.querySelectorAll('#gvDSKetQuaGuiHoso tr[id*="DXDataRow"], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow'));
+                                if (rIdx < rows.length) {
+                                    const r = rows[rIdx];
+                                    const link = r.querySelector('td a, td span[onclick], td[onclick]');
+                                    if (link) {
+                                        link.click();
+                                        return true;
+                                    }
+                                    r.click();
+                                    return true;
+                                }
+                                return false;
+                            }""", r_idx)
+
+                            time.sleep(1.5)
+
+                            exp_btn = page.locator("span, a, td, button").filter(has_text=re.compile(r"^Xuất Excel$", re.IGNORECASE)).first
+                            if exp_btn.is_visible(timeout=6000):
+                                with page.expect_download(timeout=60000) as d_info:
+                                    exp_btn.click(force=True)
+                                d = d_info.value
+                                t_path = os.path.join(TEMP_DIR, f"err_p{p_idx}_{r_idx+1}_{int(time.time()*1000)}.xlsx")
+                                d.save_as(t_path)
+                                total_dl += 1
+                                self.log(f"  -> Đã tải tệp lỗi #{total_dl} ✅")
+                            else:
+                                self.log(f"  -> Không thấy nút 'Xuất Excel' trong popup dòng #{r_idx + 1}.")
+
+                            # Đóng popup
                             try:
-                                l_txt = link.inner_text()
-                                self.log(f"[{idx+1}/{len(links)}] Mở gói: {l_txt[:25]}...")
-                                link.click()
-                                time.sleep(1.5)
+                                page.evaluate("""() => {
+                                    try {
+                                        const pop = window.PopupNhanChiTietLoiHS || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('PopupNhanChiTietLoiHS'));
+                                        if (pop && typeof pop.Hide === 'function') pop.Hide();
+                                    } catch(e) {}
+                                }""")
+                                for c_s in [".dxpc-closeBtn", "img[alt*='Close']", "img[title*='Close']", ".dxWeb_pcCloseButton_Youthful"]:
+                                    ce = page.locator(c_s).first
+                                    if ce.is_visible(timeout=800):
+                                        ce.click(force=True)
+                                        break
+                            except Exception: pass
 
-                                exp_btn = page.locator("span").filter(has_text="Xuất Excel").first
-                                if exp_btn.is_visible(timeout=5000):
-                                    with page.expect_download(timeout=60000) as d_info:
-                                        exp_btn.click()
-                                    d = d_info.value
-                                    t_path = os.path.join(TEMP_DIR, f"err_p{p_idx}_{idx+1}_{int(time.time()*1000)}.xlsx")
-                                    d.save_as(t_path)
-                                    total_dl += 1
-                                    self.log(f"  -> Đã tải tệp lỗi #{total_dl} ✅")
-
-                                # Đóng popup
-                                closed = False
-                                try:
-                                    closed = page.evaluate("""() => {
-                                        try {
-                                            const pop = window.PopupNhanChiTietLoiHS || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('PopupNhanChiTietLoiHS'));
-                                            if (pop && typeof pop.Hide === 'function') {
-                                                pop.Hide();
-                                                return true;
-                                            }
-                                        } catch(e) {}
-                                        return false;
-                                    }""")
-                                except Exception: pass
-
-                                if not closed:
-                                    for c_s in [".dxpc-closeBtn", "img[alt*='Close']", "img[title*='Close']"]:
-                                        try:
-                                            ce = page.locator(c_s).first
-                                            if ce.is_visible(timeout=1000):
-                                                ce.click(force=True)
-                                                closed = True
-                                                break
-                                        except Exception: pass
-
-                                time.sleep(0.6)
-                            except Exception as re:
-                                self.log(f"  Lỗi tải dòng #{idx+1}: {re}")
-                                try:
-                                    page.evaluate("""() => {
-                                        if (window.PopupNhanChiTietLoiHS && typeof window.PopupNhanChiTietLoiHS.Hide === 'function') window.PopupNhanChiTietLoiHS.Hide();
-                                    }""")
-                                except Exception:
-                                    pass
+                            time.sleep(0.6)
 
                         try:
                             next_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom .dxp-button:has-text('>')").first
