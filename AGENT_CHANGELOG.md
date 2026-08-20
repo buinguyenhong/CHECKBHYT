@@ -56,6 +56,30 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-20 16:10 - Antigravity (Nâng cấp toàn diện Luồng C sang DevExpress Client-Side API & Promise EndCallback)
+
+### Mục tiêu
+- Khắc phục triệt để tình trạng timing/delay khi thao tác trên Cổng BHYT (ASP.NET WebForms + DevExpress).
+- Tự động tác động trực tiếp vào `ASPxClientControl` của trang web qua JavaScript: nạp ngày Today, bấm tìm kiếm, đặt 100 bản ghi/trang, lọc số 1 cột lỗi, mở popup tải Excel, và chuyển trang một cách chuẩn xác, tức thì.
+
+### Thay đổi
+- `web_app/services/portal_automation.py`:
+  - Bổ sung `wait_devexpress_callback(page, control_name, timeout_sec)`: Đợi callback DevExpress hoàn tất thông qua lắng nghe sự kiện `ctrl.EndCallback.AddHandler()` kết hợp `ctrl.InCallback()`.
+  - Nâng cấp toàn bộ 5 bước Luồng C:
+    - Bước 1: `deTu.SetDate(new Date())`, `deDen.SetDate(new Date())`, `btnTimKiem.DoClick()`.
+    - Bước 2: `grid.SetPageSize(100)` + `wait_devexpress_callback`.
+    - Bước 3: Tự động quét tìm chỉ số cột Lỗi trong header (`Lỗi`, `Số lỗi`, `Chi tiết lỗi`) -> thực thi `grid.AutoFilterByColumn(col, '1')` và dispatch event -> `wait_devexpress_callback`.
+    - Bước 4: Mở popup bằng JS click -> Chờ tải `Xuất Excel` -> đóng popup qua `PopupNhanChiTietLoiHS.Hide()`.
+    - Bước 5: Chuyển trang qua `grid.NextPage()` hoặc Pager button + `wait_devexpress_callback`.
+- `client_runner/client_agent.py`:
+  - Đồng bộ toàn bộ cơ chế `_wait_devexpress_callback` và các lệnh JS API tương ứng vào `_run_flow_c_worker`.
+
+### Nghiệp vụ ảnh hưởng
+- Đảm bảo luồng tự động hóa cào dữ liệu lỗi Luồng C chạy mượt mà, không phụ thuộc vào `time.sleep()`, không bị race condition khi tải trang hoặc khi lọc dữ liệu trên Cổng BHYT.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-20 08:05 - Antigravity (Chuẩn hóa quy trình Luồng C: Lọc Today -> 100 dòng/trang -> Lọc số 1 cột lỗi -> Tải chi tiết từng ca)
 
 ### Mục tiêu

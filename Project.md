@@ -1123,16 +1123,17 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
 - `client_runner/Chay_RPA_May_Tram.bat`: Script khởi chạy Client Runner trên máy trạm.
 
 ### 19.3. Quy trình chuẩn hóa Luồng C (Tải danh sách lỗi chi tiết & Đối soát C)
-1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Do đó, hệ thống luôn chọn ngày `Today` (mở popup lịch `Từ ngày` -> click `Today` -> đồng bộ `Đến ngày` = `Today`).
+1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Do đó, hệ thống luôn chọn ngày `Today` (sử dụng DevExpress API `deTu.SetDate(new Date())`, `deDen.SetDate(new Date())` kết hợp click `Today` fallback).
 2. **Quy tắc lọc số `1` cột Lỗi:**
    - Trên bảng kết quả Cổng BHYT (`#gvDSKetQuaGuiHoso`), mỗi bản ghi đại diện cho 1 ca riêng biệt.
    - Nếu ca đó bị lỗi thì cột lỗi mang giá trị là `1`.
-   - Do đó, hệ thống nhận diện đúng ô lọc của cột lỗi trên thanh `AutoFilterRow`, nhập số `1` và bấm `Enter` để lấy toàn bộ các ca có lỗi.
-3. **Quy trình thực thi tuần tự & Xử lý bất đồng bộ DevExpress Grid:**
-   - **Bước 1 (Chọn ngày & Tìm kiếm):** Bấm `Today` -> Bấm `Tìm kiếm` -> Bắt buộc chờ DevExpress nạp xong dữ liệu bảng ban đầu (`wait_for_grid_data` + `wait_portal_idle`).
-   - **Bước 2 (Hiển thị 100 bản ghi/trang):** Chọn 100 dòng -> Bắt buộc chờ DevExpress callback nạp xong 100 dòng hoàn toàn (chống nghẽn callback làm rỗng bảng).
-   - **Bước 3 (Nhận diện cột Lỗi & Điền số 1):** Tự động nhận diện ID ô lọc của cột Lỗi (`col5` hoặc tương ứng) -> Điền số `1` -> Bấm `Enter` -> Chờ DevExpress áp dụng bộ lọc xong.
-   - **Bước 4 (Tải từng ca lỗi chi tiết):** Lấy danh sách các ca lỗi hiển thị -> Click mở popup chi tiết -> Bấm "Xuất Excel" -> Lưu file `err_p{page}_{row}_{timestamp}.xlsx` -> Đóng popup an toàn (`PopupNhanChiTietLoiHS.Hide()` + close button) -> Lặp tiếp cho toàn bộ các dòng và tự động chuyển trang (`>`).
+   - Hệ thống tự động nhận diện chỉ số cột Lỗi trong header (`Lỗi`, `Số lỗi`, `Chi tiết lỗi`) và áp dụng bộ lọc trực tiếp bằng `grid.AutoFilterByColumn(col, '1')` hoặc tác động DOM AutoFilterRow.
+3. **Cơ chế Điều khiển DevExpress Client-Side API & Lắng nghe Sự kiện Bất đồng bộ:**
+   - Thay vì sử dụng `time.sleep()` cứng dễ dẫn đến race condition, hệ thống sử dụng hàm `wait_devexpress_callback` thông qua `Promise` JavaScript lắng nghe sự kiện `grid.EndCallback.AddHandler()` kết hợp cờ `grid.InCallback()`.
+   - **Bước 1 (Chọn ngày & Tìm kiếm):** Gọi `deTu.SetDate(new Date())`, `deDen.SetDate(new Date())` -> Kích hoạt tìm kiếm bằng `btnTimKiem.DoClick()` -> Chờ `EndCallback` của Grid.
+   - **Bước 2 (Hiển thị 100 bản ghi/trang):** Thiết lập `grid.SetPageSize(100)` -> Chờ `EndCallback` nạp hoàn tất 100 dòng.
+   - **Bước 3 (Nhận diện cột Lỗi & Điền số 1):** Tự động nhận diện cột Lỗi -> Gọi `grid.AutoFilterByColumn(col, '1')` -> Chờ `EndCallback` áp dụng bộ lọc xong.
+   - **Bước 4 (Tải từng ca lỗi chi tiết):** Lấy danh sách các dòng ca lỗi qua JS -> Kích hoạt click mở popup chi tiết -> Chờ tải `Xuất Excel` -> Đóng popup ngay lập tức bằng DevExpress API `PopupNhanChiTietLoiHS.Hide()` -> Lặp tiếp cho toàn bộ các dòng và tự động chuyển trang bằng `grid.NextPage()`.
    - **Bước 5 (Gom file & Đối soát C):** Gom tất cả file Excel con thành `HoSoLoiChiTiet.xlsx` và tự động kích hoạt tiến trình Đối soát C với CSDL HIS.
 
 ### 19.4. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
