@@ -56,18 +56,20 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-08-20 08:00 - Antigravity (Nâng cấp Luồng C: Tự động nhận diện động cột lỗi, xử lý ngày thông minh và tải gói lỗi chính xác)
+## 2026-08-20 08:05 - Antigravity (Chuẩn hóa quy trình Luồng C: Lọc Today -> 100 dòng/trang -> Lọc số 1 cột lỗi -> Tải chi tiết từng ca)
 
 ### Mục tiêu
-- Khắc phục triệt để hiện tượng Luồng C báo `"Không tìm thấy gói hồ sơ lỗi nào trên trang này"` và `"Tìm thấy 0 gói hồ sơ trên trang 1"`.
+- Thực hiện đúng và đầy đủ quy trình nghiệp vụ chuẩn:
+  1. Mở lịch `Từ ngày` -> Bấm nút `Today` -> Bấm `Tìm kiếm` -> Chờ bảng nạp xong.
+  2. Chọn hiển thị `100 bản ghi/trang` -> Bắt buộc chờ DevExpress callback nạp xong 100 bản ghi hoàn toàn (chống nghẽn callback).
+  3. Nhận diện chính xác ô lọc cột lỗi trên thanh AutoFilterRow -> Điền số `1` -> Bấm `Enter` -> Chờ DevExpress áp dụng bộ lọc xong.
+  4. Duyệt qua tất cả các dòng ca lỗi trên bảng -> Mở popup -> Bấm `Xuất Excel` -> Tải file `err_*.xlsx` -> Đóng popup -> Tiếp tục các ca tiếp theo và tự động chuyển trang.
+  5. Gom file và tiến hành Đối soát C với CSDL HIS.
 
-### Nguyên nhân kỹ thuật & Cải tiến
-1. **Tránh nghẽn Callback AutoFilterRow:** Thay vì phụ thuộc vào việc nhập chuỗi `1` vào ô lọc cột DevExpress (dễ gây lỗi race-condition callback hoặc gõ nhầm cột khi thứ tự cột thay đổi), hệ thống chuyển sang **phân tích DOM thời gian thực**.
-2. **Tự động nhận diện cột lỗi:** Quét tiêu đề các cột của DevExpress GridView để xác định chính xác cột chứa lỗi (`errColIdx`).
-3. **Quét trực tiếp từng dòng dữ liệu:** Duyệt qua tất cả các dòng dữ liệu hiển thị trên bảng, tự động nhận diện dòng có số lỗi `= 1` (hoặc `> 0`) hoặc có liên kết mở popup chi tiết lỗi (`PopupNhanChiTietLoiHS`).
-4. **Tải và đóng popup an toàn:** Mở từng gói lỗi -> Tải file Excel `err_*.xlsx` -> Đóng popup -> Lặp tiếp cho đến hết tất cả các dòng và chuyển trang.
-5. **Xử lý ngày tìm kiếm:** Đặt ngày `Từ ngày` & `Đến ngày` linh hoạt theo khoảng ngày đã chọn và nút `Today` có log hiển thị rõ ràng trên giao diện thời gian thực.
-6. Đồng bộ hóa cả `web_app/services/portal_automation.py` và `client_runner/client_agent.py`.
+### Thay đổi
+- `web_app/services/portal_automation.py` [MODIFY]: Áp dụng quy trình chuẩn hóa 4 bước tuần tự, có chờ DevExpress idle sau mỗi thao tác.
+- `client_runner/client_agent.py` [MODIFY]: Đồng bộ logic 4 bước chuẩn hóa trên Client RPA.
+- `AGENT_CHANGELOG.md` & `Project.md` [MODIFY]: Đồng bộ tài liệu và nhật ký.
 
 ---
 
