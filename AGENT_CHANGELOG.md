@@ -56,6 +56,31 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-20 17:08 - Antigravity (Sửa lỗi dứt điểm: Chọn Today qua Lịch, Phân trang 100 qua Pager, Popup Modal Mask và Nút Xuất Excel)
+
+### Mục tiêu
+- Khắc phục triệt để các lỗi phát sinh trong thực tế trên Cổng BHYT:
+  1. Luồng C: Chọn ngày Today không nhận khi chỉ gọi hàm JS thuần.
+  2. Luồng C: Phân trang 100 dòng không có tác dụng với `grid.SetPageSize(100)`.
+  3. Luồng C: Không tìm thấy nút "Xuất Excel" trong popup chi tiết ca lỗi do bị lớp phủ mờ (`.dxpc-mask`) chặn tương tác mở popup của các dòng sau.
+  4. Luồng B: Treo timeout chờ download do bấm "Xuất excel" khi grid chưa hoàn tất tìm kiếm và click popup menu chưa chuẩn.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - **Luồng C - Chọn ngày Today:** Mở popup lịch bằng icon `#deTuNgay_B-1` -> Click nút `Today` (`#deTuNgay_DDD_C_BT` / `.dxeCalendarTodayButton_EIS`) đảm bảo sinh sự kiện cập nhật đầy đủ hidden input `_VI`, `_RawData` của ASP.NET.
+  - **Luồng C - Đổi 100 dòng/trang:** Mở Pager DropDown `#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg` -> Click item `100` -> Chờ nạp dữ liệu xong (`wait_for_grid_data`).
+  - **Luồng C - Xử lý Popup chi tiết ca lỗi & Mask Blocking:**
+    - Trước khi mở dòng: Đợi lớp phủ `.dxpc-mask` và popup cũ biến mất hoàn toàn (`state="hidden"`).
+    - Sau khi click dòng: Đợi popup `#PopupNhanChiTietLoiHS_PW-0` và loading indicator bên trong hiển thị hoàn tất.
+    - Tìm và click nút "Xuất Excel" bên trong popup với timeout an toàn.
+    - Đóng popup và chờ mask ẩn hẳn trước khi duyệt dòng kế tiếp.
+  - **Luồng B - Xuất Excel:**
+    - Sau khi bấm `bt_TimKiem`, đợi bảng danh sách đề nghị thanh toán nạp xong dữ liệu.
+    - Mở menu Xuất Excel và click chính xác mục con "Xuất excel" trong popup container bằng Playwright locator `sub_item.click(force=True)` kết hợp `expect_download`.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-20 16:25 - Antigravity (Nâng cấp Luồng B sang DevExpress Client-Side API & Đồng bộ đặc thù giao diện không có ngày)
 
 ### Mục tiêu

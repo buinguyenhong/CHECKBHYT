@@ -1124,26 +1124,23 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
 
 ### 19.3. Quy trình chuẩn hóa Luồng B (Tải danh sách đã gửi listbh.xlsx)
 1. **Đặc thù giao diện:** Giao diện "Danh sách đề nghị thanh toán" trên Cổng BHYT hoàn toàn không có ô chọn ngày (Từ ngày / Đến ngày), do đó hệ thống không thao tác ngày tháng ở luồng này.
-2. **Cơ chế DevExpress Client-Side API & Lắng nghe Sự kiện Bất đồng bộ:**
+2. **Cơ chế Điều khiển & Tải file chuẩn xác:**
    - **Bước 1 (Chọn Trạng thái):** Gọi `cb_TrangThaiTT.SetSelectedIndex(...)` chọn "Đã đề nghị thanh toán" và kích hoạt `ProcessItemClick()`.
-   - **Bước 2 (Tìm kiếm & Chờ Callback):** Kích hoạt `bt_TimKiem.DoClick()` -> Sử dụng `wait_devexpress_callback(page, "bt_TimKiem", 45)` để chờ máy chủ nạp xong dữ liệu danh sách trước khi mở popup.
-   - **Bước 3 (Xuất Excel):** Kích hoạt `bt_XuatExcel.DoClick()` -> Dùng JavaScript chọn chính xác mục con "Xuất excel" trong container popup menu -> Bắt sự kiện `expect_download` để lưu tệp thành `listbh.xlsx`.
+   - **Bước 2 (Tìm kiếm & Chờ dữ liệu):** Kích hoạt `bt_TimKiem.DoClick()` -> Chờ các hàng dữ liệu của bảng nạp xong hoàn toàn (`wait_portal_idle`).
+   - **Bước 3 (Xuất Excel):** Mở menu `#bt_XuatExcel` -> Chờ popup menu xuất hiện -> Dùng Playwright click chính xác mục con "Xuất excel" (`table.dxm-item:has-text('Xuất excel')`) trong khối `expect_download` để lưu tệp thành `listbh.xlsx`.
 
 ### 19.4. Quy trình chuẩn hóa Luồng C (Tải danh sách lỗi chi tiết & Đối soát C)
-1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Do đó, hệ thống luôn chọn ngày `Today` (sử dụng DevExpress API `deTu.SetDate(new Date())`, `deDen.SetDate(new Date())` kết hợp click `Today` fallback).
-2. **Quy tắc lọc số `1` cột Lỗi:**
-   - Trên bảng kết quả Cổng BHYT (`#gvDSKetQuaGuiHoso`), mỗi bản ghi đại diện cho 1 ca riêng biệt.
-   - Nếu ca đó bị lỗi thì cột lỗi mang giá trị là `1`.
-   - Hệ thống tự động nhận diện chỉ số cột Lỗi trong header (`Lỗi`, `Số lỗi`, `Chi tiết lỗi`) và áp dụng bộ lọc trực tiếp bằng `grid.AutoFilterByColumn(col, '1')` hoặc tác động DOM AutoFilterRow.
-3. **Cơ chế Điều khiển DevExpress Client-Side API & Lắng nghe Sự kiện Bất đồng bộ:**
-   - Thay vì sử dụng `time.sleep()` cứng dễ dẫn đến race condition, hệ thống sử dụng hàm `wait_devexpress_callback` thông qua `Promise` JavaScript lắng nghe sự kiện `grid.EndCallback.AddHandler()` kết hợp cờ `grid.InCallback()`.
-   - **Bước 1 (Chọn ngày & Tìm kiếm):** Gọi `deTu.SetDate(new Date())`, `deDen.SetDate(new Date())` -> Kích hoạt tìm kiếm bằng `btnTimKiem.DoClick()` -> Chờ `EndCallback` của Grid.
-   - **Bước 2 (Hiển thị 100 bản ghi/trang):** Thiết lập `grid.SetPageSize(100)` -> Chờ `EndCallback` nạp hoàn tất 100 dòng.
-   - **Bước 3 (Nhận diện cột Lỗi & Điền số 1):** Tự động nhận diện cột Lỗi -> Gọi `grid.AutoFilterByColumn(col, '1')` -> Chờ `EndCallback` áp dụng bộ lọc xong.
-   - **Bước 4 (Tải từng ca lỗi chi tiết):** Lấy danh sách các dòng ca lỗi qua JS -> Kích hoạt click mở popup chi tiết -> Chờ tải `Xuất Excel` -> Đóng popup ngay lập tức bằng DevExpress API `PopupNhanChiTietLoiHS.Hide()` -> Lặp tiếp cho toàn bộ các dòng và tự động chuyển trang bằng `grid.NextPage()`.
-   - **Bước 5 (Gom file & Đối soát C):** Gom tất cả file Excel con thành `HoSoLoiChiTiet.xlsx` và tự động kích hoạt tiến trình Đối soát C với CSDL HIS.
+1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Hệ thống mở popup lịch bằng icon `#deTuNgay_B-1` -> Click nút **`Today`** (`#deTuNgay_DDD_C_BT` / `.dxeCalendarTodayButton_EIS`) đảm bảo máy chủ nhận đủ các trường ẩn của DevExpress.
+2. **Quy tắc phân trang 100 bản ghi/trang:** Mở Pager Dropdown `#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg` -> Click chọn dòng **`100`** -> Chờ bảng nạp xong dữ liệu mới.
+3. **Quy tắc lọc số `1` cột Lỗi:** Tự động nhận diện chỉ số cột Lỗi (`Lỗi`, `Số lỗi`, `Chi tiết lỗi`) -> Điền số `1` vào ô lọc `#gvDSKetQuaGuiHoso_DXFREditorcol{col}_I` -> Gửi phím Enter và chờ bảng cập nhật.
+4. **Cơ chế Mở Popup Chi tiết ca lỗi & Chống nghẽn Modal Mask:**
+   - Trước khi click mở dòng: Đợi lớp phủ `.dxpc-mask` và popup cũ biến mất hoàn toàn (`state="hidden"`).
+   - Sau khi click dòng: Đợi popup `#PopupNhanChiTietLoiHS_PW-0` và loading indicator bên trong nạp xong.
+   - Tìm và click nút "Xuất Excel" bên trong popup với `expect_download`.
+   - Đóng popup an toàn (`PopupNhanChiTietLoiHS.Hide()`) và đợi mask ẩn hẳn trước khi sang dòng tiếp theo.
+5. **Gom file & Đối soát C:** Gom tất cả file Excel con thành `HoSoLoiChiTiet.xlsx` và tự động kích hoạt tiến trình Đối soát C với CSDL HIS.
 
-### 19.4. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
+### 19.5. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
 - Khi chạy Đối soát C: nếu một ca bệnh (`MA_LK`) vừa có trong danh sách đã gửi (`listbh`) nhưng lại xuất hiện trong file lỗi chi tiết (`HoSoLoiChiTiet.xlsx`):
   - Hệ thống ưu tiên đánh dấu ca đó thuộc nhóm **LỖI (`LOI`)**.
   - Tự động gắn kèm `MALOI`, `MOTALOI`, nguyên nhân và hướng dẫn khắc phục cụ thể từ danh mục `error_definitions`.
