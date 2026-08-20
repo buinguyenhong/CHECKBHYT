@@ -1122,4 +1122,32 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
 - `client_runner/Cai_Dat_May_Tram.bat`: Script cài đặt 1-click cho máy trạm (thư viện + Chromium).
 - `client_runner/Chay_RPA_May_Tram.bat`: Script khởi chạy Client Runner trên máy trạm.
 
+### 19.3. Quy trình chuẩn hóa Luồng C (Tải danh sách lỗi chi tiết & Đối soát C)
+1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Do đó, hệ thống luôn chọn ngày `Today` (mở popup lịch `Từ ngày` -> click `Today` -> đồng bộ `Đến ngày` = `Today`).
+2. **Quy tắc lọc số `1` cột Lỗi:**
+   - Trên bảng kết quả Cổng BHYT (`#gvDSKetQuaGuiHoso`), mỗi bản ghi đại diện cho 1 ca riêng biệt.
+   - Nếu ca đó bị lỗi thì cột lỗi mang giá trị là `1`.
+   - Do đó, hệ thống nhận diện đúng ô lọc của cột lỗi trên thanh `AutoFilterRow`, nhập số `1` và bấm `Enter` để lấy toàn bộ các ca có lỗi.
+3. **Quy trình thực thi tuần tự & Xử lý bất đồng bộ DevExpress Grid:**
+   - **Bước 1 (Chọn ngày & Tìm kiếm):** Bấm `Today` -> Bấm `Tìm kiếm` -> Bắt buộc chờ DevExpress nạp xong dữ liệu bảng ban đầu (`wait_for_grid_data` + `wait_portal_idle`).
+   - **Bước 2 (Hiển thị 100 bản ghi/trang):** Chọn 100 dòng -> Bắt buộc chờ DevExpress callback nạp xong 100 dòng hoàn toàn (chống nghẽn callback làm rỗng bảng).
+   - **Bước 3 (Nhận diện cột Lỗi & Điền số 1):** Tự động nhận diện ID ô lọc của cột Lỗi (`col5` hoặc tương ứng) -> Điền số `1` -> Bấm `Enter` -> Chờ DevExpress áp dụng bộ lọc xong.
+   - **Bước 4 (Tải từng ca lỗi chi tiết):** Lấy danh sách các ca lỗi hiển thị -> Click mở popup chi tiết -> Bấm "Xuất Excel" -> Lưu file `err_p{page}_{row}_{timestamp}.xlsx` -> Đóng popup an toàn (`PopupNhanChiTietLoiHS.Hide()` + close button) -> Lặp tiếp cho toàn bộ các dòng và tự động chuyển trang (`>`).
+   - **Bước 5 (Gom file & Đối soát C):** Gom tất cả file Excel con thành `HoSoLoiChiTiet.xlsx` và tự động kích hoạt tiến trình Đối soát C với CSDL HIS.
+
+### 19.4. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
+- Khi chạy Đối soát C: nếu một ca bệnh (`MA_LK`) vừa có trong danh sách đã gửi (`listbh`) nhưng lại xuất hiện trong file lỗi chi tiết (`HoSoLoiChiTiet.xlsx`):
+  - Hệ thống ưu tiên đánh dấu ca đó thuộc nhóm **LỖI (`LOI`)**.
+  - Tự động gắn kèm `MALOI`, `MOTALOI`, nguyên nhân và hướng dẫn khắc phục cụ thể từ danh mục `error_definitions`.
+  - Phân loại rõ cờ `requires_his_reset` (Bắt buộc Reset HIS hay Khoa tự sửa) để IT và Khoa lâm sàng phối hợp xử lý dứt điểm trước khi gửi lại lên cổng BHYT.
+
+### 19.5. Danh mục Định nghĩa & Hướng dẫn Lỗi XML BHYT
+- Hệ thống duy trì danh mục 67 định nghĩa lỗi XML trong CSDL `app_state.db` (bảng `error_definitions`).
+- Bao phủ đầy đủ các nhóm lỗi phổ biến:
+  - **XML3:** `DIEN_BIEN_LS` (thiếu diễn biến lâm sàng), `TOMTAT_KQ` (thiếu tóm tắt cận lâm sàng), `MA_BS_DOC_KQ` (thiếu mã bác sĩ đọc kết quả), `KET_LUAN` (thiếu kết luận CĐHA/TDCN), `MA_BAC_SI` (mã người thực hiện/chỉ định trống), `MA_THUOC`/`MA_VAT_TU` (thiếu mã tương đương), v.v.
+  - **XML5:** `NGAY_TH_YL` (ngày thực hiện y lệnh sai), `XML5` (thông tin chi tiết thuốc/vật tư).
+  - **XML8 (Tóm tắt HSBA):** `MA_TTDV` (thiếu mã tương đương dịch vụ).
+  - **XML9, XML11, XML13, v.v.:** Các thông tin giấy chứng sinh, giấy chứng nhận nghỉ dưỡng thai, phiếu chuyển tuyến.
+- Quản trị viên và IT có thể tùy chỉnh nguyên nhân và hướng dẫn khắc phục trên WebApp (`/admin` -> Tab Quản lý Lỗi).
+
 
