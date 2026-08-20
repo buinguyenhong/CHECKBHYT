@@ -56,6 +56,24 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-20 16:25 - Antigravity (Nâng cấp Luồng B sang DevExpress Client-Side API & Đồng bộ đặc thù giao diện không có ngày)
+
+### Mục tiêu
+- Nâng cấp Luồng B (Tải danh sách đã gửi `listbh.xlsx`) sang cơ chế điều khiển DevExpress Client-Side API và `wait_devexpress_callback`.
+- Chuẩn hóa nghiệp vụ: Giao diện "Danh sách đề nghị thanh toán" trên Cổng BHYT không có ô Từ ngày/Đến ngày -> Loại bỏ mọi xử lý ngày tháng dư thừa.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - Mở rộng `wait_devexpress_callback`: Tự động duyệt tìm mọi GridView / Control đang trong trạng thái `InCallback()` nếu không khớp tên định sẵn.
+  - Luồng B:
+    - Bước 1: Điều hướng cố định vào menu "Danh sách đề nghị thanh toán".
+    - Bước 2: Chọn trạng thái "Đã đề nghị thanh toán" trực tiếp qua `cb_TrangThaiTT.SetSelectedIndex(...)` và kích hoạt item click event.
+    - Bước 3: Kích hoạt nút Tìm kiếm qua `bt_TimKiem.DoClick()` và chờ `EndCallback` của máy chủ Cổng BHYT.
+    - Bước 4: Mở menu Xuất Excel qua DevExpress API `bt_XuatExcel.DoClick()` -> Chọn chính xác mục con "Xuất excel" trong popup container qua JavaScript -> Tải `listbh.xlsx` an toàn.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-20 16:10 - Antigravity (Nâng cấp toàn diện Luồng C sang DevExpress Client-Side API & Promise EndCallback)
 
 ### Mục tiêu

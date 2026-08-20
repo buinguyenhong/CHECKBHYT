@@ -1122,7 +1122,14 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
 - `client_runner/Cai_Dat_May_Tram.bat`: Script cài đặt 1-click cho máy trạm (thư viện + Chromium).
 - `client_runner/Chay_RPA_May_Tram.bat`: Script khởi chạy Client Runner trên máy trạm.
 
-### 19.3. Quy trình chuẩn hóa Luồng C (Tải danh sách lỗi chi tiết & Đối soát C)
+### 19.3. Quy trình chuẩn hóa Luồng B (Tải danh sách đã gửi listbh.xlsx)
+1. **Đặc thù giao diện:** Giao diện "Danh sách đề nghị thanh toán" trên Cổng BHYT hoàn toàn không có ô chọn ngày (Từ ngày / Đến ngày), do đó hệ thống không thao tác ngày tháng ở luồng này.
+2. **Cơ chế DevExpress Client-Side API & Lắng nghe Sự kiện Bất đồng bộ:**
+   - **Bước 1 (Chọn Trạng thái):** Gọi `cb_TrangThaiTT.SetSelectedIndex(...)` chọn "Đã đề nghị thanh toán" và kích hoạt `ProcessItemClick()`.
+   - **Bước 2 (Tìm kiếm & Chờ Callback):** Kích hoạt `bt_TimKiem.DoClick()` -> Sử dụng `wait_devexpress_callback(page, "bt_TimKiem", 45)` để chờ máy chủ nạp xong dữ liệu danh sách trước khi mở popup.
+   - **Bước 3 (Xuất Excel):** Kích hoạt `bt_XuatExcel.DoClick()` -> Dùng JavaScript chọn chính xác mục con "Xuất excel" trong container popup menu -> Bắt sự kiện `expect_download` để lưu tệp thành `listbh.xlsx`.
+
+### 19.4. Quy trình chuẩn hóa Luồng C (Tải danh sách lỗi chi tiết & Đối soát C)
 1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Do đó, hệ thống luôn chọn ngày `Today` (sử dụng DevExpress API `deTu.SetDate(new Date())`, `deDen.SetDate(new Date())` kết hợp click `Today` fallback).
 2. **Quy tắc lọc số `1` cột Lỗi:**
    - Trên bảng kết quả Cổng BHYT (`#gvDSKetQuaGuiHoso`), mỗi bản ghi đại diện cho 1 ca riêng biệt.
