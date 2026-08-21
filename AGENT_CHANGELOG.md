@@ -56,6 +56,25 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-21 08:05 - Antigravity (Nâng cấp Điều hướng Đa tầng Luồng B & 3 Lớp Chọn Ngày Today Luồng C)
+
+### Mục tiêu
+- Khắc phục lỗi timeout 15s điều hướng menu Luồng B do thiếu bước click bung menu con "Hồ sơ XML".
+- Khắc phục lỗi Luồng C không chọn được ngày Today (vẫn bị lấy từ ngày 01) do selector lịch không kích hoạt được ASP.NET event.
+- Khắc phục logic kiểm tra trạng thái đăng nhập `_ensure_login` tránh nhầm lẫn khi phiên đã hết hạn.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - **Kiểm tra đăng nhập `_ensure_login`:** Nhận diện chính xác liên kết "Đăng xuất" và nút "Đăng nhập" để biết phiên hợp lệ hay cần nhập Captcha, đóng các popup OTP/thông báo cản trở.
+  - **Luồng B - Điều hướng 3 tầng:** Kích hoạt `#HeaderMenu` ("Hồ sơ đề nghị thanh toán") -> Bung menu con ("Hồ sơ XML") -> Click mục con "Danh sách đề nghị thanh toán" (quét toàn diện DOM + JS fallback).
+  - **Luồng C - Đặt ngày TODAY 3 lớp:**
+    1. Lớp 1: Gọi `c.SetDate(new Date())` và bắn sự kiện `ValueChanged` trên toàn bộ controls DateEdit của DevExpress.
+    2. Lớp 2: Tìm toàn bộ input Từ ngày/Đến ngày trên DOM, bôi đen và điền trực tiếp chuỗi ngày hôm nay (`dd/MM/yyyy`).
+    3. Lớp 3: Quét mọi selector icon lịch và click nút **`Today`**.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-20 17:08 - Antigravity (Sửa lỗi dứt điểm: Chọn Today qua Lịch, Phân trang 100 qua Pager, Popup Modal Mask và Nút Xuất Excel)
 
 ### Mục tiêu

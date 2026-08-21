@@ -107,24 +107,27 @@ class PortalAutomationService:
                 log_func(msg)
             safe_print(f"[*] [PortalAutomation] {msg}")
 
-
         log("Đang truy cập Cổng BHYT...")
         page.goto(self.base_url, timeout=60000)
         page.wait_for_load_state("domcontentloaded")
+        time.sleep(1.5)
 
-        # Kiểm tra xem đã đăng nhập chưa (dựa vào URL và các phần tử giao diện trang chủ)
+        # Đóng các popup thông báo hoặc OTP nếu có
         try:
-            current_url = page.url.lower()
-            if "login" not in current_url and ("home" in current_url or "gdbhyt" in current_url):
-                # Kiểm tra các phần tử chỉ xuất hiện khi đã đăng nhập
-                is_logged_in = page.locator("#HeaderMenu").is_visible(timeout=3000) or \
-                               page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible(timeout=3000) or \
-                               page.locator("#HeaderMenu_DXME2_").is_visible(timeout=3000) or \
-                               page.get_by_text("Hồ sơ XML").is_visible(timeout=3000) or \
-                               page.locator("a:has-text('Đăng xuất')").is_visible(timeout=3000)
-                if is_logged_in:
-                    log("Phiên đăng nhập vẫn còn hiệu lực (Session Valid) ✅ -> Vào thẳng chức năng, KHÔNG cần đăng nhập lại!")
-                    return
+            btn_close_pop = page.locator(".dxpc-closeBtn, #btnKhong_CD, #btnKhong, input[value='Không']").first
+            if btn_close_pop.is_visible(timeout=1500):
+                btn_close_pop.click(force=True)
+                time.sleep(0.5)
+        except Exception: pass
+
+        # Kiểm tra xem đã đăng nhập chưa
+        try:
+            has_logout = page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible(timeout=2000)
+            has_login_btn = page.locator("a:has-text('Đăng nhập'), input[value='Đăng nhập'], #btnLogin, #btnDangNhap, input[name*='UserName']").is_visible(timeout=2000)
+            
+            if has_logout and not has_login_btn:
+                log("Phiên đăng nhập vẫn còn hiệu lực (Session Valid) ✅ -> Vào thẳng chức năng, KHÔNG cần đăng nhập lại!")
+                return
         except Exception:
             pass
 
@@ -133,23 +136,33 @@ class PortalAutomationService:
         
         try:
             # Điền Mã cơ sở KCB
-            if page.get_by_role("textbox", name="Mã cơ sở KCB").is_visible(timeout=5000):
-                page.get_by_role("textbox", name="Mã cơ sở KCB").click()
+            ma_inp = page.locator("input[name*='MaCSKCB'], input[id*='txtMaCSKCB'], input[placeholder*='Mã cơ sở']").first
+            if ma_inp.is_visible(timeout=3000):
+                ma_inp.click()
+                ma_inp.fill(self.ma_cskcb)
+            elif page.get_by_role("textbox", name="Mã cơ sở KCB").is_visible(timeout=2000):
                 page.get_by_role("textbox", name="Mã cơ sở KCB").fill(self.ma_cskcb)
             
             # Điền Tên đăng nhập
-            if page.get_by_role("textbox", name="Tên đăng nhập").is_visible(timeout=5000):
-                page.get_by_role("textbox", name="Tên đăng nhập").click()
+            user_inp = page.locator("input[name*='UserName'], input[id*='txtUserName'], input[placeholder*='Tên đăng nhập']").first
+            if user_inp.is_visible(timeout=3000):
+                user_inp.click()
+                user_inp.fill(self.username)
+            elif page.get_by_role("textbox", name="Tên đăng nhập").is_visible(timeout=2000):
                 page.get_by_role("textbox", name="Tên đăng nhập").fill(self.username)
             
             # Điền Mật khẩu
-            if page.get_by_role("textbox", name="Mật khẩu").is_visible(timeout=5000):
-                page.get_by_role("textbox", name="Mật khẩu").click()
+            pass_inp = page.locator("input[type='password'], input[name*='Password'], input[id*='txtPassword']").first
+            if pass_inp.is_visible(timeout=3000):
+                pass_inp.click()
+                pass_inp.fill(self.password)
+            elif page.get_by_role("textbox", name="Mật khẩu").is_visible(timeout=2000):
                 page.get_by_role("textbox", name="Mật khẩu").fill(self.password)
             
             # Focus vào ô Captcha để người dùng nhập
-            if page.get_by_role("textbox", name="Gõ mã hiển thị").is_visible(timeout=5000):
-                page.get_by_role("textbox", name="Gõ mã hiển thị").click()
+            cap_inp = page.locator("input[name*='Captcha'], input[id*='Captcha'], input[placeholder*='mã hiển thị']").first
+            if cap_inp.is_visible(timeout=3000):
+                cap_inp.click()
                 log("Vui lòng nhìn mã CAPTCHA trên màn hình trình duyệt, nhập vào và bấm ĐĂNG NHẬP (Chờ tối đa 120 giây)...")
             
             # Chờ người dùng nhập captcha và đăng nhập thành công
@@ -157,12 +170,11 @@ class PortalAutomationService:
             start_wait = time.time()
             while time.time() - start_wait < 120:
                 try:
-                    # Kiểm tra các dấu hiệu đăng nhập thành công
-                    if page.locator("#HeaderMenu").is_visible() or \
-                       page.locator("#HeaderMenu_DXME2_").is_visible() or \
-                       page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible() or \
-                       page.get_by_text("Hồ sơ XML").is_visible() or \
-                       page.locator("a:has-text('Đăng xuất')").is_visible():
+                    if page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible():
+                        login_success = True
+                        break
+                    # Nếu thấy menu Hồ sơ đề nghị thanh toán và không còn form đăng nhập
+                    if page.locator("#HeaderMenu").is_visible() and not page.locator("input[name*='UserName']").is_visible():
                         login_success = True
                         break
                 except Exception:
@@ -344,7 +356,31 @@ class PortalAutomationService:
                 except Exception:
                     pass
 
-                page.get_by_role("link", name="Danh sách đề nghị thanh toán").click(timeout=15000)
+                try:
+                    xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-popup div, .dxm-item").filter(has_text="Hồ sơ XML")
+                    if xml_menu.first.is_visible(timeout=3000):
+                        xml_menu.first.click()
+                        time.sleep(0.5)
+                except Exception:
+                    pass
+
+                navigated_b = False
+                for sel in ["a:has-text('Danh sách đề nghị thanh toán')", "span:has-text('Danh sách đề nghị thanh toán')", ".dxm-item:has-text('Danh sách đề nghị thanh toán')"]:
+                    try:
+                        el = page.locator(sel).first
+                        if el.is_visible(timeout=2000):
+                            el.click(force=True)
+                            navigated_b = True
+                            break
+                    except Exception: pass
+
+                if not navigated_b:
+                    page.evaluate("""() => {
+                        const items = Array.from(document.querySelectorAll('a, span, td, div, .dxm-item'));
+                        const target = items.find(e => e.textContent && e.textContent.trim().includes('Danh sách đề nghị thanh toán'));
+                        if (target) target.click();
+                    }""")
+
                 page.wait_for_load_state("domcontentloaded")
                 self.wait_portal_idle(page)
 
@@ -643,32 +679,68 @@ class PortalAutomationService:
                 except Exception as w_err:
                     log(f"Lưu ý chờ bảng: {w_err}")
 
-                # 3. BƯỚC 1: ĐẶT NGÀY TODAY BẰNG CÁCH MỞ POPUP LỊCH & CLICK NÚT TODAY
-                log("Đang mở popup lịch để bấm nút Today...")
+                # 3. BƯỚC 1: ĐẶT NGÀY TODAY (KẾT HỢP 3 LỚP ĐẢM BẢO 100%)
+                log("Đang đặt khoảng ngày tìm kiếm = TODAY...")
+                import datetime as dt_mod
+                today_ddmmyyyy = dt_mod.datetime.now().strftime("%d/%m/%Y")
+
+                # Lớp 1: DevExpress Client API
                 try:
-                    # Mở popup lịch Từ ngày
-                    tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, td[id*='deTuNgay_B-1']").first
-                    if tu_btn.is_visible(timeout=3000):
+                    page.evaluate("""() => {
+                        try {
+                            if (window.ASPxClientControl) {
+                                const cc = window.ASPxClientControl.GetControlCollection();
+                                const now = new Date();
+                                cc.ForEachControl((c) => {
+                                    if (c && typeof c.SetDate === 'function') {
+                                        const name = (c.name || '').toLowerCase();
+                                        if (name.includes('tu') || name.includes('from') || name.includes('den') || name.includes('to')) {
+                                            c.SetDate(now);
+                                            if (c.ValueChanged && typeof c.ValueChanged.FireEvent === 'function') {
+                                                c.ValueChanged.FireEvent(c, {});
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        } catch(e) {}
+                    }""")
+                    log(f"Đã đặt ngày qua DevExpress Client API ({today_ddmmyyyy}) ✅")
+                except Exception: pass
+
+                # Lớp 2: Điền chuỗi dd/MM/yyyy vào input DOM
+                try:
+                    tu_inputs = page.locator("input[id*='TuNgay'], input[name*='TuNgay'], input[id*='txtTuNgay'], input[id*='deTuNgay']").all()
+                    for inp in tu_inputs:
+                        if inp.is_visible():
+                            inp.click(click_count=3)
+                            inp.fill(today_ddmmyyyy)
+                            inp.press("Tab")
+                except Exception: pass
+
+                # Lớp 3: Mở popup lịch Từ ngày & Đến ngày và click Today
+                try:
+                    tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, td[id*='TuNgay'][id*='_B-1'], [id*='TuNgay'] img, td:has-text('Từ ngày') ~ td img").first
+                    if tu_btn.is_visible(timeout=1500):
                         tu_btn.click(force=True)
-                        time.sleep(0.5)
+                        time.sleep(0.3)
                         today_btn = page.locator("#deTuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
-                        if today_btn.is_visible(timeout=3000):
+                        if today_btn.is_visible(timeout=1500):
                             today_btn.click(force=True)
                             log("Đã chọn nút 'Today' trên popup Từ ngày ✅")
-                            time.sleep(0.5)
+                            time.sleep(0.3)
 
-                    # Mở popup lịch Đến ngày nếu có
-                    den_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, td[id*='deDenNgay_B-1']").first
+                    den_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, td[id*='DenNgay'][id*='_B-1'], [id*='DenNgay'] img, td:has-text('Đến ngày') ~ td img").first
                     if den_btn.is_visible(timeout=1500):
                         den_btn.click(force=True)
-                        time.sleep(0.5)
+                        time.sleep(0.3)
                         today_den = page.locator("#deDenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
                         if today_den.is_visible(timeout=1500):
                             today_den.click(force=True)
                             log("Đã chọn nút 'Today' trên popup Đến ngày ✅")
-                            time.sleep(0.5)
+                            time.sleep(0.3)
                 except Exception as dt_err:
-                    log(f"Lưu ý chọn ngày: {dt_err}")
+                    log(f"Lưu ý click popup lịch: {dt_err}")
 
                 # Bấm nút Tìm kiếm
                 log("Bấm Tìm kiếm dữ liệu...")

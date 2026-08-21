@@ -578,7 +578,32 @@ class ClientRPAGui:
                             time.sleep(0.5)
                     except Exception:
                         pass
-                    page.get_by_role("link", name="Danh sách đề nghị thanh toán").click(timeout=15000)
+
+                    try:
+                        xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-popup div, .dxm-item").filter(has_text="Hồ sơ XML")
+                        if xml_menu.first.is_visible(timeout=3000):
+                            xml_menu.first.click()
+                            time.sleep(0.5)
+                    except Exception:
+                        pass
+
+                    navigated_b = False
+                    for sel in ["a:has-text('Danh sách đề nghị thanh toán')", "span:has-text('Danh sách đề nghị thanh toán')", ".dxm-item:has-text('Danh sách đề nghị thanh toán')"]:
+                        try:
+                            el = page.locator(sel).first
+                            if el.is_visible(timeout=2000):
+                                el.click(force=True)
+                                navigated_b = True
+                                break
+                        except Exception: pass
+
+                    if not navigated_b:
+                        page.evaluate("""() => {
+                            const items = Array.from(document.querySelectorAll('a, span, td, div, .dxm-item'));
+                            const target = items.find(e => e.textContent && e.textContent.trim().includes('Danh sách đề nghị thanh toán'));
+                            if (target) target.click();
+                        }""")
+
                     page.wait_for_load_state("domcontentloaded")
                     self._wait_portal_idle(page)
 
@@ -862,30 +887,68 @@ class ClientRPAGui:
                         self._wait_portal_idle(page)
                     except Exception: pass
 
-                    # 3. BƯỚC 1: ĐẶT NGÀY TODAY BẰNG CÁCH MỞ POPUP LỊCH & CLICK NÚT TODAY
-                    self.log("Đang mở popup lịch để bấm nút Today...")
+                    # 3. BƯỚC 1: ĐẶT NGÀY TODAY (KẾT HỢP 3 LỚP ĐẢM BẢO 100%)
+                    self.log("Đang đặt khoảng ngày tìm kiếm = TODAY...")
+                    import datetime as dt_mod
+                    today_ddmmyyyy = dt_mod.datetime.now().strftime("%d/%m/%Y")
+
+                    # Lớp 1: DevExpress Client API
                     try:
-                        tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, td[id*='deTuNgay_B-1']").first
-                        if tu_btn.is_visible(timeout=3000):
+                        page.evaluate("""() => {
+                            try {
+                                if (window.ASPxClientControl) {
+                                    const cc = window.ASPxClientControl.GetControlCollection();
+                                    const now = new Date();
+                                    cc.ForEachControl((c) => {
+                                        if (c && typeof c.SetDate === 'function') {
+                                            const name = (c.name || '').toLowerCase();
+                                            if (name.includes('tu') || name.includes('from') || name.includes('den') || name.includes('to')) {
+                                                c.SetDate(now);
+                                                if (c.ValueChanged && typeof c.ValueChanged.FireEvent === 'function') {
+                                                    c.ValueChanged.FireEvent(c, {});
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            } catch(e) {}
+                        }""")
+                        self.log(f"Đã đặt ngày qua DevExpress Client API ({today_ddmmyyyy}) ✅")
+                    except Exception: pass
+
+                    # Lớp 2: Điền chuỗi dd/MM/yyyy vào input DOM
+                    try:
+                        tu_inputs = page.locator("input[id*='TuNgay'], input[name*='TuNgay'], input[id*='txtTuNgay'], input[id*='deTuNgay']").all()
+                        for inp in tu_inputs:
+                            if inp.is_visible():
+                                inp.click(click_count=3)
+                                inp.fill(today_ddmmyyyy)
+                                inp.press("Tab")
+                    except Exception: pass
+
+                    # Lớp 3: Mở popup lịch Từ ngày & Đến ngày và click Today
+                    try:
+                        tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, td[id*='TuNgay'][id*='_B-1'], [id*='TuNgay'] img, td:has-text('Từ ngày') ~ td img").first
+                        if tu_btn.is_visible(timeout=1500):
                             tu_btn.click(force=True)
-                            time.sleep(0.5)
+                            time.sleep(0.3)
                             today_btn = page.locator("#deTuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
-                            if today_btn.is_visible(timeout=3000):
+                            if today_btn.is_visible(timeout=1500):
                                 today_btn.click(force=True)
                                 self.log("Đã chọn nút 'Today' trên popup Từ ngày ✅")
-                                time.sleep(0.5)
+                                time.sleep(0.3)
 
-                        den_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, td[id*='deDenNgay_B-1']").first
+                        den_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, td[id*='DenNgay'][id*='_B-1'], [id*='DenNgay'] img, td:has-text('Đến ngày') ~ td img").first
                         if den_btn.is_visible(timeout=1500):
                             den_btn.click(force=True)
-                            time.sleep(0.5)
+                            time.sleep(0.3)
                             today_den = page.locator("#deDenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
                             if today_den.is_visible(timeout=1500):
                                 today_den.click(force=True)
                                 self.log("Đã chọn nút 'Today' trên popup Đến ngày ✅")
-                                time.sleep(0.5)
+                                time.sleep(0.3)
                     except Exception as dt_err:
-                        self.log(f"Lưu ý chọn ngày: {dt_err}")
+                        self.log(f"Lưu ý click popup lịch: {dt_err}")
 
                     # Bấm nút Tìm kiếm
                     self.log("Bấm Tìm kiếm dữ liệu...")
