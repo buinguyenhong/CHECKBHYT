@@ -1601,7 +1601,8 @@ def export_department_loi(
             "Loại ca": resolve_loai_ca(r),
             "Mã lỗi": r.maloi,
             "Mô tả lỗi": r.motaloi,
-            "Trạng thái": status_text,
+            "Tổng tiền": float(r.tong_tien or 0.0),
+            "Tiền BHYT": float(r.tien_bhyt or 0.0),
             "Cảnh báo": days_overdue,
             "Ghi chú": r.note or ""
         })
@@ -2211,7 +2212,6 @@ def export_fail_list(
     
     data = []
     for r in records:
-        status_text = "Đã duyệt" if r.status == "RESOLVED" else ("Chờ gửi lại" if r.status == "WAITING_RESEND" else "Chưa xử lý (PENDING)")
         data.append({
             "Loại ca": resolve_loai_ca(r),
             "MA_LK": r.ma_lk,
@@ -2220,7 +2220,8 @@ def export_fail_list(
             "Tên khoa": r.ten_khoa,
             "Mã y tế": r.ma_y_te,
             "Ngày ra viện": r.ngay_ra_vien,
-            "Trạng thái": status_text,
+            "Tổng tiền": float(r.tong_tien or 0.0),
+            "Tiền BHYT": float(r.tien_bhyt or 0.0),
             "Ghi chú IT": r.note or ""
         })
         
@@ -2285,6 +2286,7 @@ def export_loi_list(
     data = []
     for r in records:
         data.append({
+            "Loại ca": resolve_loai_ca(r),
             "MA_LK": r.ma_lk,
             "Họ tên": r.ho_ten,
             "Mã thẻ": r.ma_the,
@@ -2294,8 +2296,9 @@ def export_loi_list(
             "Ngày ra": r.ngay_ra,
             "MALOI": r.maloi,
             "MOTALOI": r.motaloi,
-            "Trạng thái": r.status,
-            "Ý kiến khoa giải trình": r.note
+            "Tổng tiền": float(r.tong_tien or 0.0),
+            "Tiền BHYT": float(r.tien_bhyt or 0.0),
+            "Ý kiến khoa giải trình": r.note or ""
         })
         
     df = pd.DataFrame(data)

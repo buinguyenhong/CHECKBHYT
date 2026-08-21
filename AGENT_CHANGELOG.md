@@ -56,6 +56,22 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-21 10:35 - Antigravity (Cập nhật Cột Báo cáo Excel: Bỏ Trạng thái, Thêm Tổng tiền & Tiền BHYT)
+
+### Mục tiêu
+- Tối ưu hóa định dạng báo cáo Excel xuất ra theo yêu cầu người dùng:
+  - Bỏ cột `Trạng thái`.
+  - Bổ sung 2 cột tài chính quan trọng: `Tổng tiền` (`tong_tien`) và `Tiền BHYT` (`tien_bhyt`).
+
+### Thay đổi
+- `web_app/main.py`:
+  - Cập nhật `/api/export/fail` (`DANH_SACH_FAIL.xlsx`): Loại bỏ cột `Trạng thái`, thêm cột `Tổng tiền`, `Tiền BHYT`.
+  - Cập nhật `/api/export/loi` (`DANH_SACH_KEM_LOI.xlsx`): Loại bỏ cột `Trạng thái`, thêm cột `Tổng tiền`, `Tiền BHYT`.
+  - Cập nhật `/api/export/dept/loi` (`LOI_BHYT_{khoa}.xlsx`): Loại bỏ cột `Trạng thái`, thêm cột `Tổng tiền`, `Tiền BHYT`.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py` -> PASS (Exit code 0).
+
 ## 2026-08-21 10:14 - Antigravity (Tối ưu hóa Chọn PageSize 100 bằng Mouse Events & Chờ Loading Hoàn tất)
 
 ### Mục tiêu
