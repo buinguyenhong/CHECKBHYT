@@ -19,7 +19,7 @@ def test_flow_b():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     first_day_str = datetime.date.today().replace(day=1).strftime("%Y-%m-%d")
     try:
-        res = portal_service.run_flow_b(first_day_str, today_str)
+        res = portal_service.run_flow_b(first_day_str, today_str, log_func=lambda msg: print(f"  -> {msg}"))
         print("\n✅ KẾT QUẢ TEST LUỒNG B:")
         print(f"  - File đã tải: {res.get('file_path')}")
         print(f"  - Số dòng dữ liệu: {res.get('rows')}")
@@ -35,7 +35,7 @@ def test_flow_c():
     print("=" * 60)
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     try:
-        res = portal_service.run_flow_c(today_str, today_str)
+        res = portal_service.run_flow_c(today_str, today_str, log_func=lambda msg: print(f"  -> {msg}"))
         print("\n✅ KẾT QUẢ TEST LUỒNG C:")
         print(f"  - File đã tổng hợp: {res.get('file_path')}")
         print(f"  - Số gói lỗi tải về: {res.get('downloaded_files')}")

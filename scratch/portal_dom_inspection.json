@@ -1,0 +1,5852 @@
+{
+  "Flow_B": {
+    "url": "https://gdbhyt.baohiemxahoi.gov.vn/DanhSachHSKCB/Index",
+    "title": "PIS v2.0 | DANH SÁCH HỒ SƠ KHÁM CHỮA BỆNH",
+    "devExpressControls": [
+      {
+        "name": "HeaderMenu",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "HeaderPane",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "MessAlert",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "BtnClosePPAlertMessage",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "popupAlertMessage",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupMessageAlertInfo",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_cskcb_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_cskcb_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_cskcb",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_LoaiKCB_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_LoaiKCB_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_LoaiKCB",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thoigian_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thoigian_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thoigian",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thang_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thang_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thang",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_quy_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_quy_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_quy",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungay_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungay_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungay_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungay",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "Fri Aug 21 2026 08:59:33 GMT+0700 (Indochina Time)",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_nam_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_nam_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_nam",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngay_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngay_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngay_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngay",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "Fri Aug 21 2026 08:59:33 GMT+0700 (Indochina Time)",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiHS_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiHS_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiHS",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiTT_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiTT_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "chkAll1",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbHsTuVong",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnGuiHoSoBQP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "bt_TimKiem",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnExport",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnDeNghiTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnXemTTGD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "formLayout",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "sum_hs",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "sum_bntt",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "sum_tongchi",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "sum_bhtt",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnChotThayThe",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "formLayout1",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "message",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "roundPanel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol3_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol3_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol3",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol5",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol6",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol7",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol8",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol9_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol9_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol9",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol10_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol10_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol10_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol10",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "null",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol11_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol11_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol11_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol11",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "null",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol12_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol12_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol12_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol12",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "null",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol13",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol14",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol16",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol17",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol18",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol19",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol20_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol20_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol20_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol20",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "null",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol21_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol21_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol21_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol21",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "null",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol22_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol22_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol22_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol22",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "null",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol23_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol23_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol23",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol24_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol24_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol24",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol25_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol25_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFREditorcol25",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_custwindow",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXFilterRowMenu",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXContextMenu_GroupPanel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXContextMenu_Columns",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXContextMenu_Rows",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo_DXContextMenu_Footer",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSo",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": true
+      },
+      {
+        "name": "LoadingPanel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "popup_message_ls",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "popup_message",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvChiTietLoiHS_DXFREditorcol1",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvChiTietLoiHS_DXFREditorcol2",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvChiTietLoiHS_DXFilterRowMenu",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvChiTietLoiHS",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": true
+      },
+      {
+        "name": "PopupLoiHS",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXFREditorcol3",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXFREditorcol4",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXFREditorcol5",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_custwindow",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXFilterRowMenu",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXContextMenu_GroupPanel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXContextMenu_Columns",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXContextMenu_Rows",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT_DXContextMenu_Footer",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDanhSachHoSoCT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": true
+      },
+      {
+        "name": "PopupViewTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnCo",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnKhong",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupThongBaoXoa",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnCoSua",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnKhongSua",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupThongBaoSua",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnExportExcel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnDanhSachYeuCau",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnClosePopupExport",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupExportCustom",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "NGAY_TTOAN_DDD_C_CL",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "NGAY_TTOAN_DDD_C_TE",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "null",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "NGAY_TTOAN_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "NGAY_TTOAN_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "NGAY_TTOAN_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "NGAY_TTOAN",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "Fri Aug 21 2026 08:59:34 GMT+0700 (Indochina Time)",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "formLayoutTTHC4",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnUpdateNgayTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnHuyNgayTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupSuaNgayTToan",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_cskcbDsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_cskcbDsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_cskcbDsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_LoaiKCB_DsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_LoaiKCB_DsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_LoaiKCB_DsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thoigianDsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thoigianDsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thoigianDsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thangDsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thangDsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_thangDsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_quyDsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_quyDsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_quyDsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungayDsYc_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungayDsYc_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungayDsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_tungayDsYc",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "Fri Aug 21 2026 08:59:34 GMT+0700 (Indochina Time)",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_namDsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_namDsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cbx_namDsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngayDsYc_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngayDsYc_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngayDsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_denngayDsYc",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "Fri Aug 21 2026 08:59:34 GMT+0700 (Indochina Time)",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnTimKiemDsYeuCau",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiHS_DsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiHS_DsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiHS_DsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiTT_DsYc_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiTT_DsYc_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "cb_TrangThaiTT_DsYc",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "formLayoutDsYeuCau",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol1",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol2_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol2_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol2",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol3",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol4",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol5",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol6_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol6_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol6",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol7_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol7_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol7",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFREditorcol8",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau_DXFilterRowMenu",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "grvDanhSachYeuCau",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": true
+      },
+      {
+        "name": "popupDanhSachYeuCau",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnDongYGuiDeNghiTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnKhongDongYGuiDeNghiTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupThongBaoDeNghiTT",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnDongYChotThayThe",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnKhongDongYChotThayThe",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupThongBaoChot",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "popupConfirmMessageLabel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btn_popupConfirmMessage_Yes",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btn_popupConfirmMessage_No",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "popupConfirmMessage",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      }
+    ],
+    "inputs": [
+      {
+        "id": "BtnClosePPAlertMessage_I",
+        "name": "BtnClosePPAlertMessage",
+        "type": "button",
+        "value": "OK",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "cbx_cskcb_VI",
+        "name": "cbx_cskcb_VI",
+        "type": "hidden",
+        "value": "66232",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_cskcb_I",
+        "name": "cbx_cskcb",
+        "type": "text",
+        "value": "Bệnh viện đa khoa Thiện Hạnh (66232)",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys dxeDisabled_EIS",
+        "visible": true
+      },
+      {
+        "id": "cbx_cskcb_DDD_L_VI",
+        "name": "cbx_cskcb$DDD$L",
+        "type": "hidden",
+        "value": "66232",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_LoaiKCB_VI",
+        "name": "cb_LoaiKCB_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_LoaiKCB_I",
+        "name": "cb_LoaiKCB",
+        "type": "text",
+        "value": "Tất cả",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "cb_LoaiKCB_DDD_L_VI",
+        "name": "cb_LoaiKCB$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thoigian_VI",
+        "name": "cbx_thoigian_VI",
+        "type": "hidden",
+        "value": "2",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thoigian_I",
+        "name": "cbx_thoigian",
+        "type": "text",
+        "value": "Tháng",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "cbx_thoigian_DDD_L_VI",
+        "name": "cbx_thoigian$DDD$L",
+        "type": "hidden",
+        "value": "2",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thang_VI",
+        "name": "cbx_thang_VI",
+        "type": "hidden",
+        "value": "8",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thang_I",
+        "name": "cbx_thang",
+        "type": "text",
+        "value": "8",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "cbx_thang_DDD_L_VI",
+        "name": "cbx_thang$DDD$L",
+        "type": "hidden",
+        "value": "8",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_quy_VI",
+        "name": "cbx_quy_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_quy_I",
+        "name": "cbx_quy",
+        "type": "text",
+        "value": "Quý",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys dxh0",
+        "visible": false
+      },
+      {
+        "id": "cbx_quy_DDD_L_VI",
+        "name": "cbx_quy$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "dt_tungay_I",
+        "name": "dt_tungay",
+        "type": "text",
+        "value": "21/08/2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cbx_nam_VI",
+        "name": "cbx_nam_VI",
+        "type": "hidden",
+        "value": "2026",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_nam_I",
+        "name": "cbx_nam",
+        "type": "text",
+        "value": "2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "cbx_nam_DDD_L_VI",
+        "name": "cbx_nam$DDD$L",
+        "type": "hidden",
+        "value": "2026",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "dt_denngay_I",
+        "name": "dt_denngay",
+        "type": "text",
+        "value": "21/08/2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiHS_VI",
+        "name": "cb_TrangThaiHS_VI",
+        "type": "hidden",
+        "value": "0",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiHS_I",
+        "name": "cb_TrangThaiHS",
+        "type": "text",
+        "value": "Hồ sơ đúng",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "cb_TrangThaiHS_DDD_L_VI",
+        "name": "cb_TrangThaiHS$DDD$L",
+        "type": "hidden",
+        "value": "0",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiTT_VI",
+        "name": "cb_TrangThaiTT_VI",
+        "type": "hidden",
+        "value": "1",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiTT_I",
+        "name": "cb_TrangThaiTT",
+        "type": "text",
+        "value": "Chưa đề nghị thanh toán",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "cb_TrangThaiTT_DDD_L_VI",
+        "name": "cb_TrangThaiTT$DDD$L",
+        "type": "hidden",
+        "value": "1",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "chkAll1_S",
+        "name": "chkAll1",
+        "type": "text",
+        "value": "I",
+        "placeholder": "",
+        "className": "",
+        "visible": true
+      },
+      {
+        "id": "cbHsTuVong_S",
+        "name": "cbHsTuVong",
+        "type": "text",
+        "value": "I",
+        "placeholder": "",
+        "className": "",
+        "visible": true
+      },
+      {
+        "id": "btnGuiHoSoBQP_I",
+        "name": "btnGuiHoSoBQP",
+        "type": "button",
+        "value": "ĐNTT BQP",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "bt_TimKiem_I",
+        "name": "bt_TimKiem",
+        "type": "button",
+        "value": "Tìm kiếm",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnExport_I",
+        "name": "btnExport",
+        "type": "button",
+        "value": "Xuất Excel",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnDeNghiTT_I",
+        "name": "btnDeNghiTT",
+        "type": "button",
+        "value": "Đề nghị thanh toán",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnXemTTGD_I",
+        "name": "btnXemTTGD",
+        "type": "button",
+        "value": "Xem trạng thái GĐ",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "sum_hs_I",
+        "name": "sum_hs",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "sum_bntt_I",
+        "name": "sum_bntt",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "sum_tongchi_I",
+        "name": "sum_tongchi",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "sum_bhtt_I",
+        "name": "sum_bhtt",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "btnChotThayThe_I",
+        "name": "btnChotThayThe",
+        "type": "button",
+        "value": "Chốt thay thế",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3_VI",
+        "name": "gvDanhSachHoSo_DXFREditorcol3_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol3",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3_DDD_L_VI",
+        "name": "gvDanhSachHoSo$DXFREditorcol3$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol5_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol5",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol6_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol6",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol7_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol7",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol8_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol8",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9_VI",
+        "name": "gvDanhSachHoSo_DXFREditorcol9_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol9",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9_DDD_L_VI",
+        "name": "gvDanhSachHoSo$DXFREditorcol9$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol10",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol11",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol12",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol13_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol13",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol14_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol14",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol16_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol16",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol17_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol17",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol18_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol18",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol19_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol19",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol20",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol21",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol22",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23_VI",
+        "name": "gvDanhSachHoSo_DXFREditorcol23_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol23",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23_DDD_L_VI",
+        "name": "gvDanhSachHoSo$DXFREditorcol23$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24_VI",
+        "name": "gvDanhSachHoSo_DXFREditorcol24_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol24",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24_DDD_L_VI",
+        "name": "gvDanhSachHoSo$DXFREditorcol24$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25_VI",
+        "name": "gvDanhSachHoSo_DXFREditorcol25_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25_I",
+        "name": "gvDanhSachHoSo$DXFREditorcol25",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25_DDD_L_VI",
+        "name": "gvDanhSachHoSo$DXFREditorcol25$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvChiTietLoiHS_DXFREditorcol1_I",
+        "name": "grvChiTietLoiHS$DXFREditorcol1",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvChiTietLoiHS_DXFREditorcol2_I",
+        "name": "grvChiTietLoiHS$DXFREditorcol2",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "DXScript",
+        "name": "DXScript",
+        "type": "hidden",
+        "value": "1_182,1_180,1_181,1_179,1_225,1_164,1_130,1_127,1_202,1_213,1_207,1_210,1_129,14_36,14_3,1_206,1_218,1_146,14_8,1_208,1_148,1_147,14_9,1_162,1_170,1_223,1_189,1_191,1_224,1_174,14_10,1_217,1_216,1_201,14_35,1_134,1_175,1_211,1_209,1_149,1_220,1_188,1_186,1_192,14_14,1_133,1_194,1_195,14_16,1_196,1_197,14_17,14_18,1_176,14_12,1_199,1_203,14_21,1_214,14_23,1_212,1_215,14_27,1_219,14_31,14_34,4_76,1_145,5_5,5_4,4_84,4_82,4_83,4_46,4_92,4_79,4_91,4_89,4_93,4_90,4_81,4_28,4_22,4_68,4_45,4_30,4_44,4_23,4_20,4_24,4_25,4_26,4_27,4_29,4_31,4_33,4_34,4_21,4_35,4_36,4_37,4_38,4_39,4_40,4_41,4_42,4_43,4_47,4_52,4_53,4_54,4_55,4_56,4_57,4_58,4_59,4_60,4_65,4_48,4_49,4_50,4_51,4_66,4_67,4_32,4_63,4_62,4_64,4_61,4_69,4_70,4_71,4_72,4_19,4_80,4_73,4_78,4_94,4_96,4_97,4_98,4_95,4_88,4_77,4_75,14_15,4_85,1_161,1_159,1_165,4_86,4_87,1_156,1_158,1_151,14_1,1_190,14_13,1_183,1_178,1_177,1_184,1_136,1_143,1_144,9_24,9_25,9_42,9_34,9_23,9_35,14_25,9_43,9_44,14_37,9_39,9_36,9_22,14_24,9_38,9_33,9_41,9_40,9_37,14_6,1_160,1_152,14_2,1_154,1_198,1_166,1_168,1_169,14_19",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "DXCss",
+        "name": "DXCss",
+        "type": "hidden",
+        "value": "/Content/Site.css,/Content/StyleSheet.css,/Content/Images/logo.ico,105_92,1_32,1_34,1_18,105_94,0_5654,0_5656,0_5658,0_5660,105_104,4_2,4_5,105_106,5_1,105_193,105_228,105_230,1_23,1_28,105_96,105_98,1_4,1_9,1_5,1_19,9_7,9_9,9_13,105_251,9_1,105_253,9_3,1_14",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "",
+        "name": "DXMVCEditorsValues",
+        "type": "hidden",
+        "value": "{\"cbx_cskcb_DDD_L\":[\"66232\"],\"cbx_cskcb\":null,\"cb_LoaiKCB_DDD_L\":[],\"cb_LoaiKCB\":null,\"cbx_thoigian_DDD_L\":[2],\"cbx_thoigian\":2,\"cbx_thang_DDD_L\":[8],\"cbx_thang\":8,\"cbx_quy_DDD_L\":[],\"cbx_quy\":null,\"dt_tungay\":new Date(2026,7,21,8,59,33,676),\"cbx_nam_DDD_L\":[2026],\"cbx_nam\":2026,\"dt_denngay\":new Date(2026,7,21,8,59,33,692),\"cb_TrangThaiHS_DDD_L\":[0],\"cb_TrangThaiHS\":0,\"cb_TrangThaiTT_DDD_L\":[1],\"cb_TrangThaiTT\":1,\"chkAll1\":null,\"cbHsTuVong\":null,\"sum_hs\":null,\"sum_bntt\":null,\"sum_tongchi\":null,\"sum_bhtt\":null,\"gvDanhSachHoSo_DXFREditorcol3_DDD_L\":[],\"gvDanhSachHoSo_DXFREditorcol3\":null,\"gvDanhSachHoSo_DXFREditorcol5\":null,\"gvDanhSachHoSo_DXFREditorcol6\":null,\"gvDanhSachHoSo_DXFREditorcol7\":null,\"gvDanhSachHoSo_DXFREditorcol8\":null,\"gvDanhSachHoSo_DXFREditorcol9_DDD_L\":[],\"gvDanhSachHoSo_DXFREditorcol9\":null,\"gvDanhSachHoSo_DXFREditorcol10\":null,\"gvDanhSachHoSo_DXFREditorcol11\":null,\"gvDanhSachHoSo_DXFREditorcol12\":null,\"gvDanhSachHoSo_DXFREditorcol13\":null,\"gvDanhSachHoSo_DXFREditorcol14\":null,\"gvDanhSachHoSo_DXFREditorcol16\":null,\"gvDanhSachHoSo_DXFREditorcol17\":null,\"gvDanhSachHoSo_DXFREditorcol18\":null,\"gvDanhSachHoSo_DXFREditorcol19\":null,\"gvDanhSachHoSo_DXFREditorcol20\":null,\"gvDanhSachHoSo_DXFREditorcol21\":null,\"gvDanhSachHoSo_DXFREditorcol22\":null,\"gvDanhSachHoSo_DXFREditorcol23_DDD_L\":[],\"gvDanhSachHoSo_DXFREditorcol23\":null,\"gvDanhSachHoSo_DXFREditorcol24_DDD_L\":[],\"gvDanhSachHoSo_DXFREditorcol24\":null,\"gvDanhSachHoSo_DXFREditorcol25_DDD_L\":[],\"gvDanhSachHoSo_DXFREditorcol25\":null,\"grvChiTietLoiHS_DXFREditorcol1\":null,\"grvChiTietLoiHS_DXFREditorcol2\":null}",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFREditorcol3_I",
+        "name": "gvDanhSachHoSoCT$DXFREditorcol3",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFREditorcol4_I",
+        "name": "gvDanhSachHoSoCT$DXFREditorcol4",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFREditorcol5_I",
+        "name": "gvDanhSachHoSoCT$DXFREditorcol5",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "btnCo_I",
+        "name": "btnCo",
+        "type": "button",
+        "value": "Có",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhong_I",
+        "name": "btnKhong",
+        "type": "button",
+        "value": "Không",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnCoSua_I",
+        "name": "btnCoSua",
+        "type": "button",
+        "value": "Có",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongSua_I",
+        "name": "btnKhongSua",
+        "type": "button",
+        "value": "Không",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnExportExcel_I",
+        "name": "btnExportExcel",
+        "type": "button",
+        "value": "Xuất excel",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnDanhSachYeuCau_I",
+        "name": "btnDanhSachYeuCau",
+        "type": "button",
+        "value": "Danh sách yêu cầu",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnClosePopupExport_I",
+        "name": "btnClosePopupExport",
+        "type": "button",
+        "value": "Đóng",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "NGAY_TTOAN_I",
+        "name": "NGAY_TTOAN",
+        "type": "text",
+        "value": "21/08/2026 08:59 SA",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "NGAY_TTOAN_DDD_C_TE_I",
+        "name": "NGAY_TTOAN$DDD$C$TE",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys dxh0",
+        "visible": false
+      },
+      {
+        "id": "btnUpdateNgayTT_I",
+        "name": "btnUpdateNgayTT",
+        "type": "button",
+        "value": "Cập nhật",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnHuyNgayTT_I",
+        "name": "btnHuyNgayTT",
+        "type": "button",
+        "value": "Hủy",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "DXScript",
+        "name": "DXScript",
+        "type": "hidden",
+        "value": "1_182,1_180,1_181,1_179,1_225,1_164,1_130,1_127,1_202,1_213,1_207,1_210,1_129,14_36,14_3,1_206,1_218,1_146,14_8,1_208,1_148,1_147,14_9,1_162,1_170,1_223,1_189,1_191,1_224,1_174,14_10,1_217,1_216,1_201,14_35,1_134,1_175,1_211,1_209,1_149,1_220,1_188,1_186,1_192,14_14,1_133,1_194,1_195,14_16,1_196,1_197,14_17,14_18,1_176,14_12,1_199,1_203,14_21,1_214,14_23,1_212,1_215,14_27,1_219,14_31,14_34,4_76,1_145,5_5,5_4,4_84,4_82,4_83,4_46,4_92,4_79,4_91,4_89,4_93,4_90,4_81,4_28,4_22,4_68,4_45,4_30,4_44,4_23,4_20,4_24,4_25,4_26,4_27,4_29,4_31,4_33,4_34,4_21,4_35,4_36,4_37,4_38,4_39,4_40,4_41,4_42,4_43,4_47,4_52,4_53,4_54,4_55,4_56,4_57,4_58,4_59,4_60,4_65,4_48,4_49,4_50,4_51,4_66,4_67,4_32,4_63,4_62,4_64,4_61,4_69,4_70,4_71,4_72,4_19,4_80,4_73,4_78,4_94,4_96,4_97,4_98,4_95,4_88,4_77,4_75,14_15,4_85,1_161,1_159,1_165,4_86,4_87,1_156,1_158,1_151,14_1,1_190,14_13,1_183,1_178,1_177,1_184,1_136,1_143,1_144,9_24,9_25,9_42,9_34,9_23,9_35,14_25,9_43,9_44,14_37,9_39,9_36,9_22,14_24,9_38,9_33,9_41,9_40,9_37,14_6,1_160,1_152,14_2,1_154,1_198,1_166,1_168,1_169,14_19",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "DXCss",
+        "name": "DXCss",
+        "type": "hidden",
+        "value": "/Content/Site.css,/Content/StyleSheet.css,/Content/Images/logo.ico,105_92,1_32,1_34,1_18,105_94,0_5654,0_5656,0_5658,0_5660,105_104,4_2,4_5,105_106,5_1,105_193,105_228,105_230,1_23,1_28,105_96,105_98,1_4,1_9,1_5,1_19,9_7,9_9,9_13,105_251,9_1,105_253,9_3,1_14",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "",
+        "name": "DXMVCEditorsValues",
+        "type": "hidden",
+        "value": "{\"NGAY_TTOAN_DDD_C_TE\":null,\"NGAY_TTOAN\":new Date(2026,7,21,8,59,34,51)}",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_cskcbDsYc_VI",
+        "name": "cbx_cskcbDsYc_VI",
+        "type": "hidden",
+        "value": "66232",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_cskcbDsYc_I",
+        "name": "cbx_cskcbDsYc",
+        "type": "text",
+        "value": "Bệnh viện đa khoa Thiện Hạnh (66232) ",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cbx_cskcbDsYc_DDD_L_VI",
+        "name": "cbx_cskcbDsYc$DDD$L",
+        "type": "hidden",
+        "value": "66232",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_LoaiKCB_DsYc_VI",
+        "name": "cb_LoaiKCB_DsYc_VI",
+        "type": "hidden",
+        "value": "0",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_LoaiKCB_DsYc_I",
+        "name": "cb_LoaiKCB_DsYc",
+        "type": "text",
+        "value": "Tất cả",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cb_LoaiKCB_DsYc_DDD_L_VI",
+        "name": "cb_LoaiKCB_DsYc$DDD$L",
+        "type": "hidden",
+        "value": "0",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thoigianDsYc_VI",
+        "name": "cbx_thoigianDsYc_VI",
+        "type": "hidden",
+        "value": "2",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thoigianDsYc_I",
+        "name": "cbx_thoigianDsYc",
+        "type": "text",
+        "value": "Tháng",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cbx_thoigianDsYc_DDD_L_VI",
+        "name": "cbx_thoigianDsYc$DDD$L",
+        "type": "hidden",
+        "value": "2",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thangDsYc_VI",
+        "name": "cbx_thangDsYc_VI",
+        "type": "hidden",
+        "value": "8",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_thangDsYc_I",
+        "name": "cbx_thangDsYc",
+        "type": "text",
+        "value": "8",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cbx_thangDsYc_DDD_L_VI",
+        "name": "cbx_thangDsYc$DDD$L",
+        "type": "hidden",
+        "value": "8",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_quyDsYc_VI",
+        "name": "cbx_quyDsYc_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_quyDsYc_I",
+        "name": "cbx_quyDsYc",
+        "type": "text",
+        "value": "Quý",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys dxh0",
+        "visible": false
+      },
+      {
+        "id": "cbx_quyDsYc_DDD_L_VI",
+        "name": "cbx_quyDsYc$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "dt_tungayDsYc_I",
+        "name": "dt_tungayDsYc",
+        "type": "text",
+        "value": "21/08/2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cbx_namDsYc_VI",
+        "name": "cbx_namDsYc_VI",
+        "type": "hidden",
+        "value": "2026",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cbx_namDsYc_I",
+        "name": "cbx_namDsYc",
+        "type": "text",
+        "value": "2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cbx_namDsYc_DDD_L_VI",
+        "name": "cbx_namDsYc$DDD$L",
+        "type": "hidden",
+        "value": "2026",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "dt_denngayDsYc_I",
+        "name": "dt_denngayDsYc",
+        "type": "text",
+        "value": "21/08/2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiHS_DsYc_VI",
+        "name": "cb_TrangThaiHS_DsYc_VI",
+        "type": "hidden",
+        "value": "0",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiHS_DsYc_I",
+        "name": "cb_TrangThaiHS_DsYc",
+        "type": "text",
+        "value": "Hồ sơ đúng",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiHS_DsYc_DDD_L_VI",
+        "name": "cb_TrangThaiHS_DsYc$DDD$L",
+        "type": "hidden",
+        "value": "0",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiTT_DsYc_VI",
+        "name": "cb_TrangThaiTT_DsYc_VI",
+        "type": "hidden",
+        "value": "1",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiTT_DsYc_I",
+        "name": "cb_TrangThaiTT_DsYc",
+        "type": "text",
+        "value": "Chưa đề nghị TT",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiTT_DsYc_DDD_L_VI",
+        "name": "cb_TrangThaiTT_DsYc$DDD$L",
+        "type": "hidden",
+        "value": "1",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol1_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol1",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol2_VI",
+        "name": "grvDanhSachYeuCau_DXFREditorcol2_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol2_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol2",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol2_DDD_L_VI",
+        "name": "grvDanhSachYeuCau$DXFREditorcol2$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol3_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol3",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol4_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol4",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol5_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol5",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol6_VI",
+        "name": "grvDanhSachYeuCau_DXFREditorcol6_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol6_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol6",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol6_DDD_L_VI",
+        "name": "grvDanhSachYeuCau$DXFREditorcol6$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol7_VI",
+        "name": "grvDanhSachYeuCau_DXFREditorcol7_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol7_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol7",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol7_DDD_L_VI",
+        "name": "grvDanhSachYeuCau$DXFREditorcol7$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol8_I",
+        "name": "grvDanhSachYeuCau$DXFREditorcol8",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": false
+      },
+      {
+        "id": "btnDongYGuiDeNghiTT_I",
+        "name": "btnDongYGuiDeNghiTT",
+        "type": "button",
+        "value": "Có",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYGuiDeNghiTT_I",
+        "name": "btnKhongDongYGuiDeNghiTT",
+        "type": "button",
+        "value": "Không",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnDongYChotThayThe_I",
+        "name": "btnDongYChotThayThe",
+        "type": "button",
+        "value": "Có",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYChotThayThe_I",
+        "name": "btnKhongDongYChotThayThe",
+        "type": "button",
+        "value": "Không",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_Yes_I",
+        "name": "btn_popupConfirmMessage_Yes",
+        "type": "button",
+        "value": "Có",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_No_I",
+        "name": "btn_popupConfirmMessage_No",
+        "type": "button",
+        "value": "Không",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": false
+      }
+    ],
+    "buttons": [
+      {
+        "id": "BtnClosePPAlertMessage_I",
+        "tag": "INPUT",
+        "text": "OK",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnGuiHoSoBQP",
+        "tag": "DIV",
+        "text": "ĐNTT BQP",
+        "className": "dxbButton_EIS dxbButtonSys ",
+        "visible": false
+      },
+      {
+        "id": "btnGuiHoSoBQP_CD",
+        "tag": "DIV",
+        "text": "ĐNTT BQP",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnGuiHoSoBQP_I",
+        "tag": "INPUT",
+        "text": "ĐNTT BQP",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnGuiHoSoBQPImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dxIcon_arrows_next_16x16 dx-vam",
+        "visible": false
+      },
+      {
+        "id": "bt_TimKiem",
+        "tag": "DIV",
+        "text": "Tìm kiếm",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": true
+      },
+      {
+        "id": "bt_TimKiem_CD",
+        "tag": "DIV",
+        "text": "Tìm kiếm",
+        "className": "dxb",
+        "visible": true
+      },
+      {
+        "id": "bt_TimKiem_I",
+        "tag": "INPUT",
+        "text": "Tìm kiếm",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "bt_TimKiemImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dxIcon_actions_search_16x16devav dx-vam",
+        "visible": true
+      },
+      {
+        "id": "btnExport",
+        "tag": "DIV",
+        "text": "Xuất Excel",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": true
+      },
+      {
+        "id": "btnExport_CD",
+        "tag": "DIV",
+        "text": "Xuất Excel",
+        "className": "dxb",
+        "visible": true
+      },
+      {
+        "id": "btnExport_I",
+        "tag": "INPUT",
+        "text": "Xuất Excel",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnExportImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dxIcon_export_export_16x16 dx-vam",
+        "visible": true
+      },
+      {
+        "id": "btnDeNghiTT",
+        "tag": "DIV",
+        "text": "Đề nghị thanh toán",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": true
+      },
+      {
+        "id": "btnDeNghiTT_CD",
+        "tag": "DIV",
+        "text": "Đề nghị thanh toán",
+        "className": "dxb",
+        "visible": true
+      },
+      {
+        "id": "btnDeNghiTT_I",
+        "tag": "INPUT",
+        "text": "Đề nghị thanh toán",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnDeNghiTTImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dxIcon_arrows_next_16x16 dx-vam",
+        "visible": true
+      },
+      {
+        "id": "btnXemTTGD",
+        "tag": "DIV",
+        "text": "Xem trạng thái GĐ",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys dxbDisabled_EIS",
+        "visible": true
+      },
+      {
+        "id": "btnXemTTGD_CD",
+        "tag": "DIV",
+        "text": "Xem trạng thái GĐ",
+        "className": "dxb",
+        "visible": true
+      },
+      {
+        "id": "btnXemTTGD_I",
+        "tag": "INPUT",
+        "text": "Xem trạng thái GĐ",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnXemTTGDImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dxIcon_actions_apply_16x16gray dx-vam dxIcon_actions_apply_16x16gray_disabled",
+        "visible": true
+      },
+      {
+        "id": "div_btnChotThayThe",
+        "tag": "DIV",
+        "text": "Chốt thay thế <!-- ASPx.AddHoverItems('btnChotThayThe',[[['dxbButtonHover_EIS'],[''],[''],['','TC']]]); ASPx.AddPressedItems('btnChotThayThe',[[['dxbButtonPressed_EIS'],[''],[''],['','TC']]]); ASPx.AddDisabledItems('btnChotThayThe',[[['dxbDisabled_EIS'],[''],[''],['','TC'],[[{'spriteCssClass':'dxIcon_actions_apply_16x16office2013_disabled'}]],['Img']]]); var dxo = new MVCxClientButton('btnChotThayThe'); window['btnChotThayThe'] = dxo; dxo.clientVisible = false; dxo.Click.AddHandler(funcChotThayThe); ASPx.AddSelectedItems('btnChotThayThe',[[['dxbf'],[''],['CD']]]); dxo.useSubmitBehavior = false; dxo.AfterCreate(); //-->",
+        "className": "",
+        "visible": true
+      },
+      {
+        "id": "btnChotThayThe",
+        "tag": "DIV",
+        "text": "Chốt thay thế",
+        "className": "dxbButton_EIS dxbButtonSys ",
+        "visible": true
+      },
+      {
+        "id": "btnChotThayThe_CD",
+        "tag": "DIV",
+        "text": "Chốt thay thế",
+        "className": "dxb",
+        "visible": true
+      },
+      {
+        "id": "btnChotThayThe_I",
+        "tag": "INPUT",
+        "text": "Chốt thay thế",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnChotThayTheImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dxIcon_actions_apply_16x16office2013 dx-vam",
+        "visible": true
+      },
+      {
+        "id": "btnCo",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnCo_CD",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnCo_I",
+        "tag": "INPUT",
+        "text": "Có",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnCoImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnKhong",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnKhong_CD",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnKhong_I",
+        "tag": "INPUT",
+        "text": "Không",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnCoSua",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnCoSua_CD",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnCoSua_I",
+        "tag": "INPUT",
+        "text": "Có",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnCoSuaImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnKhongSua",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnKhongSua_CD",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongSua_I",
+        "tag": "INPUT",
+        "text": "Không",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongSuaImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnExportExcel",
+        "tag": "DIV",
+        "text": "Xuất excel",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnExportExcel_CD",
+        "tag": "DIV",
+        "text": "Xuất excel",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnExportExcel_I",
+        "tag": "INPUT",
+        "text": "Xuất excel",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnExportExcelImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnDanhSachYeuCau",
+        "tag": "DIV",
+        "text": "Danh sách yêu cầu",
+        "className": "dxbButton_EIS dxbButtonSys ",
+        "visible": false
+      },
+      {
+        "id": "btnDanhSachYeuCau_CD",
+        "tag": "DIV",
+        "text": "Danh sách yêu cầu",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnDanhSachYeuCau_I",
+        "tag": "INPUT",
+        "text": "Danh sách yêu cầu",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnDanhSachYeuCauImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnClosePopupExport",
+        "tag": "DIV",
+        "text": "Đóng",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnClosePopupExport_CD",
+        "tag": "DIV",
+        "text": "Đóng",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnClosePopupExport_I",
+        "tag": "INPUT",
+        "text": "Đóng",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnClosePopupExportImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnUpdateNgayTT",
+        "tag": "DIV",
+        "text": "Cập nhật",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnUpdateNgayTT_CD",
+        "tag": "DIV",
+        "text": "Cập nhật",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnUpdateNgayTT_I",
+        "tag": "INPUT",
+        "text": "Cập nhật",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnUpdateNgayTTImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnHuyNgayTT",
+        "tag": "DIV",
+        "text": "Hủy",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnHuyNgayTT_CD",
+        "tag": "DIV",
+        "text": "Hủy",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnHuyNgayTT_I",
+        "tag": "INPUT",
+        "text": "Hủy",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnHuyNgayTTImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnTimKiemDsYeuCau",
+        "tag": "A",
+        "text": "",
+        "className": "dxbButton dxbButtonSys",
+        "visible": false
+      },
+      {
+        "id": "btnTimKiemDsYeuCauImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "btnSearch dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnDongYGuiDeNghiTT",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnDongYGuiDeNghiTT_CD",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnDongYGuiDeNghiTT_I",
+        "tag": "INPUT",
+        "text": "Có",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnDongYGuiDeNghiTTImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYGuiDeNghiTT",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYGuiDeNghiTT_CD",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYGuiDeNghiTT_I",
+        "tag": "INPUT",
+        "text": "Không",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYGuiDeNghiTTImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnDongYChotThayThe",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnDongYChotThayThe_CD",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnDongYChotThayThe_I",
+        "tag": "INPUT",
+        "text": "Có",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnDongYChotThayTheImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYChotThayThe",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYChotThayThe_CD",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYChotThayThe_I",
+        "tag": "INPUT",
+        "text": "Không",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btnKhongDongYChotThayTheImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dx-vam",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_Yes",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_Yes_CD",
+        "tag": "DIV",
+        "text": "Có",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_Yes_I",
+        "tag": "INPUT",
+        "text": "Có",
+        "className": "dxb-hb",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_No",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_No_CD",
+        "tag": "DIV",
+        "text": "Không",
+        "className": "dxb",
+        "visible": false
+      },
+      {
+        "id": "btn_popupConfirmMessage_No_I",
+        "tag": "INPUT",
+        "text": "Không",
+        "className": "dxb-hb",
+        "visible": false
+      }
+    ],
+    "tables": [
+      {
+        "id": "gvDanhSachHoSo",
+        "className": "dxgvControl_EIS",
+        "rowCount": 235
+      },
+      {
+        "id": "gvDanhSachHoSo_DXHeaderTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 228
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3_LP",
+        "className": "dxeLoadingPanel_EIS dxlpLoadingPanel_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3_DDD_L",
+        "className": "dxeListBox_EIS",
+        "rowCount": 11
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3_DDD_L_LBT",
+        "className": "",
+        "rowCount": 9
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol5",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol6",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol7",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol8",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9_LP",
+        "className": "dxeLoadingPanel_EIS dxlpLoadingPanel_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9_DDD_L",
+        "className": "dxeListBox_EIS",
+        "rowCount": 5
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9_DDD_L_LBT",
+        "className": "",
+        "rowCount": 3
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10_DDD_C",
+        "className": "dxeCalendar_EIS",
+        "rowCount": 13
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10_DDD_C_mt",
+        "className": "",
+        "rowCount": 7
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10_DDD_C_FNP_m",
+        "className": "",
+        "rowCount": 3
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10_DDD_C_FNP_y",
+        "className": "",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11_DDD_C",
+        "className": "dxeCalendar_EIS",
+        "rowCount": 13
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11_DDD_C_mt",
+        "className": "",
+        "rowCount": 7
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11_DDD_C_FNP_m",
+        "className": "",
+        "rowCount": 3
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11_DDD_C_FNP_y",
+        "className": "",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12_DDD_C",
+        "className": "dxeCalendar_EIS",
+        "rowCount": 13
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12_DDD_C_mt",
+        "className": "",
+        "rowCount": 7
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12_DDD_C_FNP_m",
+        "className": "",
+        "rowCount": 3
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12_DDD_C_FNP_y",
+        "className": "",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol13",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol14",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol16",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol17",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol18",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol19",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20_DDD_C",
+        "className": "dxeCalendar_EIS",
+        "rowCount": 13
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20_DDD_C_mt",
+        "className": "",
+        "rowCount": 7
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20_DDD_C_FNP_m",
+        "className": "",
+        "rowCount": 3
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20_DDD_C_FNP_y",
+        "className": "",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21_DDD_C",
+        "className": "dxeCalendar_EIS",
+        "rowCount": 13
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21_DDD_C_mt",
+        "className": "",
+        "rowCount": 7
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21_DDD_C_FNP_m",
+        "className": "",
+        "rowCount": 3
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21_DDD_C_FNP_y",
+        "className": "",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22_DDD_C",
+        "className": "dxeCalendar_EIS",
+        "rowCount": 13
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22_DDD_C_mt",
+        "className": "",
+        "rowCount": 7
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22_DDD_C_FNP_m",
+        "className": "",
+        "rowCount": 3
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22_DDD_C_FNP_y",
+        "className": "",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23_LP",
+        "className": "dxeLoadingPanel_EIS dxlpLoadingPanel_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23_DDD_L",
+        "className": "dxeListBox_EIS",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23_DDD_L_LBT",
+        "className": "",
+        "rowCount": 0
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24_LP",
+        "className": "dxeLoadingPanel_EIS dxlpLoadingPanel_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24_DDD_L",
+        "className": "dxeListBox_EIS",
+        "rowCount": 13
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24_DDD_L_LBT",
+        "className": "",
+        "rowCount": 11
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25_LP",
+        "className": "dxeLoadingPanel_EIS dxlpLoadingPanel_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25_DDD_L",
+        "className": "dxeListBox_EIS",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25_DDD_L_LBT",
+        "className": "",
+        "rowCount": 0
+      },
+      {
+        "id": "gvDanhSachHoSo_DXMainTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFooterTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSo_LP",
+        "className": "dxgvLoadingPanel_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSoCT",
+        "className": "dxgvControl_EIS",
+        "rowCount": 39
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXHeaderTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 32
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFREditorcol3",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFREditorcol4",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFREditorcol5",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXMainTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFooterTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDanhSachHoSoCT_LP",
+        "className": "dxgvLoadingPanel_EIS",
+        "rowCount": 1
+      }
+    ],
+    "popups": [
+      {
+        "id": "HeaderMenu_DXME1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME1i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i0i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i0i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i1i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i2i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i2i6_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i8_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i9_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME3i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i7_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i3i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i3i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME6_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7i13_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME8_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME8i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME10_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "popupAlertMessage_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "PopupMessageAlertInfo_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_cskcb_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cb_LoaiKCB_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_thoigian_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_thang_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_quy_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_tungay_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_tungay_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_nam_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_denngay_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_denngay_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiHS_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiTT_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "message_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol3_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol9_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol10_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol11_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol12_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol20_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol21_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol22_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol23_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol24_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFREditorcol25_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_custwindow_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXFilterRowMenu_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXContextMenu_GroupPanel_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXContextMenu_Columns_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXContextMenu_Rows_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSo_DXContextMenu_Footer_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "popup_message_ls_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "popup_message_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "PopupLoiHS_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "grvChiTietLoiHS_DXFilterRowMenu_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "PopupViewTT_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv popup-100 dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_custwindow_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXFilterRowMenu_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXContextMenu_GroupPanel_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXContextMenu_Columns_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXContextMenu_Rows_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDanhSachHoSoCT_DXContextMenu_Footer_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "PopupThongBaoXoa_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "PopupThongBaoSua_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "PopupExportCustom_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "PopupSuaNgayTToan_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "NGAY_TTOAN_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "NGAY_TTOAN_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "popupDanhSachYeuCau_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_cskcbDsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cb_LoaiKCB_DsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_thoigianDsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_thangDsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_quyDsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_tungayDsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_tungayDsYc_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cbx_namDsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_denngayDsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_denngayDsYc_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiHS_DsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "cb_TrangThaiTT_DsYc_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol2_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol6_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFREditorcol7_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "grvDanhSachYeuCau_DXFilterRowMenu_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "PopupThongBaoDeNghiTT_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "PopupThongBaoChot_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "popupConfirmMessage_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      }
+    ]
+  },
+  "Flow_C": {
+    "url": "https://gdbhyt.baohiemxahoi.gov.vn/DanhSachKetQuaGuiHoSoQD130/Index",
+    "title": "PIS | Tra cứu kết quả gửi Hồ sơ",
+    "devExpressControls": [
+      {
+        "name": "HeaderMenu",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "HeaderPane",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "MaCoSoKCB_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "MaCoSoKCB_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "MaCoSoKCB",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_TuNgay_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_TuNgay_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_TuNgay_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_TuNgay",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "Sat Aug 01 2026 00:00:00 GMT+0700 (Indochina Time)",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_DenNgay_DDD_C_FNP",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_DenNgay_DDD_C",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_DenNgay_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "dt_DenNgay",
+        "type": "ret",
+        "isDate": true,
+        "currentDate": "Fri Aug 21 2026 08:59:41 GMT+0700 (Indochina Time)",
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "btnTimKiem",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": true,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "formLayout",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "roundPanel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol1",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol3_DDD_L",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol3_DDD",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol3",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol4",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol5",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol6",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol7",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol8",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_custwindow",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXFilterRowMenu",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXContextMenu_GroupPanel",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXContextMenu_Columns",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXContextMenu_Rows",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso_DXContextMenu_Footer",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "gvDSKetQuaGuiHoso",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": true
+      },
+      {
+        "name": "popup_message_ls",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "PopupNhanChiTietLoiHS",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": true,
+        "hasAutoFilterByColumn": false
+      },
+      {
+        "name": "_Loading",
+        "type": "ret",
+        "isDate": false,
+        "currentDate": null,
+        "hasDoClick": false,
+        "hasPerformCallback": false,
+        "hasAutoFilterByColumn": false
+      }
+    ],
+    "inputs": [
+      {
+        "id": "MaCoSoKCB_VI",
+        "name": "MaCoSoKCB_VI",
+        "type": "hidden",
+        "value": "66232",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "MaCoSoKCB_I",
+        "name": "MaCoSoKCB",
+        "type": "text",
+        "value": "66232 Bệnh viện đa khoa Thiện Hạnh",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "MaCoSoKCB_DDD_L_VI",
+        "name": "MaCoSoKCB$DDD$L",
+        "type": "hidden",
+        "value": "66232",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "dt_TuNgay_I",
+        "name": "dt_TuNgay",
+        "type": "text",
+        "value": "01/08/2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "dt_DenNgay_I",
+        "name": "dt_DenNgay",
+        "type": "text",
+        "value": "21/08/2026",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "btnTimKiem_I",
+        "name": "btnTimKiem",
+        "type": "button",
+        "value": "Tìm kiếm",
+        "placeholder": "",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol1_I",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol1",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3_VI",
+        "name": "gvDSKetQuaGuiHoso_DXFREditorcol3_VI",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3_I",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol3",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3_DDD_L_VI",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol3$DDD$L",
+        "type": "hidden",
+        "value": "",
+        "placeholder": "",
+        "className": "",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol4_I",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol4",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol5_I",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol5",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol6_I",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol6",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol7_I",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol7",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol8_I",
+        "name": "gvDSKetQuaGuiHoso$DXFREditorcol8",
+        "type": "text",
+        "value": "",
+        "placeholder": "",
+        "className": "dxeEditArea_EIS dxeEditAreaSys",
+        "visible": true
+      }
+    ],
+    "buttons": [
+      {
+        "id": "btnTimKiem",
+        "tag": "DIV",
+        "text": "Tìm kiếm",
+        "className": "dxbButton_EIS dxbButtonSys dxbTSys",
+        "visible": true
+      },
+      {
+        "id": "btnTimKiem_CD",
+        "tag": "DIV",
+        "text": "Tìm kiếm",
+        "className": "dxb",
+        "visible": true
+      },
+      {
+        "id": "btnTimKiem_I",
+        "tag": "INPUT",
+        "text": "Tìm kiếm",
+        "className": "dxb-hb",
+        "visible": true
+      },
+      {
+        "id": "btnTimKiemImg",
+        "tag": "IMG",
+        "text": "",
+        "className": "dxIcon_actions_search_16x16devav dx-vam",
+        "visible": true
+      }
+    ],
+    "tables": [
+      {
+        "id": "gvDSKetQuaGuiHoso",
+        "className": "dxgvControl_EIS",
+        "rowCount": 35
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXHeaderTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 30
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol1",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3_LP",
+        "className": "dxeLoadingPanel_EIS dxlpLoadingPanel_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3",
+        "className": "dxeButtonEditSys dxeButtonEdit_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3_DDD_L",
+        "className": "dxeListBox_EIS",
+        "rowCount": 4
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3_DDD_L_LBT",
+        "className": "",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol4",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol5",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol6",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol7",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol8",
+        "className": "dxeTextBoxSys dxeTextBox_EIS",
+        "rowCount": 1
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXMainTable",
+        "className": "dxgvTable_EIS",
+        "rowCount": 2
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_LP",
+        "className": "dxgvLoadingPanel_EIS",
+        "rowCount": 1
+      }
+    ],
+    "popups": [
+      {
+        "id": "HeaderMenu_DXME1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME1i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i0i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i0i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i1i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i2i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i2i6_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i8_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME2i9_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME3i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i0i7_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i2i5_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i3_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i3i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i3i1_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME4i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME6_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7i2_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7i4_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME7i13_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME8_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME8i0_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "HeaderMenu_DXME10_",
+        "className": "dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "MaCoSoKCB_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_TuNgay_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_TuNgay_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_DenNgay_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "dt_DenNgay_DDD_C_FNP_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFREditorcol3_DDD_PW-1",
+        "className": "dxpcDropDown_EIS dxpclW dxpc-ddSys",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_custwindow_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXFilterRowMenu_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXContextMenu_GroupPanel_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXContextMenu_Columns_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXContextMenu_Rows_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "gvDSKetQuaGuiHoso_DXContextMenu_Footer_DXME_",
+        "className": "dxm-popupMain dxm-shadow dxm-popup dxgvContextMenu_EIS",
+        "visible": false
+      },
+      {
+        "id": "popup_message_ls_PW-1",
+        "className": "dxpcLite_EIS dxpclW",
+        "visible": false
+      },
+      {
+        "id": "",
+        "className": "dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      },
+      {
+        "id": "PopupNhanChiTietLoiHS_PW-1",
+        "className": "dxpcLite_EIS dxpclW dxpc-mainDiv dxpc-shadow",
+        "visible": false
+      }
+    ]
+  }
+}
