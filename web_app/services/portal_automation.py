@@ -476,47 +476,54 @@ class PortalAutomationService:
                 time.sleep(1.0)
 
                 # 5. Xuất Excel và tải file listbh.xlsx
-                log("Đang kích hoạt Xuất Excel danh sách đã gửi (hỗ trợ tối đa 5 phút)...")
+                log("Đang kích hoạt Xuất Excel danh sách đã gửi...")
                 
-                # Bước 5.1: Click nút cha "Xuất Excel" để mở menu
-                log("Click nút 'Xuất Excel' để mở menu lựa chọn...")
-                export_btn = page.locator("#HeaderMenu span:has-text('Xuất Excel'), #bt_XuatExcel_CD, #bt_XuatExcel, .dxbButton:has-text('Xuất Excel'), td.dxb:has-text('Xuất Excel'), span:has-text('Xuất Excel')").first
-                if export_btn.is_visible(timeout=3000):
-                    export_btn.click(force=True)
-                else:
-                    page.evaluate("""() => {
-                        const btnXuat = window.bt_XuatExcel || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('bt_XuatExcel'));
-                        if (btnXuat && typeof btnXuat.DoClick === 'function') btnXuat.DoClick();
+                # Bước 5.1: Click nút "Xuất Excel" (btnExport) để mở Popup Export
+                log("Click nút 'Xuất Excel' (btnExport)...")
+                opened_popup = page.evaluate("""() => {
+                    try {
+                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                        const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
+                        if (btn && typeof btn.DoClick === 'function') {
+                            btn.DoClick();
+                            return true;
+                        }
+                    } catch(e) {}
+                    return false;
+                }""")
+
+                if not opened_popup:
+                    btn_exp = page.locator("#btnExport_CD, #btnExport, #bt_XuatExcel_CD, #bt_XuatExcel, .dxbButton:has-text('Xuất Excel')").first
+                    if btn_exp.is_visible(timeout=3000):
+                        btn_exp.click(force=True)
+
+                time.sleep(1.2)
+
+                # Bước 5.2: Bấm nút "Xuất excel" (btnExportExcel) trong Popup kèm theo expect_download
+                log("Đang bấm nút 'Xuất excel' (btnExportExcel) để tải file listbh.xlsx...")
+                with page.expect_download(timeout=300000) as download_info:
+                    clicked_excel = page.evaluate("""() => {
+                        try {
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
+                            if (btn && typeof btn.DoClick === 'function') {
+                                btn.DoClick();
+                                return true;
+                            }
+                        } catch(e) {}
+                        return false;
                     }""")
 
-                time.sleep(1.0)
-
-                # Bước 5.2: Đợi menu popup và Click mục con "Xuất excel"
-                log("Đang click vào mục con 'Xuất excel' trong popup menu...")
-                try:
-                    page.wait_for_selector(".dxm-popup, div[id*='_DXME'], .dxm-shadow, table.dxm-item", timeout=5000)
-                except Exception: pass
-
-                with page.expect_download(timeout=300000) as download_info:
-                    clicked_sub = False
-                    try:
-                        sub_item = page.locator(".dxm-popup, div[id*='_DXME'], .dxm-shadow").locator("td, span, a, tr").filter(has_text=re.compile(r"^Xuất excel$", re.IGNORECASE)).first
-                        if sub_item.is_visible(timeout=3000):
-                            sub_item.click(force=True)
-                            clicked_sub = True
-                    except Exception: pass
-
-                    if not clicked_sub:
-                        clicked_sub = page.evaluate("""() => {
-                            const popups = Array.from(document.querySelectorAll('.dxm-popup, div[id*="_DXME"], .dxm-shadow, .dxm-subMenuItem'));
-                            for (const pop of popups) {
-                                if (pop.offsetParent !== null) {
-                                    const target = Array.from(pop.querySelectorAll('.dxm-item, span, td, a, tr')).find(e => e.textContent && e.textContent.trim().toLowerCase().includes('xuất excel'));
-                                    if (target) { target.click(); return true; }
-                                }
-                            }
-                            return false;
-                        }""")
+                    if not clicked_excel:
+                        btn_down = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel'), [id*='btnExportExcel']").first
+                        if btn_down.is_visible(timeout=5000):
+                            btn_down.click(force=True)
+                        else:
+                            page.evaluate("""() => {
+                                const btns = Array.from(document.querySelectorAll('.dxbButton, button, a, tr, td, span'));
+                                const target = btns.find(b => b.textContent && b.textContent.trim().toLowerCase() === 'xuất excel');
+                                if (target) target.click();
+                            }""")
 
                 log("Cổng BHYT đã tạo tệp Excel xong! Đang tải về máy...")
                 download = download_info.value
@@ -674,45 +681,44 @@ class PortalAutomationService:
                 # Đợi bảng danh sách và gridview hiển thị sẵn sàng
                 log("Đang chờ bảng danh sách Kết quả gửi hồ sơ XML hiển thị hoàn tất...")
                 try:
-                    page.wait_for_selector("#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable, input[name*='TuNgay'], #deTuNgay_I", timeout=30000)
+                    page.wait_for_selector("#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable, input[name*='TuNgay'], #dt_TuNgay_I", timeout=30000)
                     self.wait_portal_idle(page)
                 except Exception as w_err:
                     log(f"Lưu ý chờ bảng: {w_err}")
 
                 # 3. BƯỚC 1: ĐẶT NGÀY TODAY (KẾT HỢP 3 LỚP ĐẢM BẢO 100%)
-                log("Đang đặt khoảng ngày tìm kiếm = TODAY...")
+                log("Đang đặt khoảng ngày tìm kiếm = TODAY (dt_TuNgay / dt_DenNgay)...")
                 import datetime as dt_mod
                 today_ddmmyyyy = dt_mod.datetime.now().strftime("%d/%m/%Y")
 
-                # Lớp 1: DevExpress Client API
+                # Lớp 1: DevExpress Client API gán trực tiếp dt_TuNgay và dt_DenNgay
                 try:
                     page.evaluate("""() => {
                         try {
-                            if (window.ASPxClientControl) {
-                                const cc = window.ASPxClientControl.GetControlCollection();
-                                const now = new Date();
-                                cc.ForEachControl((c) => {
-                                    if (c && typeof c.SetDate === 'function') {
-                                        const name = (c.name || '').toLowerCase();
-                                        if (name.includes('tu') || name.includes('from') || name.includes('den') || name.includes('to')) {
-                                            c.SetDate(now);
-                                            if (c.ValueChanged && typeof c.ValueChanged.FireEvent === 'function') {
-                                                c.ValueChanged.FireEvent(c, {});
-                                            }
-                                        }
-                                    }
-                                });
+                            const now = new Date();
+                            if (window.dt_TuNgay && typeof window.dt_TuNgay.SetDate === 'function') {
+                                window.dt_TuNgay.SetDate(now);
+                            }
+                            if (window.dt_DenNgay && typeof window.dt_DenNgay.SetDate === 'function') {
+                                window.dt_DenNgay.SetDate(now);
+                            }
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            if (cc) {
+                                const cTu = cc.GetByName('dt_TuNgay');
+                                if (cTu && typeof cTu.SetDate === 'function') cTu.SetDate(now);
+                                const cDen = cc.GetByName('dt_DenNgay');
+                                if (cDen && typeof cDen.SetDate === 'function') cDen.SetDate(now);
                             }
                         } catch(e) {}
                     }""")
-                    log(f"Đã đặt ngày qua DevExpress Client API ({today_ddmmyyyy}) ✅")
+                    log(f"Đã đặt ngày qua DevExpress API dt_TuNgay / dt_DenNgay ({today_ddmmyyyy}) ✅")
                 except Exception: pass
 
                 # Lớp 2: Điền chuỗi dd/MM/yyyy vào input DOM
                 try:
-                    tu_inputs = page.locator("input[id*='TuNgay'], input[name*='TuNgay'], input[id*='txtTuNgay'], input[id*='deTuNgay']").all()
-                    for inp in tu_inputs:
-                        if inp.is_visible():
+                    for s_inp in ["#dt_TuNgay_I", "#dt_DenNgay_I", "input[id*='TuNgay']", "input[id*='DenNgay']"]:
+                        inp = page.locator(s_inp).first
+                        if inp.is_visible(timeout=1000):
                             inp.click(click_count=3)
                             inp.fill(today_ddmmyyyy)
                             inp.press("Tab")
@@ -720,21 +726,21 @@ class PortalAutomationService:
 
                 # Lớp 3: Mở popup lịch Từ ngày & Đến ngày và click Today
                 try:
-                    tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, td[id*='TuNgay'][id*='_B-1'], [id*='TuNgay'] img, td:has-text('Từ ngày') ~ td img").first
+                    tu_btn = page.locator("#dt_TuNgay_B-1, #dt_TuNgay_B-1Img, td[id*='dt_TuNgay_B-1'], [id*='TuNgay'][id*='_B-1']").first
                     if tu_btn.is_visible(timeout=1500):
                         tu_btn.click(force=True)
                         time.sleep(0.3)
-                        today_btn = page.locator("#deTuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
+                        today_btn = page.locator("#dt_TuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
                         if today_btn.is_visible(timeout=1500):
                             today_btn.click(force=True)
                             log("Đã chọn nút 'Today' trên popup Từ ngày ✅")
                             time.sleep(0.3)
 
-                    den_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, td[id*='DenNgay'][id*='_B-1'], [id*='DenNgay'] img, td:has-text('Đến ngày') ~ td img").first
+                    den_btn = page.locator("#dt_DenNgay_B-1, #dt_DenNgay_B-1Img, td[id*='dt_DenNgay_B-1'], [id*='DenNgay'][id*='_B-1']").first
                     if den_btn.is_visible(timeout=1500):
                         den_btn.click(force=True)
                         time.sleep(0.3)
-                        today_den = page.locator("#deDenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
+                        today_den = page.locator("#dt_DenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
                         if today_den.is_visible(timeout=1500):
                             today_den.click(force=True)
                             log("Đã chọn nút 'Today' trên popup Đến ngày ✅")
@@ -742,14 +748,14 @@ class PortalAutomationService:
                 except Exception as dt_err:
                     log(f"Lưu ý click popup lịch: {dt_err}")
 
-                # Bấm nút Tìm kiếm
-                log("Bấm Tìm kiếm dữ liệu...")
+                # Bấm nút Tìm kiếm (btnTimKiem)
+                log("Bấm Tìm kiếm dữ liệu (btnTimKiem)...")
                 searched = False
                 try:
                     searched = page.evaluate("""() => {
                         try {
                             const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            const btn = window.btnTimKiem || window.bt_TimKiem || (cc ? (cc.GetByName('btnTimKiem') || cc.GetByName('bt_TimKiem')) : null);
+                            const btn = window.btnTimKiem || (cc ? cc.GetByName('btnTimKiem') : null);
                             if (btn && typeof btn.DoClick === 'function') {
                                 btn.DoClick();
                                 return true;
@@ -758,6 +764,16 @@ class PortalAutomationService:
                         return false;
                     }""")
                 except Exception: pass
+
+                if not searched:
+                    for s_sel in ["#btnTimKiem_CD", "#btnTimKiem_B", "#btnTimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')"]:
+                        try:
+                            s_btn = page.locator(s_sel).first
+                            if s_btn.is_visible(timeout=2000):
+                                s_btn.click(force=True)
+                                searched = True
+                                break
+                        except Exception: pass
 
                 if not searched:
                     for s_sel in ["#btnTimKiem_CD", "#btnTimKiem_B", "#btnTimKiem", "#bt_TimKiem_CD", "#bt_TimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')"]:

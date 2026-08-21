@@ -56,6 +56,22 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-21 09:10 - Antigravity (Tích hợp Cấu trúc DOM Thực tế Cổng BHYT sau Live Scan)
+
+### Mục tiêu
+- Áp dụng các định danh (IDs/Names) và DevExpress Controls chính xác 100% thu thập được từ phiên Live Scan thực tế:
+  1. Luồng B: Trang `DanhSachHSKCB/Index` với nút `btnExport` mở popup và `btnExportExcel` tải file `listbh.xlsx`.
+  2. Luồng C: Trang `DanhSachKetQuaGuiHoSoQD130/Index` với control `dt_TuNgay` và `dt_DenNgay` (thay vì `deTuNgay`) và nút tìm kiếm `btnTimKiem`.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - **Luồng B - Xuất Excel:** Kích hoạt `btnExport` (`#btnExport_CD` / `window.btnExport.DoClick()`) mở Popup Export -> Bấm `btnExportExcel` (`#btnExportExcel_CD` / `window.btnExportExcel.DoClick()`) kèm theo `expect_download` lưu `listbh.xlsx`.
+  - **Luồng C - Đặt ngày TODAY:** Gọi trực tiếp `window.dt_TuNgay.SetDate(new Date())` và `window.dt_DenNgay.SetDate(new Date())`, điền input `#dt_TuNgay_I` và `#dt_DenNgay_I`, bấm popup icon `#dt_TuNgay_B-1` -> nút Today `#dt_TuNgay_DDD_C_BT`.
+  - **Luồng C - Tìm kiếm:** Gọi `window.btnTimKiem.DoClick()` / `#btnTimKiem_CD`.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-21 08:05 - Antigravity (Nâng cấp Điều hướng Đa tầng Luồng B & 3 Lớp Chọn Ngày Today Luồng C)
 
 ### Mục tiêu

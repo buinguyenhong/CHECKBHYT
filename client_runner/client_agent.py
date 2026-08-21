@@ -684,118 +684,103 @@ class ClientRPAGui:
                                     break
                             except Exception: pass
 
-                    # Chờ máy chủ Cổng BHYT nạp dữ liệu xong
-                    self.log("Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách đề nghị thanh toán...")
-                    start_w = time.time()
-                    time.sleep(1.0)
-                    while time.time() - start_w < 45:
-                        self._wait_portal_idle(page)
-                        try:
-                            rows = page.locator(".dxgvDataRow_EIS, tr[id*='DXDataRow'], tr.dxgvEmptyDataRow")
-                            if rows.count() > 0: break
-                        except Exception: pass
-                        time.sleep(0.5)
-
-                    time.sleep(1.0)
-
                     # 5. Xuất Excel và tải file listbh.xlsx
-                    self.log("Đang kích hoạt Xuất Excel danh sách đã gửi (hỗ trợ tối đa 5 phút)...")
+                    self.log("Đang kích hoạt Xuất Excel danh sách đã gửi...")
                     
-                    # Bước 5.1: Click nút cha "Xuất Excel" để mở menu
-                    self.log("Click nút 'Xuất Excel' để mở menu lựa chọn...")
-                    exp_btn = page.locator("#HeaderMenu span:has-text('Xuất Excel'), #bt_XuatExcel_CD, #bt_XuatExcel, .dxbButton:has-text('Xuất Excel'), td.dxb:has-text('Xuất Excel'), span:has-text('Xuất Excel')").first
-                    if exp_btn.is_visible(timeout=3000):
-                        exp_btn.click(force=True)
-                    else:
-                        page.evaluate("""() => {
-                            const btnXuat = window.bt_XuatExcel || (window.ASPxClientControl && window.ASPxClientControl.GetControlCollection().GetByName('bt_XuatExcel'));
-                            if (btnXuat && typeof btnXuat.DoClick === 'function') btnXuat.DoClick();
+                    # Bước 5.1: Click nút "Xuất Excel" (btnExport) để mở Popup Export
+                    self.log("Click nút 'Xuất Excel' (btnExport)...")
+                    opened_popup = page.evaluate("""() => {
+                        try {
+                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                            const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
+                            if (btn && typeof btn.DoClick === 'function') {
+                                btn.DoClick();
+                                return true;
+                            }
+                        } catch(e) {}
+                        return false;
+                    }""")
+
+                    if not opened_popup:
+                        btn_exp = page.locator("#btnExport_CD, #btnExport, #bt_XuatExcel_CD, #bt_XuatExcel, .dxbButton:has-text('Xuất Excel')").first
+                        if btn_exp.is_visible(timeout=3000):
+                            btn_exp.click(force=True)
+
+                    time.sleep(1.2)
+
+                    # Bước 5.2: Bấm nút "Xuất excel" (btnExportExcel) trong Popup kèm theo expect_download
+                    self.log("Đang bấm nút 'Xuất excel' (btnExportExcel) để tải file listbh.xlsx...")
+                    with page.expect_download(timeout=300000) as dl_info:
+                        clicked_excel = page.evaluate("""() => {
+                            try {
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
+                                if (btn && typeof btn.DoClick === 'function') {
+                                    btn.DoClick();
+                                    return true;
+                                }
+                            } catch(e) {}
+                            return false;
                         }""")
 
-                    time.sleep(1.0)
+                        if not clicked_excel:
+                            btn_down = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel'), [id*='btnExportExcel']").first
+                            if btn_down.is_visible(timeout=5000):
+                                btn_down.click(force=True)
+                            else:
+                                page.evaluate("""() => {
+                                    const btns = Array.from(document.querySelectorAll('.dxbButton, button, a, tr, td, span'));
+                                    const target = btns.find(b => b.textContent && b.textContent.trim().toLowerCase() === 'xuất excel');
+                                    if (target) target.click();
+                                }""")
 
-                    # Bước 5.2: Đợi menu popup và Click mục con "Xuất excel"
-                    self.log("Đang click vào mục con 'Xuất excel' trong popup menu...")
-                    try:
-                        page.wait_for_selector(".dxm-popup, div[id*='_DXME'], .dxm-shadow, table.dxm-item", timeout=5000)
-                    except Exception: pass
+                    self.log("Cổng BHYT đã tạo tệp Excel xong! Đang tải về máy...")
+                    download = dl_info.value
+                    dest_path = os.path.join(TEMP_DIR, "listbh.xlsx")
+                    download.save_as(dest_path)
+                    self.log(f"Tải tệp danh sách đã gửi thành công: {dest_path} ✅")
 
-                    with page.expect_download(timeout=300000) as dl_info:
-                        clicked_sub = False
-                        try:
-                            sub_item = page.locator(".dxm-popup, div[id*='_DXME'], .dxm-shadow").locator("td, span, a, tr").filter(has_text=re.compile(r"^Xuất excel$", re.IGNORECASE)).first
-                            if sub_item.is_visible(timeout=3000):
-                                sub_item.click(force=True)
-                                clicked_sub = True
-                        except Exception: pass
-
-                        if not clicked_sub:
-                            clicked_sub = page.evaluate("""() => {
-                                const popups = Array.from(document.querySelectorAll('.dxm-popup, div[id*="_DXME"], .dxm-shadow, .dxm-subMenuItem'));
-                                for (const pop of popups) {
-                                    if (pop.offsetParent !== null) {
-                                        const target = Array.from(pop.querySelectorAll('.dxm-item, span, td, a, tr')).find(e => e.textContent && e.textContent.trim().toLowerCase().includes('xuất excel'));
-                                        if (target) { target.click(); return true; }
-                                    }
-                                }
-                                return false;
-                            }""")
-
-                    self.log("Cổng BHYT đã tạo tệp Excel xong! Đang tải file về máy trạm...")
-                    dl = dl_info.value
-                    dest_file = os.path.join(TEMP_DIR, "listbh.xlsx")
-                    dl.save_as(dest_file)
                     context.storage_state(path=SESSION_FILE)
-                    self.log(f"Đã tải thành công: {dest_file} ✅")
+
+                    df = pd.read_excel(dest_path)
+                    row_count = len(df)
+                    self.log(f"Đã nạp file listbh.xlsx với {row_count} dòng dữ liệu.")
+
+                    if is_from_web:
+                        self.log("Đang gửi kết quả về WebApp Server...")
+                        try:
+                            with open(dest_path, "rb") as f:
+                                resp = requests.post(
+                                    f"{srv}/api/reconcile/upload_listbh",
+                                    files={"file": ("listbh.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+                                    timeout=60
+                                )
+                                self.log(f"Kết quả gửi WebApp: {resp.status_code}")
+                        except Exception as ue:
+                            self.log(f"Lỗi gửi file lên server: {ue}")
+
+                    self.last_status = {
+                        "status": "success",
+                        "flow": "B",
+                        "message": f"Tải thành công {row_count} bản ghi danh sách đã gửi.",
+                        "error": None
+                    }
+                    self.log(f"=== HOÀN THÀNH LUỒNG B: {row_count} BẢN GHI ===")
+
+                except Exception as e:
+                    self.last_status = {"status": "error", "flow": "B", "message": str(e), "error": str(e)}
+                    self.log(f"LỖI LUỒNG B: {str(e)}")
                 finally:
                     context.close()
                     browser.close()
 
-            # Gửi file lên WebApp Server
-            self.log(f"Đang đẩy file {dest_file} lên máy chủ {srv}...")
-            with open(dest_file, "rb") as f:
-                r_upload = requests.post(f"{srv}/api/upload/b", files={"file": ("listbh.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}, timeout=60)
-
-            if r_upload.status_code != 200:
-                raise Exception(f"Lỗi tải file lên server: {r_upload.text}")
-
-            self.log("Tải file lên server thành công! Đang kích hoạt Đối soát B với CSDL HIS...")
-            clean_from = from_d.replace('-', '').replace('/', '')
-            clean_to = to_d.replace('-', '').replace('/', '')
-            r_sync = requests.post(f"{srv}/api/sync/start", json={"from_date": clean_from, "to_date": clean_to, "include_errors": False}, timeout=120)
-
-            if r_sync.status_code == 200:
-                res_data = r_sync.json()
-                self.last_status = {"status": "success", "flow": "B", "message": res_data.get('message', 'Thành công'), "error": None}
-                self.log("=== ĐỐI SOÁT B HOÀN TẤT THÀNH CÔNG! ✅ ===")
-                self.log(f"Kết quả: {res_data.get('message', 'Thành công')}")
-                if not is_from_web:
-                    messagebox.showinfo("Thành công", f"Đã hoàn thành Đối soát B trên máy chủ!\n{res_data.get('message', '')}")
-            else:
-                err_text = r_sync.text
-                self.last_status = {"status": "error", "flow": "B", "message": f"Máy chủ trả về lỗi: {err_text}", "error": err_text}
-                self.log(f"Lỗi đối soát: {err_text}")
-                if not is_from_web:
-                    messagebox.showerror("Lỗi đối soát", f"Máy chủ trả về lỗi: {err_text}")
-
         except Exception as e:
             self.last_status = {"status": "error", "flow": "B", "message": str(e), "error": str(e)}
-            self.log(f"LỖI THỰC THI: {e}")
-            if not is_from_web:
-                messagebox.showerror("Lỗi", f"Lỗi Luồng B: {e}")
+            self.log(f"LỖI KHỞI CHẠY TRÌNH DUYỆT B: {str(e)}")
         finally:
             self.is_running = False
-            self.root.after(0, lambda: self.btn_flow_b.configure(state=tk.NORMAL))
-            self.root.after(0, lambda: self.btn_flow_c.configure(state=tk.NORMAL))
-
-    def start_flow_c(self):
-        import threading
-        self.save_config()
-        self.btn_flow_b.configure(state=tk.DISABLED)
-        self.btn_flow_c.configure(state=tk.DISABLED)
-        self.is_running = True
-        self.last_status = {"status": "running", "flow": "C", "message": "Đang khởi chạy Luồng C...", "error": None}
-        threading.Thread(target=self._run_flow_c_worker, kwargs={"is_from_web": False}, daemon=True).start()
+            self.btn_flow_b.configure(state=tk.NORMAL)
+            self.btn_flow_c.configure(state=tk.NORMAL)
 
     def _run_flow_c_worker(self, is_from_web: bool = False):
         from playwright.sync_api import sync_playwright
@@ -807,7 +792,7 @@ class ClientRPAGui:
         self.last_status = {"status": "running", "flow": "C", "message": "Đang chạy Luồng C (Tải danh sách lỗi chi tiết)...", "error": None}
         self.log("=== BẮT ĐẦU LUỒNG C (TẢI DANH SÁCH LỖI CHI TIẾT) ===")
 
-        # Xóa temp cũ
+        # Xóa file cũ
         for old_f in glob.glob(os.path.join(TEMP_DIR, "*.*")):
             try: os.remove(old_f)
             except Exception: pass
@@ -823,31 +808,23 @@ class ClientRPAGui:
                     self._ensure_login(page)
                     self._wait_portal_idle(page)
 
-                    # 4 bước điều hướng trực tiếp (Không hover)
-                    self.log("Điều hướng: Hồ sơ ĐNTT > Hồ sơ XML > QĐ 3176 > Kết quả gửi XML...")
+                    # Điều hướng trực tiếp
+                    self.log("Đang điều hướng: Hồ sơ ĐNTT > Hồ sơ XML > QĐ 3176 > Kết quả gửi hồ sơ XML...")
                     try:
-                        top = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                        if top.is_visible(timeout=3000): top.click()
+                        top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
+                        if top_menu.is_visible(timeout=3000): top_menu.click()
                     except Exception: pass
                     time.sleep(0.6)
 
                     try:
                         xml_item = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
-                        if xml_item.is_visible(timeout=3000):
-                            xml_item.click(force=True)
+                        if xml_item.is_visible(timeout=3000): xml_item.click(force=True)
                     except Exception: pass
                     time.sleep(0.6)
 
                     try:
-                        qd = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
-                        if qd.is_visible(timeout=3000):
-                            qd.click(force=True)
-                        else:
-                            page.evaluate("""() => {
-                                const spans = Array.from(document.querySelectorAll('.dxm-item, span, a, div'));
-                                const el = spans.find(s => s.textContent && s.textContent.includes('3176'));
-                                if (el) el.click();
-                            }""")
+                        qd3176 = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
+                        if qd3176.is_visible(timeout=3000): qd3176.click(force=True)
                     except Exception: pass
                     time.sleep(0.8)
 
@@ -859,7 +836,6 @@ class ClientRPAGui:
                     page.wait_for_load_state("domcontentloaded")
                     self._wait_portal_idle(page)
 
-                    # Helper kiểm tra bảng nạp dữ liệu
                     def wait_for_grid_data(timeout=45):
                         start = time.time()
                         time.sleep(1.0)
@@ -883,12 +859,12 @@ class ClientRPAGui:
 
                     # Đợi bảng danh sách hiển thị
                     try:
-                        page.wait_for_selector("#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable, input[name*='TuNgay'], #deTuNgay_I", timeout=30000)
+                        page.wait_for_selector("#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable, input[name*='TuNgay'], #dt_TuNgay_I", timeout=30000)
                         self._wait_portal_idle(page)
                     except Exception: pass
 
                     # 3. BƯỚC 1: ĐẶT NGÀY TODAY (KẾT HỢP 3 LỚP ĐẢM BẢO 100%)
-                    self.log("Đang đặt khoảng ngày tìm kiếm = TODAY...")
+                    self.log("Đang đặt khoảng ngày tìm kiếm = TODAY (dt_TuNgay / dt_DenNgay)...")
                     import datetime as dt_mod
                     today_ddmmyyyy = dt_mod.datetime.now().strftime("%d/%m/%Y")
 
@@ -896,31 +872,30 @@ class ClientRPAGui:
                     try:
                         page.evaluate("""() => {
                             try {
-                                if (window.ASPxClientControl) {
-                                    const cc = window.ASPxClientControl.GetControlCollection();
-                                    const now = new Date();
-                                    cc.ForEachControl((c) => {
-                                        if (c && typeof c.SetDate === 'function') {
-                                            const name = (c.name || '').toLowerCase();
-                                            if (name.includes('tu') || name.includes('from') || name.includes('den') || name.includes('to')) {
-                                                c.SetDate(now);
-                                                if (c.ValueChanged && typeof c.ValueChanged.FireEvent === 'function') {
-                                                    c.ValueChanged.FireEvent(c, {});
-                                                }
-                                            }
-                                        }
-                                    });
+                                const now = new Date();
+                                if (window.dt_TuNgay && typeof window.dt_TuNgay.SetDate === 'function') {
+                                    window.dt_TuNgay.SetDate(now);
+                                }
+                                if (window.dt_DenNgay && typeof window.dt_DenNgay.SetDate === 'function') {
+                                    window.dt_DenNgay.SetDate(now);
+                                }
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                if (cc) {
+                                    const cTu = cc.GetByName('dt_TuNgay');
+                                    if (cTu && typeof cTu.SetDate === 'function') cTu.SetDate(now);
+                                    const cDen = cc.GetByName('dt_DenNgay');
+                                    if (cDen && typeof cDen.SetDate === 'function') cDen.SetDate(now);
                                 }
                             } catch(e) {}
                         }""")
-                        self.log(f"Đã đặt ngày qua DevExpress Client API ({today_ddmmyyyy}) ✅")
+                        self.log(f"Đã đặt ngày qua DevExpress API dt_TuNgay / dt_DenNgay ({today_ddmmyyyy}) ✅")
                     except Exception: pass
 
                     # Lớp 2: Điền chuỗi dd/MM/yyyy vào input DOM
                     try:
-                        tu_inputs = page.locator("input[id*='TuNgay'], input[name*='TuNgay'], input[id*='txtTuNgay'], input[id*='deTuNgay']").all()
-                        for inp in tu_inputs:
-                            if inp.is_visible():
+                        for s_inp in ["#dt_TuNgay_I", "#dt_DenNgay_I", "input[id*='TuNgay']", "input[id*='DenNgay']"]:
+                            inp = page.locator(s_inp).first
+                            if inp.is_visible(timeout=1000):
                                 inp.click(click_count=3)
                                 inp.fill(today_ddmmyyyy)
                                 inp.press("Tab")
@@ -928,21 +903,21 @@ class ClientRPAGui:
 
                     # Lớp 3: Mở popup lịch Từ ngày & Đến ngày và click Today
                     try:
-                        tu_btn = page.locator("#deTuNgay_B-1, #deTuNgay_B-1Img, td[id*='TuNgay'][id*='_B-1'], [id*='TuNgay'] img, td:has-text('Từ ngày') ~ td img").first
+                        tu_btn = page.locator("#dt_TuNgay_B-1, #dt_TuNgay_B-1Img, td[id*='dt_TuNgay_B-1'], [id*='TuNgay'][id*='_B-1']").first
                         if tu_btn.is_visible(timeout=1500):
                             tu_btn.click(force=True)
                             time.sleep(0.3)
-                            today_btn = page.locator("#deTuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
+                            today_btn = page.locator("#dt_TuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
                             if today_btn.is_visible(timeout=1500):
                                 today_btn.click(force=True)
                                 self.log("Đã chọn nút 'Today' trên popup Từ ngày ✅")
                                 time.sleep(0.3)
 
-                        den_btn = page.locator("#deDenNgay_B-1, #deDenNgay_B-1Img, td[id*='DenNgay'][id*='_B-1'], [id*='DenNgay'] img, td:has-text('Đến ngày') ~ td img").first
+                        den_btn = page.locator("#dt_DenNgay_B-1, #dt_DenNgay_B-1Img, td[id*='dt_DenNgay_B-1'], [id*='DenNgay'][id*='_B-1']").first
                         if den_btn.is_visible(timeout=1500):
                             den_btn.click(force=True)
                             time.sleep(0.3)
-                            today_den = page.locator("#deDenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
+                            today_den = page.locator("#dt_DenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
                             if today_den.is_visible(timeout=1500):
                                 today_den.click(force=True)
                                 self.log("Đã chọn nút 'Today' trên popup Đến ngày ✅")
@@ -950,8 +925,8 @@ class ClientRPAGui:
                     except Exception as dt_err:
                         self.log(f"Lưu ý click popup lịch: {dt_err}")
 
-                    # Bấm nút Tìm kiếm
-                    self.log("Bấm Tìm kiếm dữ liệu...")
+                    # Bấm nút Tìm kiếm (btnTimKiem)
+                    self.log("Bấm Tìm kiếm dữ liệu (btnTimKiem)...")
                     searched = False
                     try:
                         searched = page.evaluate("""() => {
