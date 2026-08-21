@@ -345,43 +345,32 @@ class PortalAutomationService:
                 self._ensure_login(page, log_func=log)
                 self.wait_portal_idle(page)
 
-                # 2. Điều hướng vào menu Danh sách đề nghị thanh toán
-                log("Đang điều hướng đến: Danh sách đề nghị thanh toán...")
+                # 2. Điều hướng trực tiếp vào Danh sách hồ sơ KCB
+                log("Đang điều hướng đến: Danh sách đề nghị thanh toán (/DanhSachHSKCB/Index)...")
                 
+                target_url_b = f"{self.base_url.rstrip('/')}/DanhSachHSKCB/Index"
                 try:
-                    top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                    if top_menu.is_visible(timeout=3000):
-                        top_menu.click()
-                        time.sleep(0.5)
-                except Exception:
-                    pass
+                    page.goto(target_url_b, timeout=45000)
+                    page.wait_for_load_state("domcontentloaded")
+                except Exception as g_err:
+                    log(f"Lưu ý truy cập URL: {g_err}")
 
+                # Chờ các control chính của trang hiển thị sẵn sàng
                 try:
-                    xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-popup div, .dxm-item").filter(has_text="Hồ sơ XML")
-                    if xml_menu.first.is_visible(timeout=3000):
-                        xml_menu.first.click()
-                        time.sleep(0.5)
+                    page.wait_for_selector("#gvDanhSachHoSo, #bt_TimKiem, #btnExport, #cb_TrangThaiTT", timeout=20000)
                 except Exception:
-                    pass
-
-                navigated_b = False
-                for sel in ["a:has-text('Danh sách đề nghị thanh toán')", "span:has-text('Danh sách đề nghị thanh toán')", ".dxm-item:has-text('Danh sách đề nghị thanh toán')"]:
+                    # Fallback menu click nếu chưa vào đúng trang
                     try:
-                        el = page.locator(sel).first
-                        if el.is_visible(timeout=2000):
-                            el.click(force=True)
-                            navigated_b = True
-                            break
+                        top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
+                        if top_menu.is_visible(timeout=3000): top_menu.click()
+                        time.sleep(0.5)
+                        xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
+                        if xml_menu.is_visible(timeout=3000): xml_menu.click(force=True)
+                        time.sleep(0.5)
+                        page.locator("a, span, .dxm-item").filter(has_text=re.compile(r"Danh sách", re.IGNORECASE)).first.click(force=True)
+                        page.wait_for_load_state("domcontentloaded")
                     except Exception: pass
 
-                if not navigated_b:
-                    page.evaluate("""() => {
-                        const items = Array.from(document.querySelectorAll('a, span, td, div, .dxm-item'));
-                        const target = items.find(e => e.textContent && e.textContent.trim().includes('Danh sách đề nghị thanh toán'));
-                        if (target) target.click();
-                    }""")
-
-                page.wait_for_load_state("domcontentloaded")
                 self.wait_portal_idle(page)
 
                 # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" qua DevExpress Client API + Fallback
@@ -467,7 +456,7 @@ class PortalAutomationService:
                 while time.time() - start_wait < 45:
                     self.wait_portal_idle(page)
                     try:
-                        rows = page.locator(".dxgvDataRow_EIS, tr[id*='DXDataRow'], tr.dxgvEmptyDataRow")
+                        rows = page.locator("#gvDanhSachHoSo tr[id*='DXDataRow'], .dxgvDataRow_EIS, tr[id*='DXDataRow'], tr.dxgvEmptyDataRow")
                         if rows.count() > 0:
                             break
                     except Exception: pass
@@ -600,57 +589,37 @@ class PortalAutomationService:
                 self._ensure_login(page, log_func=log)
                 self.wait_portal_idle(page)
 
-                # 2. Điều hướng 4 bước trực tiếp
-                log("Đang điều hướng: Hồ sơ ĐNTT > Hồ sơ XML > QĐ 3176 > Kết quả gửi hồ sơ XML...")
-                
-                # Bước 1: Click "Hồ sơ đề nghị thanh toán"
+                # 2. Điều hướng trực tiếp vào Kết quả gửi hồ sơ XML
+                log("Đang điều hướng đến: Kết quả gửi hồ sơ XML (/DanhSachKetQuaGuiHoSoQD130/Index)...")
+                target_url_c = f"{self.base_url.rstrip('/')}/DanhSachKetQuaGuiHoSoQD130/Index"
                 try:
-                    top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                    if top_menu.is_visible(timeout=3000):
-                        top_menu.click()
-                    else:
-                        page.get_by_text("Hồ sơ đề nghị thanh toán").first.click(timeout=3000)
-                except Exception as e:
-                    log(f"Lưu ý click menu chính: {e}")
-                time.sleep(0.6)
+                    page.goto(target_url_c, timeout=45000)
+                    page.wait_for_load_state("domcontentloaded")
+                except Exception as g_err:
+                    log(f"Lưu ý truy cập URL: {g_err}")
 
-                # Bước 2: Click trực tiếp "Hồ sơ XML"
+                # Chờ các control chính hiển thị hoặc fallback menu
                 try:
-                    xml_item = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
-                    if xml_item.is_visible(timeout=3000):
-                        xml_item.click(force=True)
-                except Exception as e:
-                    log(f"Lưu ý click Hồ sơ XML: {e}")
-                time.sleep(0.6)
-
-                # Bước 3: Click trực tiếp "Quyết định 3176/QĐ-BYT"
-                try:
-                    qd3176 = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
-                    if qd3176.is_visible(timeout=3000):
-                        qd3176.click(force=True)
-                    else:
-                        page.evaluate("""() => {
-                            const spans = Array.from(document.querySelectorAll('.dxm-item, span, a, div'));
-                            const el = spans.find(s => s.textContent && s.textContent.includes('3176'));
-                            if (el) el.click();
-                        }""")
-                except Exception: pass
-                time.sleep(0.8)
-
-                # Bước 4: Click trực tiếp "Kết quả gửi hồ sơ XML"
-                clicked_link = False
-                try:
-                    clicked_link = page.evaluate("""() => {
-                        const links = Array.from(document.querySelectorAll('a')).filter(a => a.textContent && a.textContent.includes('Kết quả gửi hồ sơ XML'));
-                        if (links.length > 1) { links[1].click(); return true; }
-                        else if (links.length === 1) { links[0].click(); return true; }
-                        return false;
-                    }""")
-                except Exception: pass
-
-                if not clicked_link:
+                    page.wait_for_selector("#gvDSKetQuaGuiHoso, #dt_TuNgay_I, #btnTimKiem", timeout=20000)
+                except Exception:
+                    # Fallback menu click
                     try:
-                        page.get_by_role("link", name=re.compile(r"Kết quả gửi hồ sơ XML", re.IGNORECASE)).last.click(force=True)
+                        top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
+                        if top_menu.is_visible(timeout=3000): top_menu.click()
+                        time.sleep(0.5)
+                        xml_item = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
+                        if xml_item.is_visible(timeout=3000): xml_item.click(force=True)
+                        time.sleep(0.5)
+                        qd3176 = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
+                        if qd3176.is_visible(timeout=3000): qd3176.click(force=True)
+                        time.sleep(0.5)
+                        page.evaluate("""() => {
+                            const links = Array.from(document.querySelectorAll('a')).filter(a => a.textContent && a.textContent.includes('Kết quả gửi hồ sơ XML'));
+                            if (links.length > 1) { links[1].click(); return true; }
+                            else if (links.length === 1) { links[0].click(); return true; }
+                            return false;
+                        }""")
+                        page.wait_for_load_state("domcontentloaded")
                     except Exception: pass
 
                 page.wait_for_load_state("domcontentloaded")

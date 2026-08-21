@@ -569,42 +569,29 @@ class ClientRPAGui:
                     self._ensure_login(page)
                     self._wait_portal_idle(page)
 
-                    # Điều hướng trực tiếp
-                    self.log("Đang mở Danh sách đề nghị thanh toán...")
+                    # Điều hướng trực tiếp vào Danh sách hồ sơ KCB
+                    self.log("Đang điều hướng đến: Danh sách đề nghị thanh toán (/DanhSachHSKCB/Index)...")
+                    target_url_b = f"{self.portal_url.get().strip().rstrip('/')}/DanhSachHSKCB/Index" if hasattr(self, 'portal_url') else "https://gdbhyt.baohiemxahoi.gov.vn/DanhSachHSKCB/Index"
                     try:
-                        top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                        if top_menu.is_visible(timeout=3000):
-                            top_menu.click()
-                            time.sleep(0.5)
-                    except Exception:
-                        pass
+                        page.goto(target_url_b, timeout=45000)
+                        page.wait_for_load_state("domcontentloaded")
+                    except Exception: pass
 
+                    # Chờ các control chính hoặc fallback menu
                     try:
-                        xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-popup div, .dxm-item").filter(has_text="Hồ sơ XML")
-                        if xml_menu.first.is_visible(timeout=3000):
-                            xml_menu.first.click()
-                            time.sleep(0.5)
+                        page.wait_for_selector("#gvDanhSachHoSo, #bt_TimKiem, #btnExport, #cb_TrangThaiTT", timeout=20000)
                     except Exception:
-                        pass
-
-                    navigated_b = False
-                    for sel in ["a:has-text('Danh sách đề nghị thanh toán')", "span:has-text('Danh sách đề nghị thanh toán')", ".dxm-item:has-text('Danh sách đề nghị thanh toán')"]:
                         try:
-                            el = page.locator(sel).first
-                            if el.is_visible(timeout=2000):
-                                el.click(force=True)
-                                navigated_b = True
-                                break
+                            top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
+                            if top_menu.is_visible(timeout=3000): top_menu.click()
+                            time.sleep(0.5)
+                            xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
+                            if xml_menu.is_visible(timeout=3000): xml_menu.click(force=True)
+                            time.sleep(0.5)
+                            page.locator("a, span, .dxm-item").filter(has_text=re.compile(r"Danh sách", re.IGNORECASE)).first.click(force=True)
+                            page.wait_for_load_state("domcontentloaded")
                         except Exception: pass
 
-                    if not navigated_b:
-                        page.evaluate("""() => {
-                            const items = Array.from(document.querySelectorAll('a, span, td, div, .dxm-item'));
-                            const target = items.find(e => e.textContent && e.textContent.trim().includes('Danh sách đề nghị thanh toán'));
-                            if (target) target.click();
-                        }""")
-
-                    page.wait_for_load_state("domcontentloaded")
                     self._wait_portal_idle(page)
 
                     # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" qua DevExpress Client API
@@ -808,32 +795,36 @@ class ClientRPAGui:
                     self._ensure_login(page)
                     self._wait_portal_idle(page)
 
-                    # Điều hướng trực tiếp
-                    self.log("Đang điều hướng: Hồ sơ ĐNTT > Hồ sơ XML > QĐ 3176 > Kết quả gửi hồ sơ XML...")
+                    # Điều hướng trực tiếp vào Kết quả gửi hồ sơ XML
+                    self.log("Đang điều hướng đến: Kết quả gửi hồ sơ XML (/DanhSachKetQuaGuiHoSoQD130/Index)...")
+                    target_url_c = f"{self.portal_url.get().strip().rstrip('/')}/DanhSachKetQuaGuiHoSoQD130/Index" if hasattr(self, 'portal_url') else "https://gdbhyt.baohiemxahoi.gov.vn/DanhSachKetQuaGuiHoSoQD130/Index"
                     try:
-                        top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                        if top_menu.is_visible(timeout=3000): top_menu.click()
+                        page.goto(target_url_c, timeout=45000)
+                        page.wait_for_load_state("domcontentloaded")
                     except Exception: pass
-                    time.sleep(0.6)
 
+                    # Chờ các control chính hoặc fallback menu
                     try:
-                        xml_item = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
-                        if xml_item.is_visible(timeout=3000): xml_item.click(force=True)
-                    except Exception: pass
-                    time.sleep(0.6)
+                        page.wait_for_selector("#gvDSKetQuaGuiHoso, #dt_TuNgay_I, #btnTimKiem", timeout=20000)
+                    except Exception:
+                        try:
+                            top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
+                            if top_menu.is_visible(timeout=3000): top_menu.click()
+                            time.sleep(0.5)
+                            xml_item = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
+                            if xml_item.is_visible(timeout=3000): xml_item.click(force=True)
+                            time.sleep(0.5)
+                            qd3176 = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
+                            if qd3176.is_visible(timeout=3000): qd3176.click(force=True)
+                            time.sleep(0.5)
+                            page.evaluate("""() => {
+                                const links = Array.from(document.querySelectorAll('a')).filter(a => a.textContent && a.textContent.includes('Kết quả gửi hồ sơ XML'));
+                                if (links.length > 1) links[1].click();
+                                else if (links.length === 1) links[0].click();
+                            }""")
+                            page.wait_for_load_state("domcontentloaded")
+                        except Exception: pass
 
-                    try:
-                        qd3176 = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
-                        if qd3176.is_visible(timeout=3000): qd3176.click(force=True)
-                    except Exception: pass
-                    time.sleep(0.8)
-
-                    page.evaluate("""() => {
-                        const links = Array.from(document.querySelectorAll('a')).filter(a => a.textContent && a.textContent.includes('Kết quả gửi hồ sơ XML'));
-                        if (links.length > 1) links[1].click();
-                        else if (links.length === 1) links[0].click();
-                    }""")
-                    page.wait_for_load_state("domcontentloaded")
                     self._wait_portal_idle(page)
 
                     def wait_for_grid_data(timeout=45):

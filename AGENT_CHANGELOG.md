@@ -56,6 +56,22 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-21 09:22 - Antigravity (Tối ưu hóa Direct URL Navigation cho Luồng B & Luồng C)
+
+### Mục tiêu
+- Khắc phục triệt để hiện tượng đứng yên sau khi đăng nhập ở Luồng B do phụ thuộc vào click menu cha-con DevExpress (`HeaderMenu`).
+- Tăng tốc độ điều hướng tức thì vào thẳng URL chức năng:
+  - Luồng B: `/DanhSachHSKCB/Index`
+  - Luồng C: `/DanhSachKetQuaGuiHoSoQD130/Index`
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - Sử dụng `page.goto(url)` trực tiếp vào trang chức năng ngay sau khi xác thực đăng nhập thành công.
+  - Tích hợp cơ chế chờ các selector cốt lõi (`#gvDanhSachHoSo`, `#bt_TimKiem`, `#btnExport`, `#dt_TuNgay_I`) và fallback menu click chỉ khi cần thiết.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-21 09:10 - Antigravity (Tích hợp Cấu trúc DOM Thực tế Cổng BHYT sau Live Scan)
 
 ### Mục tiêu
