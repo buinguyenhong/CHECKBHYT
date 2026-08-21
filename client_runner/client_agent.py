@@ -947,25 +947,51 @@ class ClientRPAGui:
                     wait_for_grid_data(timeout=45)
                     self._wait_portal_idle(page)
 
-                    # 4. BƯỚC 2: CHỌN HIỂN THỊ 100 DÒNG / TRANG QUA PAGER DROPDOWN
+                    # 4. BƯỚC 2: CHỌN HIỂN THỊ 100 DÒNG / TRANG QUA PAGER DROPDOWN & CHỜ LOADING
                     self.log("Thiết lập hiển thị 100 bản ghi/trang...")
+                    selected_100 = False
                     try:
-                        pager_img = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg, #gvDSKetQuaGuiHoso_DXPagerBottom .dxp-dropDownButton, .dxp-dropDownButton").first
-                        if pager_img.is_visible(timeout=3000):
-                            pager_img.click(force=True)
-                            time.sleep(0.5)
-                            item_100 = page.locator(".dxp-dropDownListBox td, .dxeListBoxItem_EIS, td.dxeListBoxItem, .dxeListBoxItem").filter(has_text=re.compile(r"^100$")).first
-                            if item_100.is_visible(timeout=3000):
-                                item_100.click(force=True)
-                                self.log("Đã click chọn 100 bản ghi/trang, đang chờ máy chủ nạp lại dữ liệu...")
-                                wait_for_grid_data(timeout=45)
-                                self._wait_portal_idle(page)
-                                time.sleep(1.0)
-                                self.log("Đã nạp xong hiển thị 100 bản ghi/trang ✅")
-                    except Exception as e:
-                        self.log(f"Lưu ý chọn 100 dòng: {e}")
+                        pager_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg, #gvDSKetQuaGuiHoso_DXPagerBottom .dxp-dropDownButton, .dxp-dropDownButton").first
+                        if pager_btn.is_visible(timeout=3000):
+                            pager_btn.click(force=True)
+                            time.sleep(0.6)
 
-                    # 5. BƯỚC 3: NHẬN DIỆN CỘT LỖI & ÁP DỤNG BỘ LỌC 1 TRỰC TIẾP
+                            selected_100 = page.evaluate("""() => {
+                                const lists = Array.from(document.querySelectorAll('.dxp-dropDownListBox, div[id*="_PSP_"], .dxeListBox, div[id*="PagerBottom"]'));
+                                for (const l of lists) {
+                                    if (l.offsetParent !== null) {
+                                        const items = Array.from(l.querySelectorAll('td, tr, span, div, li'));
+                                        const target = items.find(it => (it.textContent || '').trim() === '100');
+                                        if (target) {
+                                            target.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true}));
+                                            target.dispatchEvent(new MouseEvent('mouseup', {bubbles: true, cancelable: true}));
+                                            target.click();
+                                            return true;
+                                        }
+                                    }
+                                }
+                                return false;
+                            }""")
+
+                            if not selected_100:
+                                item_100 = page.locator("div[id*='PSP'] td, .dxp-dropDownListBox td, .dxeListBoxItem").filter(has_text=re.compile(r"^\s*100\s*$")).last
+                                if item_100.is_visible(timeout=2000):
+                                    item_100.hover()
+                                    item_100.click(force=True)
+                                    selected_100 = True
+
+                    except Exception as e:
+                        self.log(f"Lưu ý click chọn 100 dòng: {e}")
+
+                    if selected_100:
+                        self.log("Đã kích hoạt chọn 100 bản ghi/trang! Đang chờ máy chủ nạp lại dữ liệu (Loading)...")
+                        time.sleep(1.0)
+                        wait_for_grid_data(timeout=60)
+                        self._wait_portal_idle(page)
+                        time.sleep(1.0)
+                        self.log("Máy chủ đã hoàn tất tải dữ liệu 100 bản ghi/trang ✅")
+
+                    # 5. BƯỚC 3: NHẬN DIỆN CỘT LỖI & ÁP DỤNG BỘ LỌC 1 TRỰC TIẾP & CHỜ LOADING
                     self.log("Đang áp dụng bộ lọc cột Lỗi = 1...")
                     try:
                         filter_info = page.evaluate("""() => {

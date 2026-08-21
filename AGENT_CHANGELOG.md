@@ -56,6 +56,21 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-21 10:14 - Antigravity (Tối ưu hóa Chọn PageSize 100 bằng Mouse Events & Chờ Loading Hoàn tất)
+
+### Mục tiêu
+- Khắc phục triệt để lỗi Luồng C mở dropdown nhưng không nhận lựa chọn 100 dòng/trang (bị trả về 10 dòng mặc định).
+- Đáp ứng yêu cầu nghiệp vụ: Sau khi chọn PageSize 100 và sau khi áp dụng bộ lọc Lỗi = 1, hệ thống phải đợi máy chủ nạp xong hoàn toàn (Loading panel biến mất + grid rows render xong) rồi mới thực hiện bước tiếp theo.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - **Chọn 100 dòng/trang:** Mở Pager Dropdown -> Kích hoạt chuỗi sự kiện `mousedown` -> `mouseup` -> `click` trên phần tử `100` trong popup listbox.
+  - **Chờ Loading PageSize:** Sử dụng `wait_for_grid_data(timeout=60)` và `wait_portal_idle(page)` để đảm bảo bảng nạp xong toàn bộ 100 dòng trước khi sang bước lọc.
+  - **Chờ Loading Bộ lọc Lỗi = 1:** Sau khi điền số 1 và gửi phím `Enter`, tiếp tục chờ `wait_for_grid_data` và `wait_portal_idle` cho đến khi bảng nạp xong kết quả lọc.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-21 09:22 - Antigravity (Tối ưu hóa Direct URL Navigation cho Luồng B & Luồng C)
 
 ### Mục tiêu
