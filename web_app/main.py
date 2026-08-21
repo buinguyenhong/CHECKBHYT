@@ -3260,6 +3260,34 @@ def export_archive_errors(
     )
 
 
+@app.get("/api/client/download-runner")
+def download_client_runner_package():
+    """Tạo và tải về gói CheckBHYT_Client_Runner.zip cho máy trạm."""
+    import zipfile
+    client_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "client_runner")
+    if not os.path.exists(client_dir):
+        raise HTTPException(status_code=404, detail="Không tìm thấy thư mục client_runner")
+
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for root, dirs, files in os.walk(client_dir):
+            if "__pycache__" in root or ".git" in root or "downloaded_temp" in root:
+                continue
+            for file in files:
+                if file.endswith((".py", ".bat", ".txt", ".json", ".md")):
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, client_dir)
+                    zip_file.write(file_path, arcname)
+
+    zip_buffer.seek(0)
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=CheckBHYT_Client_Runner.zip"}
+    )
+
+
+
 
 
 

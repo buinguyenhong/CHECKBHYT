@@ -56,6 +56,23 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-21 16:50 - Antigravity (Tích hợp Web-to-Client RPA Bridge & Tải Gói Máy Trạm Tự Động)
+
+### Mục tiêu
+- Tích hợp liền mạch cơ chế điều khiển Chromium trực tiếp trên màn hình máy trạm (Client) ngay từ giao diện Web App tập trung:
+  - Máy trạm chỉ cần mở dịch vụ cầu nối `Chay_RPA_May_Tram.bat` (`127.0.0.1:8765`).
+  - Giao diện Web App (`/admin`) tự động nhận diện kết nối máy trạm và chuyển đổi thông minh giữa 2 chế độ: Mở Chromium trên Máy chủ (khi dùng tại Server) hoặc Mở Chromium trên Máy trạm (khi thao tác từ xa).
+  - Tự động truyền luồng log trực tiếp (Live Stream) từ máy trạm lên Web Console và tự động tải/đối soát kết quả.
+
+### Thay đổi
+- `web_app/main.py`:
+  - Bổ sung endpoint `@app.get("/api/client/download-runner")` cho phép tải trực tiếp file `CheckBHYT_Client_Runner.zip` từ giao diện Web.
+- `client_runner/client_agent.py`:
+  - Đồng bộ hóa 100% logic điều hướng trực tiếp (`/DanhSachHSKCB/Index`, `/DanhSachKetQuaGuiHoSoQD130/Index`), PageSize 100 bằng Mouse Events và bộ lọc Lỗi = 1.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-21 10:35 - Antigravity (Cập nhật Cột Báo cáo Excel: Bỏ Trạng thái, Thêm Tổng tiền & Tiền BHYT)
 
 ### Mục tiêu
