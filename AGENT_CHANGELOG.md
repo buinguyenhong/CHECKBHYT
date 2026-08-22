@@ -56,6 +56,19 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-22 10:10 - Antigravity (Nâng Cấp Chu Kỳ Kiểm Tra 10s/Lần & Timeout Tối Đa 180 Giây Cho Luồng C)
+
+### Mục tiêu
+- Đáp ứng yêu cầu người dùng: Nâng thời gian chờ tối đa lên 180 giây và kiểm tra / báo cáo tiến trình 10 giây một lần khi máy chủ Cổng BHYT phản hồi chậm.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - `wait_for_grid_data(timeout=180)`: Tự động ghi nhận và thông báo log định kỳ `[Đang đợi Cổng BHYT] Đã chờ Xs / 180s...` mỗi 10 giây.
+  - Áp dụng timeout 180s cho tất cả các bước: Tìm kiếm, Chuyển 100 dòng/trang, Lọc Lỗi = 1, và Quét trang.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py client_runner/client_agent.py web_app/services/portal_automation.py` -> PASS (Exit code 0).
+
 ## 2026-08-22 10:05 - Antigravity (Tối Ưu Hóa Chờ InCallback Sâu & Tự Động Thử Lại Lọc Lỗi Khi Mạng Chậm)
 
 ### Mục tiêu

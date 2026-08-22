@@ -625,11 +625,17 @@ class PortalAutomationService:
                 page.wait_for_load_state("domcontentloaded")
                 self.wait_portal_idle(page)
 
-                # Helper kiểm tra bảng nạp dữ liệu sâu với DevExpress InCallback & Loading Panels
-                def wait_for_grid_data(timeout=90):
+                # Helper kiểm tra bảng nạp dữ liệu sâu với DevExpress InCallback & Loading Panels (Chu kỳ kiểm tra 10s/lần, tối đa 180s)
+                def wait_for_grid_data(timeout=180):
                     start = time.time()
+                    last_log_time = start
                     time.sleep(1.0)
                     while time.time() - start < timeout:
+                        elapsed = int(time.time() - start)
+                        if time.time() - last_log_time >= 10:
+                            log(f"  [Đang đợi Cổng BHYT] Đã chờ {elapsed}s / {timeout}s...")
+                            last_log_time = time.time()
+
                         try:
                             # 1. Kiểm tra trạng thái InCallback từ nhân DevExpress
                             is_busy = page.evaluate("""() => {
@@ -764,8 +770,8 @@ class PortalAutomationService:
                                 break
                         except Exception: pass
 
-                log("Đang chờ máy chủ Cổng BHYT phản hồi dữ liệu tìm kiếm (InCallback monitoring)...")
-                wait_for_grid_data(timeout=90)
+                log("Đang chờ máy chủ Cổng BHYT phản hồi dữ liệu tìm kiếm (InCallback monitoring, tối đa 180s)...")
+                wait_for_grid_data(timeout=180)
                 self.wait_portal_idle(page)
 
                 # 4. BƯỚC 2: CHỌN HIỂN THỊ 100 DÒNG / TRANG QUA PAGER DROPDOWN & CHỜ LOADING
@@ -807,9 +813,9 @@ class PortalAutomationService:
                     log(f"Lưu ý click chọn 100 dòng: {e}")
 
                 if selected_100:
-                    log("Đã kích hoạt chọn 100 bản ghi/trang! Đang chờ máy chủ nạp lại dữ liệu...")
+                    log("Đã kích hoạt chọn 100 bản ghi/trang! Đang chờ máy chủ nạp lại dữ liệu (tối đa 180s)...")
                     time.sleep(1.0)
-                    wait_for_grid_data(timeout=90)
+                    wait_for_grid_data(timeout=180)
                     self.wait_portal_idle(page)
                     time.sleep(1.0)
                     log("Máy chủ đã hoàn tất tải dữ liệu 100 bản ghi/trang ✅")
@@ -852,8 +858,8 @@ class PortalAutomationService:
                                 } catch(e) {}
                             }""", err_col)
 
-                        log(f"Đang chờ máy chủ áp dụng bộ lọc cột lỗi = 1 (Lần {filter_attempt + 1})...")
-                        wait_for_grid_data(timeout=90)
+                        log(f"Đang chờ máy chủ áp dụng bộ lọc cột lỗi = 1 (Lần {filter_attempt + 1}, tối đa 180s)...")
+                        wait_for_grid_data(timeout=180)
                         self.wait_portal_idle(page)
                         time.sleep(1.0)
 
@@ -875,7 +881,7 @@ class PortalAutomationService:
 
                 while True:
                     log(f"Đang quét danh sách hồ sơ lỗi tại Trang {page_idx}...")
-                    wait_for_grid_data(timeout=30)
+                    wait_for_grid_data(timeout=180)
                     self.wait_portal_idle(page)
 
                     rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow").all()
