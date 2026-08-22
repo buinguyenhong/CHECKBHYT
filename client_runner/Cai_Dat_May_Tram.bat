@@ -1,22 +1,23 @@
 @echo off
-chcp 65001 >nul
 title Cai Dat CheckBHYT Client RPA Runner
+cd /d "%~dp0"
+
 echo ====================================================================
 echo    CAI DAT BO CONG CU RPA CHO MAY TRAM (CLIENT PC) - CHECKBHYT     
 echo ====================================================================
 echo.
-echo [*] BƯỚC 1/2: Đang cài đặt thư viện Python (requests, pandas, openpyxl, playwright)...
+echo [*] BUOC 1/2: Dang cai dat thu vien Python (requests, pandas, openpyxl, playwright)...
 python -m pip install --upgrade pip
 python -m pip install requests pandas openpyxl playwright
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [!] LOI: Khong the cai dat thu vien Python. Vui long kiem tra lai ket noi mang.
+    echo [!] LOI: Khong the cai dat thu vien Python. Vui long kiem tra lai ket noi mang hoac quyen Administrator.
     pause
     exit /b %ERRORLEVEL%
 )
 
 echo.
-echo [*] BƯỚC 2/2: Đang tải và cài đặt trình duyệt Chromium Playwright...
+echo [*] BUOC 2/2: Dang tai va cai dat trinh duyet Chromium Playwright...
 python -m playwright install chromium
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -27,9 +28,9 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo ====================================================================
-echo    CÀI ĐẶT THÀNH CÔNG 100%!
-echo    BÂY GIỜ BẠN CÓ THỂ CHẠY FILE:
-echo    "Chay_RPA_May_Tram.bat" ĐỂ KẾT NỐI TỰ ĐỘNG VỚI WEB APP.
+echo    CAI DAT THANH CONG 100%!
+echo    BAY GIO BAN CO THE CHAY FILE:
+echo    "Chay_RPA_May_Tram.bat" DE KET NOI TU DONG VOI WEB APP.
 echo ====================================================================
 echo.
 pause

@@ -56,6 +56,18 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-22 07:55 - Antigravity (Chuẩn Hóa ASCII Cho Các File .bat Tránh Lỗi Lệnh CMD)
+
+### Mục tiêu
+- Khắc phục triệt để lỗi `is not recognized as an internal or external command` do trình thông dịch `cmd.exe` trên Windows bị lệch con trỏ byte (byte offset) khi đọc các ký tự tiếng Việt có dấu đa byte trong tệp `.bat`.
+
+### Thay đổi
+- `client_runner/Cai_Dat_May_Tram.bat`: Chuyển toàn bộ thông điệp trong file batch sang ASCII tiếng Việt không dấu.
+- `client_runner/Chay_RPA_May_Tram.bat`: Chuyển toàn bộ thông điệp trong file batch sang ASCII tiếng Việt không dấu, bổ sung `cd /d "%~dp0"`.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py client_runner/client_agent.py web_app/services/portal_automation.py` -> PASS (Exit code 0).
+
 ## 2026-08-22 07:40 - Antigravity (Sửa Lỗi Font Tiếng Việt Batch Script & Tối Ưu Kết Nối Local Web Bridge PNA)
 
 ### Mục tiêu
