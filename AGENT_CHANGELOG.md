@@ -56,6 +56,20 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-22 10:05 - Antigravity (Tối Ưu Hóa Chờ InCallback Sâu & Tự Động Thử Lại Lọc Lỗi Khi Mạng Chậm)
+
+### Mục tiêu
+- Xử lý triệt để hiện tượng Cổng BHYT bị quá tải/lag khiến việc chuyển PageSize 100 và lọc Lỗi = 1 bị bỏ qua hoặc chưa kịp nạp.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `client_runner/client_agent.py`:
+  - Nâng cấp `wait_for_grid_data`: Kiểm tra trực tiếp trạng thái `InCallback()` từ nhân DevExpress trên tất cả các control ASPxClientControl và các loading panels.
+  - Mở rộng thời gian chờ tối đa lên 90 giây.
+  - Bổ sung vòng lặp xác thực giá trị ô lọc lỗi `Auto-Retry Verification`: Sau khi điền số 1, kiểm tra lại DOM; nếu bị rớt ký tự do callback đè, hệ thống sẽ tự động điền lại và lọc lại lần 2.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py client_runner/client_agent.py web_app/services/portal_automation.py` -> PASS (Exit code 0).
+
 ## 2026-08-22 08:30 - Antigravity (Chuyển Đổi Tự Khởi Động Sang Windows Task Scheduler Chuẩn Microsoft)
 
 ### Mục tiêu

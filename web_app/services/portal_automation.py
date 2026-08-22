@@ -625,23 +625,43 @@ class PortalAutomationService:
                 page.wait_for_load_state("domcontentloaded")
                 self.wait_portal_idle(page)
 
-                # Helper kiểm tra bảng nạp dữ liệu
-                def wait_for_grid_data(timeout=45):
+                # Helper kiểm tra bảng nạp dữ liệu sâu với DevExpress InCallback & Loading Panels
+                def wait_for_grid_data(timeout=90):
                     start = time.time()
                     time.sleep(1.0)
                     while time.time() - start < timeout:
                         try:
-                            is_loading = page.locator("#gvDSKetQuaGuiHoso_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv").is_visible()
-                            if is_loading:
-                                time.sleep(0.5)
+                            # 1. Kiểm tra trạng thái InCallback từ nhân DevExpress
+                            is_busy = page.evaluate("""() => {
+                                try {
+                                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                    const grid = window.gvDSKetQuaGuiHoso || (cc ? cc.GetByName('gvDSKetQuaGuiHoso') : null);
+                                    if (grid && typeof grid.InCallback === 'function' && grid.InCallback()) return true;
+                                    if (cc && typeof cc.ForEachControl === 'function') {
+                                        let b = false;
+                                        cc.ForEachControl(c => {
+                                            if (c && typeof c.InCallback === 'function' && c.InCallback()) b = true;
+                                        });
+                                        if (b) return true;
+                                    }
+                                } catch(e) {}
+                                const ld = document.querySelector('#gvDSKetQuaGuiHoso_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv, .dxp-loadingPanel, .dxlpLoadingPanelWithContent');
+                                if (ld && ld.offsetParent !== null && window.getComputedStyle(ld).display !== 'none' && window.getComputedStyle(ld).visibility !== 'hidden') return true;
+                                return false;
+                            }""")
+
+                            if is_busy:
+                                time.sleep(0.6)
                                 continue
+
+                            # 2. Kiểm tra số dòng sau khi đã hết loading
                             data_rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow")
                             if data_rows.count() > 0:
-                                time.sleep(0.6)
+                                time.sleep(0.8)
                                 return True
                             empty_rows = page.locator("#gvDSKetQuaGuiHoso tr.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso td.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso:has-text('Không có dữ liệu')")
                             if empty_rows.count() > 0:
-                                time.sleep(0.5)
+                                time.sleep(0.6)
                                 return False
                         except Exception: pass
                         time.sleep(0.5)
@@ -744,8 +764,8 @@ class PortalAutomationService:
                                 break
                         except Exception: pass
 
-                log("Đang chờ máy chủ Cổng BHYT phản hồi dữ liệu tìm kiếm...")
-                wait_for_grid_data(timeout=45)
+                log("Đang chờ máy chủ Cổng BHYT phản hồi dữ liệu tìm kiếm (InCallback monitoring)...")
+                wait_for_grid_data(timeout=90)
                 self.wait_portal_idle(page)
 
                 # 4. BƯỚC 2: CHỌN HIỂN THỊ 100 DÒNG / TRANG QUA PAGER DROPDOWN & CHỜ LOADING
@@ -787,14 +807,14 @@ class PortalAutomationService:
                     log(f"Lưu ý click chọn 100 dòng: {e}")
 
                 if selected_100:
-                    log("Đã kích hoạt chọn 100 bản ghi/trang! Đang chờ máy chủ nạp lại dữ liệu (Loading)...")
+                    log("Đã kích hoạt chọn 100 bản ghi/trang! Đang chờ máy chủ nạp lại dữ liệu...")
                     time.sleep(1.0)
-                    wait_for_grid_data(timeout=60)
+                    wait_for_grid_data(timeout=90)
                     self.wait_portal_idle(page)
                     time.sleep(1.0)
                     log("Máy chủ đã hoàn tất tải dữ liệu 100 bản ghi/trang ✅")
 
-                # 5. BƯỚC 3: NHẬN DIỆN CỘT LỖI & ÁP DỤNG BỘ LỌC 1 TRỰC TIẾP & CHỜ LOADING
+                # 5. BƯỚC 3: NHẬN DIỆN CỘT LỖI & ÁP DỤNG BỘ LỌC 1 VỚI CƠ CHẾ AUTO-RETRY XÁC THỰC
                 log("Đang áp dụng bộ lọc cột Lỗi = 1...")
                 try:
                     filter_info = page.evaluate("""() => {
@@ -815,16 +835,37 @@ class PortalAutomationService:
                     }""")
                     err_col = filter_info.get("errIdx", 5) if filter_info else 5
                     
-                    col_input = page.locator(f"#gvDSKetQuaGuiHoso_DXFREditorcol{err_col}_I, #gvDSKetQuaGuiHoso_DXFREditorcol5_I, input[id*='DXFREditorcol5']").first
-                    if col_input.is_visible(timeout=3000):
-                        col_input.click(click_count=3)
-                        col_input.fill("1")
-                        col_input.press("Enter")
-                        log("Đang chờ DevExpress áp dụng bộ lọc cột lỗi = 1...")
-                        wait_for_grid_data(timeout=45)
+                    # Thử áp dụng lọc tối đa 2 lần để tránh rớt phím khi mạng lag
+                    for filter_attempt in range(2):
+                        col_input = page.locator(f"#gvDSKetQuaGuiHoso_DXFREditorcol{err_col}_I, #gvDSKetQuaGuiHoso_DXFREditorcol5_I, input[id*='DXFREditorcol5']").first
+                        if col_input.is_visible(timeout=3000):
+                            col_input.click(click_count=3)
+                            col_input.fill("1")
+                            col_input.press("Enter")
+                        else:
+                            page.evaluate("""(col) => {
+                                try {
+                                    const grid = window.gvDSKetQuaGuiHoso;
+                                    if (grid && typeof grid.AutoFilterByColumn === 'function') {
+                                        grid.AutoFilterByColumn(col, '1');
+                                    }
+                                } catch(e) {}
+                            }""", err_col)
+
+                        log(f"Đang chờ máy chủ áp dụng bộ lọc cột lỗi = 1 (Lần {filter_attempt + 1})...")
+                        wait_for_grid_data(timeout=90)
                         self.wait_portal_idle(page)
-                        time.sleep(1.5)
-                        log("Đã hoàn tất lọc các ca có lỗi (cột lỗi = 1) ✅")
+                        time.sleep(1.0)
+
+                        # Kiểm tra xem giá trị trong ô lọc có đúng là 1 không
+                        curr_filter_val = page.evaluate(f"""() => {{
+                            const inp = document.querySelector("#gvDSKetQuaGuiHoso_DXFREditorcol{err_col}_I, #gvDSKetQuaGuiHoso_DXFREditorcol5_I");
+                            return inp ? inp.value.trim() : '1';
+                        }}""")
+                        if curr_filter_val == "1":
+                            break
+
+                    log("Đã hoàn tất lọc các ca có lỗi (cột lỗi = 1) ✅")
                 except Exception as f_err:
                     log(f"Lưu ý khi lọc cột lỗi: {f_err}")
 
