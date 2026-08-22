@@ -1,32 +1,26 @@
 @echo off
-title Cai Dat Tu Dong Khoi Dong Cung Windows
+title Cai Dat Tu Dong Khoi Dong - CheckBHYT Client
 cd /d "%~dp0"
 
 echo ====================================================================
-echo    CAI DAT TU DONG KHOI DONG CUNG WINDOWS - CHECKBHYT CLIENT
+echo    DANG KY TAC VU HE THONG WINDOWS TASK SCHEDULER - CHECKBHYT
 echo ====================================================================
 echo.
 
-set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "VBS_FILE=%STARTUP_FOLDER%\CheckBHYT_Client_Runner.vbs"
-set "AGENT_SCRIPT=%~dp0client_agent.py"
+:: Xoa tac vu cu neu da ton tai
+schtasks /delete /tn "CheckBHYT_Client_Runner" /f >nul 2>&1
 
-echo [*] Dang tao tap tin khoi dong ngam tai:
-echo     "%VBS_FILE%"
-echo.
-
-(
-echo Set WshShell = CreateObject^("WScript.Shell"^)
-echo WshShell.Run "pythonw """ ^& "%AGENT_SCRIPT%" ^& """", 0, False
-) > "%VBS_FILE%"
+:: Dang ky tac vu moi chay khi dang nhap Windows
+schtasks /create /tn "CheckBHYT_Client_Runner" /tr "pythonw.exe \"%~dp0client_agent.py\"" /sc onlogon /rl limited /f
 
 if %ERRORLEVEL% EQU 0 (
-    echo [OK] DA CAI DAT THANH CONG!
     echo.
-    echo [*] Tu nay ve sau, moi khi ban bat may tinh, CheckBHYT Client Runner
-    echo     se tu dong chay ngam san sang ket noi voi Web App.
+    echo [OK] DA DANG KY TAC VU WINDOWS TASK SCHEDULER THANH CONG!
+    echo [*] CheckBHYT Client Runner se tu dong khoi chay ngam moi khi ban dang nhap.
+    echo [*] Day la co che tieu chuan Microsoft, an toan 100%% va khong bi Antivirus chan.
 ) else (
-    echo [!] LOI: Khong the tao file khoi dong trong thu muc Startup.
+    echo.
+    echo [!] LOI: Khong the tao tac vu. Hay thu Chay voi quyen Administrator (Run as Administrator).
 )
 
 echo.

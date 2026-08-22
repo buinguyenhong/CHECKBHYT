@@ -56,6 +56,20 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-22 08:30 - Antigravity (Chuyển Đổi Tự Khởi Động Sang Windows Task Scheduler Chuẩn Microsoft)
+
+### Mục tiêu
+- Loại bỏ hoàn toàn việc tạo file `.vbs` trong thư mục Startup (nguyên nhân khiến Kaspersky và Antivirus phát hiện cảnh báo Heuristic Dropper).
+- Sử dụng cơ chế chính thống của Microsoft: **Windows Task Scheduler** (`schtasks.exe`) để tự động khởi chạy Client Runner khi người dùng đăng nhập Windows.
+
+### Thay đổi
+- `client_runner/Tu_Dong_Khoi_Dong_Cung_Windows.bat`: Đăng ký tác vụ hệ thống `CheckBHYT_Client_Runner` với lịch `onlogon` qua `schtasks /create`.
+- `client_runner/Tat_Khoi_Dong_Cung_Windows.bat`: Hỗ trợ gỡ bỏ tác vụ qua `schtasks /delete`.
+- `client_runner/Dung_RPA_May_Tram.bat`: Dừng tác vụ và tiến trình qua `schtasks /end` và `taskkill`.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-22 08:10 - Antigravity (Tích hợp Chạy Ngầm & Tự Khởi Động Cùng Windows Cho Client Runner)
 
 ### Mục tiêu
