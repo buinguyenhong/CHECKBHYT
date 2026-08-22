@@ -56,6 +56,19 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-22 08:05 - Antigravity (Khắc Phục Lỗi AttributeError start_flow_c Trong Client Agent)
+
+### Mục tiêu
+- Sửa lỗi `AttributeError: 'ClientRPAGui' object has no attribute 'start_flow_c'` khi khởi chạy ứng dụng máy trạm `client_agent.py`.
+
+### Thay đổi
+- `client_runner/client_agent.py`:
+  - Bổ sung phương thức `start_flow_c(self)` điều phối luồng worker `_run_flow_c_worker` cho giao diện Tkinter.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile client_runner/client_agent.py web_app/main.py` -> PASS (Exit code 0).
+- Import kiểm tra khởi chạy: `python -c "import client_runner.client_agent; print('OK')"` -> PASS (Exit code 0).
+
 ## 2026-08-22 07:55 - Antigravity (Chuẩn Hóa ASCII Cho Các File .bat Tránh Lỗi Lệnh CMD)
 
 ### Mục tiêu

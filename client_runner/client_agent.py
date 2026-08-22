@@ -774,6 +774,15 @@ class ClientRPAGui:
             self.btn_flow_b.configure(state=tk.NORMAL)
             self.btn_flow_c.configure(state=tk.NORMAL)
 
+    def start_flow_c(self):
+        import threading
+        self.save_config()
+        self.btn_flow_b.configure(state=tk.DISABLED)
+        self.btn_flow_c.configure(state=tk.DISABLED)
+        self.is_running = True
+        self.last_status = {"status": "running", "flow": "C", "message": "Đang khởi chạy Luồng C...", "error": None}
+        threading.Thread(target=self._run_flow_c_worker, kwargs={"is_from_web": False}, daemon=True).start()
+
     def _run_flow_c_worker(self, is_from_web: bool = False):
         from playwright.sync_api import sync_playwright
         from_d = self.from_date.get().strip()
