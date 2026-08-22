@@ -1,23 +1,16 @@
 @echo off
-title CheckBHYT Client RPA Runner - Local Web Bridge (Port 8765)
+title Khoi Dong CheckBHYT Client RPA Runner
 cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
 
-echo ====================================================================
-echo    CHECKBHYT - CLIENT RPA RUNNER (LOCAL WEB BRIDGE)
-echo ====================================================================
-echo.
-echo [*] Dang khoi dong tien trinh cau noi Local Bridge tai cong 8765...
-echo [*] Vui long KHONG dong cua so nay trong khi su dung Web App.
-echo.
-
-python "%~dp0client_agent.py"
+echo [*] Dang khoi dong CheckBHYT Client RPA Runner chay ngam...
+start "" pythonw "%~dp0client_agent.py"
 if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo ====================================================================
-    echo [!] PHAT HIEN LOI KHOI DONG: Ma loi %ERRORLEVEL%
-    echo [*] Goi y: Neu chua cai dat thu vien, hay chay file "Cai_Dat_May_Tram.bat" truoc!
-    echo ====================================================================
-    pause
+    start "" python "%~dp0client_agent.py"
 )
+
+echo [OK] Tien trinh da duoc khoi dong chay ngam tai cong 8765.
+echo [*] Cua so nay se tu dong dong sau 2 giay...
+timeout /t 2 /nobreak >nul
+exit

@@ -56,6 +56,22 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-22 08:10 - Antigravity (Tích hợp Chạy Ngầm & Tự Khởi Động Cùng Windows Cho Client Runner)
+
+### Mục tiêu
+- Cửa sổ đen CMD tự động đóng sau khi kích hoạt `Chay_RPA_May_Tram.bat`, tiến trình chạy ngầm 100%.
+- Cung cấp tiện ích 1-click `Tu_Dong_Khoi_Dong_Cung_Windows.bat` để mỗi khi máy tính bật lên, dịch vụ tự động chạy ngầm sẵn sàng kết nối với Web App.
+- Cung cấp các tiện ích quản trị `Tat_Khoi_Dong_Cung_Windows.bat` và `Dung_RPA_May_Tram.bat`.
+
+### Thay đổi
+- `client_runner/Chay_RPA_May_Tram.bat`: Sử dụng `start "" pythonw` và tự động thoát (`exit`).
+- `client_runner/Tu_Dong_Khoi_Dong_Cung_Windows.bat`: Thêm file VBS khởi động ngầm vào `shell:startup`.
+- `client_runner/Tat_Khoi_Dong_Cung_Windows.bat`: Gỡ file VBS khỏi `shell:startup`.
+- `client_runner/Dung_RPA_May_Tram.bat`: Dừng tiến trình `client_agent.py` ngầm.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-08-22 08:05 - Antigravity (Khắc Phục Lỗi AttributeError start_flow_c Trong Client Agent)
 
 ### Mục tiêu
