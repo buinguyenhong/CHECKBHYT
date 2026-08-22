@@ -56,6 +56,27 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-08-22 07:40 - Antigravity (Sửa Lỗi Font Tiếng Việt Batch Script & Tối Ưu Kết Nối Local Web Bridge PNA)
+
+### Mục tiêu
+- Sửa triệt để lỗi vỡ font tiếng Việt trong các tệp batch script (`Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
+- Khắc phục lỗi "chạy xong khi mở lại vẫn hiện chưa kết nối" do trình duyệt Chrome/Edge chặn kết nối Private Network Access (PNA) từ WebApp sang `127.0.0.1:8765`.
+- Hiển thị cửa sổ console rõ ràng khi chạy `Chay_RPA_May_Tram.bat`, bắt lỗi chi tiết nếu thiếu thư viện thay vì thoát ngầm.
+
+### Thay đổi
+- `client_runner/client_agent.py`:
+  - Bổ sung header `Access-Control-Allow-Private-Network: true`, `Access-Control-Request-Private-Network`, và `Access-Control-Max-Age: 86400` trong `ClientAgentHTTPHandler`.
+  - Hỗ trợ bind đa địa chỉ `0.0.0.0:8765` và `127.0.0.1:8765`.
+- `client_runner/Cai_Dat_May_Tram.bat` & `client_runner/Chay_RPA_May_Tram.bat`:
+  - Chuẩn hóa mã hóa ký tự tương thích 100% Windows CMD.
+  - Cài đặt đầy đủ các gói: `requests`, `pandas`, `openpyxl`, `playwright` và `playwright install chromium`.
+  - Chạy trực tiếp `python client_agent.py` và hiển thị thông báo trạng thái sẵn sàng.
+- `web_app/templates/admin.html`:
+  - Cải tiến hàm `checkClientEnvironment()` luôn kiểm tra `http://127.0.0.1:8765/api/ping` với chế độ CORS/PNA.
+
+### Kiểm tra
+- Biên dịch cú pháp: `python -m py_compile web_app/main.py client_runner/client_agent.py web_app/services/portal_automation.py` -> PASS (Exit code 0).
+
 ## 2026-08-21 16:50 - Antigravity (Tích hợp Web-to-Client RPA Bridge & Tải Gói Máy Trạm Tự Động)
 
 ### Mục tiêu

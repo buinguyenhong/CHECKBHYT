@@ -2406,30 +2406,33 @@
         const envBadge = document.getElementById('rpaEnvBadge');
         if (!envBadge) return;
 
-        if (isLocalhost) {
-            clientPingStatus = 'local_server';
-            envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981;"></span> <span style="color:#10b981;"><b>Máy chủ (Server Local)</b>: Chromium sẽ mở trực tiếp trên máy chủ này</span>`;
-            return;
-        }
-
-        // Kiểm tra xem Local Client Bridge có đang chạy tại http://127.0.0.1:8765 trên máy trạm này không
+        // 1. Luôn kiểm tra xem Local Client Bridge có đang chạy tại http://127.0.0.1:8765 trên máy trạm này không
         try {
             const ctrl = new AbortController();
-            const tId = setTimeout(() => ctrl.abort(), 1200);
-            const res = await fetch('http://127.0.0.1:8765/api/ping', { signal: ctrl.signal });
+            const tId = setTimeout(() => ctrl.abort(), 1500);
+            const res = await fetch('http://127.0.0.1:8765/api/ping', { 
+                signal: ctrl.signal,
+                mode: 'cors'
+            });
             clearTimeout(tId);
             if (res.ok) {
                 const data = await res.json();
                 if (data.status === 'ok') {
                     clientPingStatus = 'client_connected';
-                    envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981; animation:pulse 2s infinite;"></span> <span style="color:#10b981;"><b>Đã kết nối Máy trạm Client</b>: Chromium sẽ mở ngay trên màn hình máy này!</span>`;
+                    envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></span> <span style="color:#10b981;"><b>Đã kết nối Máy trạm (Client Bridge Online)</b>: Chromium sẽ mở ngay trên màn hình máy này!</span>`;
                     return;
                 }
             }
         } catch (e) {}
 
-        clientPingStatus = 'client_disconnected';
-        envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#f59e0b;"></span> <span style="color:#f59e0b;"><b>Máy trạm Client (Chưa bật Client Runner)</b></span>: <a href="/api/client/download-runner" style="color:#60a5fa; text-decoration:underline;">Tải gói máy trạm</a> hoặc mở <code>Chay_RPA_May_Tram.bat</code> để mở Chromium tại máy này.`;
+        // 2. Nếu không tìm thấy Client Runner cục bộ:
+        if (isLocalhost) {
+            clientPingStatus = 'local_server';
+            envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#3b82f6;"></span> <span style="color:#60a5fa;"><b>Máy chủ (Server Local)</b>: Chromium sẽ mở trực tiếp trên máy chủ này</span>`;
+        } else {
+            clientPingStatus = 'client_disconnected';
+            envBadge.innerHTML = `<span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#f59e0b;"></span> <span style="color:#f59e0b;"><b>Chưa kết nối Client Runner</b></span>: Hãy mở <code>Chay_RPA_May_Tram.bat</code> trên máy này để mở Chromium tại chỗ, hoặc <a href="/api/client/download-runner" style="color:#60a5fa; text-decoration:underline; font-weight:700;">Tải gói máy trạm (.zip)</a>.`;
+        }
     }
 
     // Trigger Playwright Portal Automation for Flow B and Flow C (Tự động thích ứng Server / Client)

@@ -65,7 +65,7 @@ ACTIVE_CLIENT_GUI = None
 
 class ClientAgentHTTPHandler(BaseHTTPRequestHandler):
     """
-    HTTP Server cục bộ lắng nghe tại 127.0.0.1:8765 cho phép WebApp trên trình duyệt
+    HTTP Server cục bộ lắng nghe tại 127.0.0.1:8765 / 0.0.0.0:8765 cho phép WebApp trên trình duyệt
     tự động phát hiện và kích hoạt Chromium trực tiếp trên màn hình Máy trạm.
     """
     def log_message(self, format, *args):
@@ -74,11 +74,13 @@ class ClientAgentHTTPHandler(BaseHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Access-Control-Request-Private-Network')
+        self.send_header('Access-Control-Allow-Private-Network', 'true')
+        self.send_header('Access-Control-Max-Age', '86400')
         super().end_headers()
 
     def do_OPTIONS(self):
-        self.send_response(200)
+        self.send_response(204)
         self.end_headers()
 
     def do_GET(self):
@@ -217,11 +219,14 @@ class ClientRPAGui:
     def start_http_bridge(self):
         """Khởi chạy HTTP Bridge Server nền tại cổng 8765"""
         def run_server():
-            try:
-                server = ThreadingHTTPServer(('127.0.0.1', 8765), ClientAgentHTTPHandler)
-                server.serve_forever()
-            except Exception as e:
-                self.log(f"Lưu ý Local Bridge (Port 8765): {e}")
+            for host in ['0.0.0.0', '127.0.0.1']:
+                try:
+                    server = ThreadingHTTPServer((host, 8765), ClientAgentHTTPHandler)
+                    self.log(f"Local Web Bridge đã sẵn sàng tại {host}:8765 ✅")
+                    server.serve_forever()
+                    break
+                except Exception as e:
+                    self.log(f"Lưu ý Local Bridge ({host}:8765): {e}")
 
         t = threading.Thread(target=run_server, daemon=True)
         t.start()
