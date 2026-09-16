@@ -12,3 +12,4 @@ sqlalchemy
 watchdog
 lxml
 playwright
+ddddocr

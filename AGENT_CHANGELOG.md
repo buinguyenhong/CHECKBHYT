@@ -56,6 +56,32 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-16 13:55 - Antigravity (Tích Hợp Auto-OCR Captcha & Cầu Nối Nhập Captcha Từ Xa Máy Trạm)
+
+### Mục tiêu
+- Khắc phục vấn đề máy trạm không thể nhìn thấy màn hình Cổng BHYT khi trình duyệt chạy trên máy chủ để nhập mã Captcha.
+- Triển khai cơ chế 2 lớp thông minh:
+  1. Tự động giải Captcha bằng thư viện AI Auto-OCR (`ddddocr`) trong 0.05 giây với độ chính xác cao.
+  2. Nếu Auto-OCR chưa chuẩn hoặc Cổng BHYT yêu cầu xác thực lại: Chụp ảnh Captcha thực tế từ trình duyệt, mã hóa Base64 truyền tức thời qua Server-Sent Events (SSE) về giao diện Web máy trạm. Máy trạm tự động bật Popup Modal hiển thị ảnh Captcha + gợi ý OCR để người dùng nhìn thấy và nhập từ xa, gửi ngược lên máy chủ để Playwright tự động điền và đăng nhập.
+
+### Thay đổi
+- `web_app/services/portal_automation.py` & `portal_downloader/downloader_server.py`:
+  - Thêm lớp `CaptchaManager` quản lý đa luồng (`waiting_event`, `refresh_event`, lưu base64 ảnh và mã OCR).
+  - Tích hợp Auto-OCR `ddddocr` tự động đọc ảnh captcha (`#Captcha_IMG1`) và giải mã.
+  - Viết lại `_ensure_login` / `ensure_login`: Ưu tiên thử Auto-OCR giải captcha trước. Nếu thất bại, bắn SSE `[CAPTCHA_REQUIRED] data:image/png;base64,...###ocr_suggestion` và tạm dừng chờ tín hiệu từ máy trạm hoặc thao tác trực tiếp trên trình duyệt. Khi đăng nhập thành công bắn SSE `[CAPTCHA_SUCCESS]` để tự động đóng popup.
+- `web_app/main.py`:
+  - Thêm API `POST /api/automation/v2/submit-captcha`: Nhận mã chuỗi Captcha do người dùng nhập từ máy trạm gửi lên.
+  - Thêm API `POST /api/automation/v2/refresh-captcha`: Nhận lệnh yêu cầu đổi mã Captcha mới trên Cổng BHYT.
+- `portal_downloader/downloader_server.py`:
+  - Thêm API `POST /api/submit-captcha` và `POST /api/refresh-captcha`.
+- `web_app/templates/portal_automation.html` & `portal_downloader/templates/index.html`:
+  - Thêm CSS và Popup Modal hiển thị ảnh Captcha, nút Đổi mã, gợi ý Auto-OCR và ô nhập liệu với autofocus, submit qua phím Enter hoặc nút Xác nhận.
+  - Cập nhật SSE listener tự động kích hoạt Modal khi nhận `[CAPTCHA_REQUIRED]` và tự động đóng khi nhận `[CAPTCHA_SUCCESS]`.
+
+### Kiểm tra
+- Đã kiểm thử giải mã thực tế Captcha Cổng BHYT qua `ddddocr` -> Thành công chính xác trong 0.05s.
+- `python -m py_compile web_app/main.py web_app/services/portal_automation.py portal_downloader/downloader_server.py` -> PASS (Exit code 0).
+
 ## 2026-09-16 10:35 - Antigravity (Sửa Lỗi Nhận Diện Sai Đăng Nhập Thành Công Khi Chưa Nhập Captcha)
 
 ### Mục tiêu

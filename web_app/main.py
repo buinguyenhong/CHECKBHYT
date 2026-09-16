@@ -17,7 +17,7 @@ from auth import (
     hash_password, verify_password, get_current_user, require_admin, SESSION_COOKIE_NAME
 )
 from services import his_service, excel_service, compare_service
-from services.portal_automation import portal_service, portal_logs, add_portal_log
+from services.portal_automation import portal_service, portal_logs, add_portal_log, captcha_mgr
 
 # ==========================================
 # XOR CRYPTOGRAPHY FOR HIS DB PASSWORD
@@ -1151,6 +1151,29 @@ async def run_automation_v2_flow_b(
     except Exception as e:
         add_portal_log(f"LỖI THỰC THI LUỒNG B: {str(e)}")
         return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
+
+
+@app.post("/api/automation/v2/submit-captcha")
+async def submit_automation_captcha(
+    data: dict,
+    user: User = Depends(require_admin)
+):
+    """Nhận mã Captcha do người dùng nhập từ xa trên giao diện máy trạm"""
+    captcha_val = str(data.get("captcha", "")).strip()
+    if not captcha_val:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "Mã Captcha không được để trống"})
+    captcha_mgr.user_captcha_value = captcha_val
+    captcha_mgr.waiting_event.set()
+    return {"status": "success", "message": "Đã gửi mã Captcha lên máy chủ"}
+
+
+@app.post("/api/automation/v2/refresh-captcha")
+async def refresh_automation_captcha(
+    user: User = Depends(require_admin)
+):
+    """Yêu cầu đổi mã Captcha mới trên Cổng BHYT"""
+    captcha_mgr.refresh_event.set()
+    return {"status": "success", "message": "Đã yêu cầu đổi mã Captcha"}
 
 
 @app.post("/api/automation/v2/merge-only")

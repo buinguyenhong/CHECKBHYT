@@ -83,6 +83,44 @@ def launch_native_browser(playwright_instance, headless: bool = False):
     )
 
 
+# =========================================================================
+# CAPTCHA MANAGER (AUTO-OCR + REMOTE WORKSTATION CAPTCHA BRIDGE)
+# =========================================================================
+import base64
+import threading
+
+class CaptchaManager:
+    def __init__(self):
+        self.waiting_event = threading.Event()
+        self.refresh_event = threading.Event()
+        self.current_captcha_b64: Optional[str] = None
+        self.current_captcha_ocr: Optional[str] = None
+        self.user_captcha_value: Optional[str] = None
+        self.is_waiting: bool = False
+        self.ocr_engine = None
+
+    def get_ocr(self):
+        if self.ocr_engine is None:
+            try:
+                import ddddocr
+                self.ocr_engine = ddddocr.DdddOcr(show_ad=False)
+                safe_print("[*] Đã kích hoạt thư viện Auto-OCR ddddocr thành công!")
+            except Exception as e:
+                safe_print(f"[*] Auto-OCR không khả dụng: {e}")
+                self.ocr_engine = False
+        return self.ocr_engine if self.ocr_engine is not False else None
+
+    def reset(self):
+        self.waiting_event.clear()
+        self.refresh_event.clear()
+        self.current_captcha_b64 = None
+        self.current_captcha_ocr = None
+        self.user_captcha_value = None
+        self.is_waiting = False
+
+captcha_mgr = CaptchaManager()
+
+
 class PortalAutomationService:
     def __init__(
         self,
@@ -104,8 +142,12 @@ class PortalAutomationService:
 
     def _ensure_login(self, page, log_func: Optional[Callable[[str], None]] = None):
         """
-        Kiểm tra và thực hiện đăng nhập vào Cổng Giám định BHYT.
-        Tự động điền Mã cơ sở KCB, Tên đăng nhập, Mật khẩu và chờ người dùng nhập Captcha.
+        Đảm bảo đăng nhập vào Cổng BHYT.
+        Hỗ trợ:
+        1. Kiểm tra session cũ còn hạn -> Bỏ qua không cần đăng nhập.
+        2. Tự động điền Mã cơ sở, Tài khoản, Mật khẩu.
+        3. Tự động giải Captcha bằng Auto-OCR (ddddocr).
+        4. Nếu cần, chụp ảnh Captcha gửi trực tiếp về màn hình máy trạm để người dùng nhập từ xa.
         """
         def log(msg: str):
             if log_func:
@@ -116,7 +158,7 @@ class PortalAutomationService:
         page.goto(self.base_url, timeout=90000, wait_until="load")
         time.sleep(1.0)
 
-        # Đóng các popup thông báo hoặc OTP nếu có
+        # Đóng các popup thông báo nếu có
         try:
             btn_close_pop = page.locator(".dxpc-closeBtn, #btnKhong_CD, #btnKhong, input[value='Không']").first
             if btn_close_pop.is_visible(timeout=1500):
@@ -125,94 +167,193 @@ class PortalAutomationService:
         except Exception:
             pass
 
-        # Kiểm tra xem đã đăng nhập chưa
+        # 1. Kiểm tra xem phiên cũ còn hiệu lực không
         try:
             has_logout = page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible(timeout=2000)
-            has_login_btn = page.locator("a:has-text('Đăng nhập'), input[value='Đăng nhập'], #btnLogin, #btnDangNhap, input[name*='UserName']").is_visible(timeout=2000)
+            has_menu = page.locator("#HeaderMenu").is_visible(timeout=2000) or page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible(timeout=2000)
+            has_login_btn = page.locator("input[value='Đăng nhập'], #btnLogin, #btnDangNhap").is_visible(timeout=2000)
             
-            if has_logout and not has_login_btn:
+            if (has_logout or has_menu) and not has_login_btn:
                 log("Phiên đăng nhập vẫn còn hiệu lực (Session Valid) ✅ -> Vào thẳng chức năng, KHÔNG cần đăng nhập lại!")
                 return
         except Exception:
             pass
 
-        # Chưa đăng nhập -> Tự động điền form đăng nhập
+        # 2. Chưa đăng nhập -> Tự động điền form đăng nhập
         log(f"Điền mã cơ sở: {self.ma_cskcb}, tài khoản: {self.username}...")
-        
         try:
-            # Điền Mã cơ sở KCB
-            ma_inp = page.locator("input[name*='MaCSKCB'], input[id*='txtMaCSKCB'], input[placeholder*='Mã cơ sở']").first
+            ma_inp = page.locator("#macskcb, input[name*='MaCSKCB'], input[id*='txtMaCSKCB'], input[placeholder*='Mã cơ sở']").first
             if ma_inp.is_visible(timeout=3000):
-                ma_inp.click()
                 ma_inp.fill(self.ma_cskcb)
-            elif page.get_by_role("textbox", name="Mã cơ sở KCB").is_visible(timeout=2000):
-                page.get_by_role("textbox", name="Mã cơ sở KCB").fill(self.ma_cskcb)
-            
-            # Điền Tên đăng nhập
-            user_inp = page.locator("input[name*='UserName'], input[id*='txtUserName'], input[placeholder*='Tên đăng nhập']").first
+
+            user_inp = page.locator("#username, input[name*='UserName'], input[id*='txtUserName'], input[placeholder*='Tên đăng nhập']").first
             if user_inp.is_visible(timeout=3000):
-                user_inp.click()
                 user_inp.fill(self.username)
-            elif page.get_by_role("textbox", name="Tên đăng nhập").is_visible(timeout=2000):
-                page.get_by_role("textbox", name="Tên đăng nhập").fill(self.username)
-            
-            # Điền Mật khẩu (nếu có)
+
             if self.password:
-                pass_inp = page.locator("input[type='password'], input[name*='Password'], input[id*='txtPassword']").first
+                pass_inp = page.locator("#password, input[type='password'], input[name*='Password'], input[id*='txtPassword']").first
                 if pass_inp.is_visible(timeout=3000):
-                    pass_inp.click()
                     pass_inp.fill(self.password)
-                elif page.get_by_role("textbox", name="Mật khẩu").is_visible(timeout=2000):
-                    page.get_by_role("textbox", name="Mật khẩu").fill(self.password)
-            
-            # Focus vào ô Captcha để người dùng nhập
-            cap_inp = page.locator("input[name*='Captcha'], input[id*='Captcha'], input[placeholder*='mã hiển thị']").first
-            if cap_inp.is_visible(timeout=3000):
-                cap_inp.click()
-                cap_inp.focus()
-            
-            log("👉 VUI LÒNG NHÌN VÀ NHẬP MÃ HIỂN THỊ (CAPTCHA), SAU ĐÓ BẤM ĐĂNG NHẬP TRÊN TRÌNH DUYỆT...")
-            
-            # Chờ người dùng nhập captcha và đăng nhập thành công
-            login_success = False
-            start_wait = time.time()
-            last_log_t = start_wait
+        except Exception as fe:
+            log(f"Điền thông tin đăng nhập: {fe}")
+
+        # Helper lấy ảnh Captcha Base64
+        def grab_captcha_b64() -> Optional[str]:
+            for sel in ["#Captcha_IMG1", "img[src*='Captcha']", "img[src*='captcha']", "img[id*='Captcha']"]:
+                try:
+                    c_el = page.locator(sel).first
+                    if c_el.is_visible(timeout=2000):
+                        src = c_el.get_attribute("src") or ""
+                        if "base64," in src:
+                            return src.split("base64,")[1]
+                        raw = c_el.screenshot()
+                        return base64.b64encode(raw).decode('utf-8')
+                except Exception:
+                    pass
+            return None
+
+        login_success = False
+        start_wait = time.time()
+        last_log_t = start_wait
+        captcha_mgr.reset()
+
+        # 3.1: Thử tự động giải Captcha bằng ddddocr
+        b64 = grab_captcha_b64()
+        ocr = captcha_mgr.get_ocr()
+        ocr_result = ""
+        if ocr and b64:
+            try:
+                ocr_result = ocr.classification(base64.b64decode(b64)).strip()
+                if len(ocr_result) >= 4:
+                    log(f"🤖 [Auto-OCR] Nhận diện được mã Captcha: '{ocr_result}'. Đang thử tự động đăng nhập...")
+                    cap_inp = page.locator("#Captcha_TB_I, input[name*='Captcha'], input[placeholder*='mã hiển thị']").first
+                    if cap_inp.is_visible(timeout=2000):
+                        cap_inp.fill(ocr_result)
+                        login_btn = page.locator(".dxbButton:has-text('Đăng nhập'), input[value='Đăng nhập'], #btnLogin").first
+                        if login_btn.is_visible(timeout=2000):
+                            login_btn.click()
+                        else:
+                            cap_inp.press("Enter")
+                        time.sleep(2.0)
+
+                        has_logout = page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible()
+                        has_menu = page.locator("#HeaderMenu").is_visible() or page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible()
+                        has_login_btn = page.locator("input[value='Đăng nhập'], #btnLogin, #btnDangNhap").is_visible()
+                        has_pass_inp = page.locator("input[type='password']").is_visible()
+
+                        if (has_logout or has_menu) and not has_login_btn and not has_pass_inp:
+                            log(f"🎉 TỰ ĐỘNG GIẢI CAPTCHA THÀNH CÔNG ('{ocr_result}')! Đã đăng nhập vào Cổng BHYT ✅")
+                            login_success = True
+                        else:
+                            log("⚠️ Mã Auto-OCR chưa chuẩn. Đang chuyển sang chế độ Popup chụp ảnh gửi về máy trạm...")
+            except Exception as oe:
+                log(f"Lưu ý Auto-OCR: {oe}")
+
+        # 3.2: Nếu Auto-OCR chưa được -> Chụp ảnh Captcha gửi về giao diện Web máy trạm (Modal)
+        if not login_success:
+            b64 = grab_captcha_b64()
+            ocr_text = ""
+            if ocr and b64:
+                try:
+                    ocr_text = ocr.classification(base64.b64decode(b64)).strip()
+                except Exception:
+                    pass
+
+            captcha_mgr.current_captcha_b64 = b64
+            captcha_mgr.current_captcha_ocr = ocr_text
+            captcha_mgr.is_waiting = True
+
+            # Gửi lệnh mở Modal Captcha trên màn hình máy trạm
+            log(f"[CAPTCHA_REQUIRED] data:image/png;base64,{b64}###{ocr_text}")
+            log("👉 ĐÃ CHỤP ẢNH CAPTCHA VÀ GỬI VỀ MÀN HÌNH MÁY TRẠM. Vui lòng gõ mã trên Popup hiển thị...")
 
             while time.time() - start_wait < 180:
+                # Kiểm tra yêu cầu đổi mã Captcha từ máy trạm
+                if captcha_mgr.refresh_event.is_set():
+                    captcha_mgr.refresh_event.clear()
+                    log("🔄 Đang đổi mã Captcha mới trên Cổng BHYT...")
+                    try:
+                        page.locator("#Captcha_IMG1, a:has-text('Đổi mã'), .dxeCaptcha_EIS").first.click(force=True)
+                        time.sleep(1.0)
+                    except Exception:
+                        pass
+                    b64 = grab_captcha_b64()
+                    ocr_text = ocr.classification(base64.b64decode(b64)).strip() if ocr and b64 else ""
+                    captcha_mgr.current_captcha_b64 = b64
+                    captcha_mgr.current_captcha_ocr = ocr_text
+                    log(f"[CAPTCHA_REQUIRED] data:image/png;base64,{b64}###{ocr_text}")
+
+                # Kiểm tra nhận mã Captcha từ máy trạm gửi lên
+                if captcha_mgr.waiting_event.is_set():
+                    captcha_mgr.waiting_event.clear()
+                    user_val = captcha_mgr.user_captcha_value
+                    log(f"📥 Đã nhận mã Captcha từ máy trạm: '{user_val}'. Đang điền và đăng nhập...")
+                    try:
+                        cap_inp = page.locator("#Captcha_TB_I, input[name*='Captcha'], input[placeholder*='mã hiển thị']").first
+                        cap_inp.click()
+                        cap_inp.fill(user_val)
+                        login_btn = page.locator(".dxbButton:has-text('Đăng nhập'), input[value='Đăng nhập'], #btnLogin").first
+                        if login_btn.is_visible(timeout=2000):
+                            login_btn.click()
+                        else:
+                            cap_inp.press("Enter")
+                        time.sleep(2.0)
+
+                        has_logout = page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible()
+                        has_menu = page.locator("#HeaderMenu").is_visible() or page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible()
+                        has_login_btn = page.locator("input[value='Đăng nhập'], #btnLogin, #btnDangNhap").is_visible()
+                        has_pass_inp = page.locator("input[type='password']").is_visible()
+
+                        if (has_logout or has_menu) and not has_login_btn and not has_pass_inp:
+                            log("🎉 ĐĂNG NHẬP THÀNH CÔNG! ✅")
+                            log("[CAPTCHA_SUCCESS]")
+                            login_success = True
+                            captcha_mgr.reset()
+                            break
+                        else:
+                            log("⚠️ Mã Captcha không chính xác. Đang chụp lại ảnh mới gửi về máy trạm...")
+                            time.sleep(1.0)
+                            b64 = grab_captcha_b64()
+                            ocr_text = ocr.classification(base64.b64decode(b64)).strip() if ocr and b64 else ""
+                            captcha_mgr.current_captcha_b64 = b64
+                            captcha_mgr.current_captcha_ocr = ocr_text
+                            log(f"[CAPTCHA_REQUIRED] data:image/png;base64,{b64}###{ocr_text}")
+                    except Exception as le:
+                        log(f"Lỗi đăng nhập: {le}")
+
+                # Kiểm tra nếu đăng nhập trực tiếp trên trình duyệt
                 try:
-                    # Dấu hiệu đăng nhập thành công chuẩn xác: có nút Đăng xuất hoặc Menu điều hướng
                     has_logout = page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible()
                     has_menu = page.locator("#HeaderMenu").is_visible() or page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible()
-                    
-                    # Nút đăng nhập hoặc ô nhập mật khẩu đã biến mất
                     has_login_btn = page.locator("input[value='Đăng nhập'], #btnLogin, #btnDangNhap").is_visible()
-                    has_pass_input = page.locator("input[type='password']").is_visible()
-
-                    if (has_logout or has_menu) and not has_login_btn and not has_pass_input:
+                    if (has_logout or has_menu) and not has_login_btn:
+                        log("🎉 ĐĂNG NHẬP THÀNH CÔNG! ✅")
+                        log("[CAPTCHA_SUCCESS]")
                         login_success = True
+                        captcha_mgr.reset()
                         break
                 except Exception:
                     pass
 
                 now = time.time()
-                if now - last_log_t >= 10:
+                if now - last_log_t >= 15:
                     elapsed = int(now - start_wait)
                     remaining = max(0, 180 - elapsed)
-                    log(f"⏳ Đang chờ bạn nhập Captcha và bấm Đăng nhập... (Đã chờ {elapsed}s / còn lại {remaining}s)")
+                    log(f"⏳ Đang chờ xác nhận Captcha... (Đã chờ {elapsed}s / còn lại {remaining}s)")
                     last_log_t = now
 
-                time.sleep(1)
+                time.sleep(0.5)
 
-            if not login_success:
-                raise Exception("Quá thời gian 180 giây chờ nhập Captcha hoặc chưa hoàn tất Đăng nhập.")
+        captcha_mgr.reset()
+        if not login_success:
+            raise Exception("Quá thời gian 180 giây chờ nhập Captcha hoặc chưa hoàn tất Đăng nhập.")
 
-            log("ĐĂNG NHẬP THÀNH CÔNG! ✅ Hệ thống đang lưu phiên làm việc...")
-            
-            # Lưu session state để dùng lại lần sau
-            try:
-                page.context.storage_state(path=SESSION_FILE)
-            except Exception as se:
-                log(f"Lưu storage state: {se}")
+        log("ĐĂNG NHẬP THÀNH CÔNG! ✅ Hệ thống đang lưu phiên làm việc...")
+        try:
+            page.context.storage_state(path=SESSION_FILE)
+            log("💾 Đã lưu phiên làm việc (Session) thành công!")
+        except Exception as se:
+            log(f"Lưu storage state: {se}")
 
         except Exception as e:
             log(f"Lỗi đăng nhập: {str(e)}")

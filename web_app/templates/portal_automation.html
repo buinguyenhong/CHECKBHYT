@@ -351,6 +351,143 @@
             justify-content: center;
             gap: 6px;
         }
+
+        /* CAPTCHA MODAL */
+        .captcha-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease-out;
+        }
+        .captcha-modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        .captcha-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .captcha-modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .captcha-close-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .captcha-close-btn:hover {
+            background: var(--danger);
+            color: #fff;
+        }
+        .captcha-img-wrapper {
+            background: #ffffff;
+            padding: 10px 16px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            border: 2px dashed #94a3b8;
+        }
+        .captcha-img-wrapper img {
+            height: 48px;
+            display: block;
+            border-radius: 4px;
+        }
+        .captcha-refresh-btn {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            transition: all 0.2s;
+        }
+        .captcha-refresh-btn:hover {
+            background: #cbd5e1;
+        }
+        .captcha-ocr-hint {
+            font-size: 12.5px;
+            color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 14px;
+            display: none;
+        }
+        .captcha-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .captcha-input {
+            flex: 1;
+            padding: 12px 14px;
+            background: var(--input-bg);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            color: var(--input-color);
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            outline: none;
+        }
+        .captcha-btn-submit {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0 18px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .captcha-btn-submit:hover {
+            background: var(--primary-hover);
+        }
+        .captcha-btn-submit:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+        }
+        .captcha-help-text {
+            font-size: 11.5px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
@@ -515,6 +652,36 @@
                 </div>
             </div>
         </div>
+    <!-- MODAL NHẬP CAPTCHA TỪ XA CHO MÁY TRẠM -->
+    <div id="captchaModal" class="captcha-modal-overlay">
+        <div class="captcha-modal-content">
+            <div class="captcha-modal-header">
+                <div class="captcha-modal-title">
+                    <span>🔐</span> Xác thực Captcha Cổng BHYT
+                </div>
+                <button type="button" class="captcha-close-btn" onclick="closeCaptchaModal()" title="Đóng popup">✕</button>
+            </div>
+            
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
+                Hình ảnh Captcha chụp trực tiếp từ Cổng BHYT trên máy chủ:
+            </p>
+
+            <div class="captcha-img-wrapper">
+                <img id="captchaModalImg" src="" alt="Mã Captcha BHYT" />
+                <button type="button" class="captcha-refresh-btn" onclick="refreshCaptchaRemote()" title="Đổi mã khác">🔄 Đổi mã</button>
+            </div>
+
+            <div id="captchaOcrHint" class="captcha-ocr-hint"></div>
+
+            <div class="captcha-input-group">
+                <input type="text" id="captchaModalInput" class="captcha-input" placeholder="GÕ MÃ TẠI ĐÂY" maxlength="10" autocomplete="off" />
+                <button type="button" id="captchaBtnSubmit" class="captcha-btn-submit" onclick="submitCaptchaRemote()">XÁC NHẬN</button>
+            </div>
+
+            <div class="captcha-help-text">
+                👉 Nhập mã và nhấn <b>Enter</b> hoặc bấm <b>Xác nhận</b> để gửi trực tiếp về máy chủ.
+            </div>
+        </div>
     </div>
 
     <script>
@@ -557,7 +724,13 @@
             if (evtSource) { evtSource.close(); }
             evtSource = new EventSource('/api/automation/v2/logs');
             evtSource.onmessage = function(e) {
-                appendLog(e.data);
+                const msg = e.data;
+                if (msg.includes('[CAPTCHA_REQUIRED]')) {
+                    handleCaptchaRequired(msg);
+                } else if (msg.includes('[CAPTCHA_SUCCESS]')) {
+                    handleCaptchaSuccess();
+                }
+                appendLog(msg);
             };
             evtSource.onerror = function() {
                 // Tự động kết nối lại sau 3s nếu đứt kết nối
@@ -565,6 +738,102 @@
             };
         }
         connectLogStream();
+
+        // XỬ LÝ CAPTCHA TỪ XA (MÁY TRẠM <-> MÁY CHỦ)
+        const captchaModal = document.getElementById('captchaModal');
+        const captchaModalImg = document.getElementById('captchaModalImg');
+        const captchaModalInput = document.getElementById('captchaModalInput');
+        const captchaOcrHint = document.getElementById('captchaOcrHint');
+        const captchaBtnSubmit = document.getElementById('captchaBtnSubmit');
+
+        function handleCaptchaRequired(rawMsg) {
+            try {
+                // Format: [CAPTCHA_REQUIRED] data:image/png;base64,...###suggested_code
+                const marker = '[CAPTCHA_REQUIRED]';
+                const payload = rawMsg.substring(rawMsg.indexOf(marker) + marker.length).trim();
+                const parts = payload.split('###');
+                const imgSrc = parts[0].trim();
+                const ocrSuggestion = parts.length > 1 ? parts[1].trim() : '';
+
+                if (imgSrc) {
+                    captchaModalImg.src = imgSrc;
+                }
+                if (ocrSuggestion) {
+                    captchaModalInput.value = ocrSuggestion;
+                    captchaOcrHint.innerHTML = `💡 Gợi ý Auto-OCR: <b>${ocrSuggestion}</b> (Kiểm tra lại hình ảnh trước khi bấm Xác nhận)`;
+                    captchaOcrHint.style.display = 'block';
+                } else {
+                    captchaModalInput.value = '';
+                    captchaOcrHint.style.display = 'none';
+                }
+
+                captchaBtnSubmit.disabled = false;
+                captchaBtnSubmit.textContent = 'XÁC NHẬN';
+                captchaModal.style.display = 'flex';
+                setTimeout(() => {
+                    captchaModalInput.focus();
+                    captchaModalInput.select();
+                }, 150);
+            } catch (err) {
+                console.error('Lỗi phân tích Captcha SSE:', err);
+            }
+        }
+
+        function handleCaptchaSuccess() {
+            captchaModal.style.display = 'none';
+            captchaModalInput.value = '';
+        }
+
+        function closeCaptchaModal() {
+            captchaModal.style.display = 'none';
+        }
+
+        captchaModalInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitCaptchaRemote();
+            }
+        });
+
+        async function submitCaptchaRemote() {
+            const val = captchaModalInput.value.trim();
+            if (!val) {
+                alert('Vui lòng nhập mã Captcha!');
+                captchaModalInput.focus();
+                return;
+            }
+
+            captchaBtnSubmit.disabled = true;
+            captchaBtnSubmit.textContent = 'Đang gửi...';
+            appendLog(`📤 Đang gửi mã Captcha '${val}' lên máy chủ...`);
+
+            try {
+                const res = await fetch('/api/automation/v2/submit-captcha', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ captcha: val })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    appendLog('✅ Đã gửi mã Captcha thành công! Máy chủ đang kiểm tra...');
+                } else {
+                    throw new Error(data.detail || 'Lỗi gửi mã');
+                }
+            } catch (err) {
+                appendLog(`❌ Lỗi gửi mã Captcha: ${err.message}`);
+                captchaBtnSubmit.disabled = false;
+                captchaBtnSubmit.textContent = 'XÁC NHẬN';
+            }
+        }
+
+        async function refreshCaptchaRemote() {
+            appendLog('🔄 Đang gửi yêu cầu đổi mã Captcha...');
+            try {
+                await fetch('/api/automation/v2/refresh-captcha', { method: 'POST' });
+            } catch (err) {
+                console.error(err);
+            }
+        }
 
         // KÍCH HOẠT LUỒNG C MỚI
         async function startFlowC() {

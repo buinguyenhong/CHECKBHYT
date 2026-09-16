@@ -83,8 +83,8 @@ File quan trọng:
 - `web_app/services/his_service.py`: kết nối SQL HIS, cache, chuẩn hóa SQL, sinh reset SQL.
 - `web_app/services/excel_service.py`: đọc `listbh.xlsx`, `HoSoLoiChiTiet.xlsx`.
 - `web_app/services/compare_service.py`: logic đối soát và lưu trạng thái.
-- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT thế hệ mới (Native Chrome/Edge, Direct URL Download `ExportExcelKPG_New?maGd=...` cho Luồng C, Luồng B tải cả tháng với timeout 1200s kèm Heartbeat định kỳ 10s, khử trùng dữ liệu tự động).
-- `portal_downloader/`: bộ công cụ tải & gộp hồ sơ BHYT chạy trực tiếp tại chỗ trên máy đang thao tác (`downloader_server.py`, `Chay_Tool_Tai_BHYT.bat`, `templates/index.html`), bật trình duyệt trực tiếp trước mặt người dùng và 1-click gửi file lên Máy chủ CHECKBHYT để đối soát CSDL.
+- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT thế hệ mới (Native Chrome/Edge, tích hợp Auto-OCR ddddocr tự động giải Captcha + Cầu nối chụp ảnh Captcha gửi SSE về giao diện Web máy trạm để nhập từ xa, Direct URL Download `ExportExcelKPG_New?maGd=...` cho Luồng C, Luồng B tải cả tháng với timeout 1200s kèm Heartbeat định kỳ 10s, khử trùng dữ liệu tự động).
+- `portal_downloader/`: bộ công cụ tải & gộp hồ sơ BHYT chạy trực tiếp tại chỗ trên máy đang thao tác (`downloader_server.py`, `Chay_Tool_Tai_BHYT.bat`, `templates/index.html`), hỗ trợ Auto-OCR và Popup xác thực Captcha trực tiếp, bật trình duyệt trước mặt người dùng và 1-click gửi file lên Máy chủ CHECKBHYT để đối soát CSDL.
 - `Chay_Tool_Tai_BHYT.bat`: tệp thực thi 1-click tại thư mục gốc khởi động nhanh công cụ tải dữ liệu BHYT cục bộ.
 - `client_runner/`: bộ công cụ RPA Runner chạy trên máy trạm (`client_agent.py`, `Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
 - `web_app/xml_validator/`: thư mục chứa mô-đun đối soát và kiểm tra cấu trúc hồ sơ XML BHYT (in-process).
@@ -1157,5 +1157,19 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
   - **XML8 (Tóm tắt HSBA):** `MA_TTDV` (thiếu mã tương đương dịch vụ).
   - **XML9, XML11, XML13, v.v.:** Các thông tin giấy chứng sinh, giấy chứng nhận nghỉ dưỡng thai, phiếu chuyển tuyến.
 - Quản trị viên và IT có thể tùy chỉnh nguyên nhân và hướng dẫn khắc phục trên WebApp (`/admin` -> Tab Quản lý Lỗi).
+
+### 19.6. Cơ chế Tự động giải Captcha (Auto-OCR) & Cầu nối Nhập Captcha từ xa (Remote Workstation Bridge)
+Nhằm giải quyết triệt để vấn đề máy trạm không thể nhìn thấy màn hình trình duyệt chạy trên máy chủ để gõ Captcha, hệ thống triển khai cơ chế kết hợp 2 lớp:
+1. **Lớp 1 - AI Auto-OCR (`ddddocr`):**
+   - Trình duyệt tự động trích xuất chuỗi Base64 của ảnh `#Captcha_IMG1`.
+   - Sử dụng mô hình `ddddocr` chạy in-memory để phân loại và giải mã ký tự trong 0.05 giây.
+   - Tự động điền kết quả vào ô `#Captcha_TB_I` và click nút "Đăng nhập".
+   - Kiểm tra trạng thái đăng nhập: nếu thành công, lưu session vào `portal_storage_state.json` và tiếp tục quy trình tự động hóa.
+2. **Lớp 2 - Cầu nối Nhập Captcha từ xa qua Server-Sent Events (SSE):**
+   - Nếu mã Auto-OCR chưa chuẩn hoặc Cổng BHYT yêu cầu nhập lại: Server mã hóa ảnh Captcha thành Base64 và phát sự kiện `[CAPTCHA_REQUIRED] data:image/png;base64,...###<ocr_suggestion>`.
+   - Giao diện Web trên máy trạm ngay lập tức bật Modal Popup hiển thị ảnh Captcha kèm gợi ý OCR, autofocus vào ô nhập liệu.
+   - Người dùng máy trạm chỉ cần nhìn ảnh trên màn hình, xác nhận hoặc sửa lại mã và bấm Enter / "Xác nhận".
+   - Máy trạm gửi mã qua API `/api/automation/v2/submit-captcha`. Server nhận giá trị, tự động điền vào Cổng BHYT và hoàn tất đăng nhập.
+   - Khi đăng nhập thành công, Server phát `[CAPTCHA_SUCCESS]` để Web máy trạm tự động ẩn Popup.
 
 
