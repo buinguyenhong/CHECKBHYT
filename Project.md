@@ -83,13 +83,14 @@ File quan trọng:
 - `web_app/services/his_service.py`: kết nối SQL HIS, cache, chuẩn hóa SQL, sinh reset SQL.
 - `web_app/services/excel_service.py`: đọc `listbh.xlsx`, `HoSoLoiChiTiet.xlsx`.
 - `web_app/services/compare_service.py`: logic đối soát và lưu trạng thái.
-- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT chạy trên Server.
+- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT thế hệ mới chạy trên Server/LAN (Native Chrome/Edge, Direct URL Download `ExportExcelKPG_New?maGd=...` cho Luồng C, timeout 600s cho Luồng B, khử trùng dữ liệu tự động).
 - `client_runner/`: bộ công cụ RPA Runner chạy trực tiếp trên máy trạm Client PC (`client_agent.py`, `Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
 - `web_app/xml_validator/`: thư mục chứa mô-đun đối soát và kiểm tra cấu trúc hồ sơ XML BHYT (in-process).
   - `xml_parser.py`: Đọc tệp XML, giải mã Container XML ký số và gom nhóm theo MA_LK.
   - `rule_engine.py`: Chứa 26 quy tắc nghiệp vụ BHYT kiểm tra lỗi.
   - `report_generator.py`: Sinh báo cáo tổng hợp lỗi Excel và JSON kết quả.
-- `web_app/templates/admin.html`: giao diện phòng IT (bao gồm Khối Tự động hóa Cổng BHYT Playwright RPA hợp nhất, Đối soát HIS/BHYT, Quản lý tài khoản khoa và Tab kiểm tra XML BHYT).
+- `web_app/templates/admin.html`: giao diện phòng IT (Đối soát HIS/BHYT, Quản lý tài khoản khoa, Tab kiểm tra XML BHYT, card liên kết tới Trung tâm Tự động hóa Cổng BHYT).
+- `web_app/templates/portal_automation.html`: màn hình chuyên biệt độc lập (`/portal-automation`) phục vụ vận hành Luồng B & Luồng C thế hệ mới với Live-Streaming Log SSE, tải file và nạp CSDL đối soát 1-click.
 - `web_app/templates/department.html`: giao diện khoa lâm sàng.
 - `web_app/templates/login.html`: đăng nhập.
 

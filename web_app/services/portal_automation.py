@@ -4,8 +4,8 @@ import re
 import time
 import glob
 import datetime
+from typing import Callable, Optional, Dict, Any, List
 import pandas as pd
-from typing import Callable, Optional
 
 # Tự động cấu hình mã hóa UTF-8 cho stdout/stderr tránh lỗi charmap trên Windows Server
 if hasattr(sys.stdout, 'reconfigure'):
@@ -40,42 +40,39 @@ os.makedirs(TEMP_ERROR_DIR, exist_ok=True)
 SESSION_FILE = os.path.join(SESSION_DIR, "portal_storage_state.json")
 
 # Danh sách log thời gian thực để UI có thể hiển thị
-portal_logs = []
+portal_logs: List[str] = []
 
 def add_portal_log(msg: str):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     entry = f"[{timestamp}] {msg}"
     portal_logs.append(entry)
-    if len(portal_logs) > 200:
+    if len(portal_logs) > 300:
         portal_logs.pop(0)
     safe_print(f"[*] [PortalAutomation] {entry}")
 
 
-def parse_date_info(date_val):
-    """Parse date string into components and standard formats."""
-    if not date_val:
-        d_obj = datetime.date.today()
-    elif isinstance(date_val, (datetime.date, datetime.datetime)):
-        d_obj = date_val if isinstance(date_val, datetime.date) else date_val.date()
-    else:
-        clean = str(date_val).strip().replace('-', '/').replace('.', '/')
-        d_obj = None
-        for fmt in ["%Y/%m/%d", "%d/%m/%Y", "%Y%m%d"]:
-            try:
-                d_obj = datetime.datetime.strptime(clean, fmt).date()
-                break
-            except Exception:
-                pass
-        if not d_obj:
-            d_obj = datetime.date.today()
-            
-    return {
-        "year": d_obj.year,
-        "month": d_obj.month, # 1-12
-        "day": d_obj.day,
-        "d_str": d_obj.strftime("%d/%m/%Y"), # 01/08/2026
-        "iso": d_obj.strftime("%Y-%m-%d")    # 2026-08-01
-    }
+def launch_native_browser(playwright_instance, headless: bool = False):
+    """
+    Khởi chạy Google Chrome hoặc Microsoft Edge có sẵn trên Windows.
+    Không yêu cầu tải gói Playwright Chromium cồng kềnh.
+    """
+    for channel in ["chrome", "msedge"]:
+        try:
+            browser = playwright_instance.chromium.launch(
+                channel=channel,
+                headless=headless,
+                args=["--start-maximized"]
+            )
+            safe_print(f"[*] Đã khởi chạy trình duyệt: {channel.upper()} có sẵn trên máy.")
+            return browser
+        except Exception:
+            continue
+
+    # Fallback nếu không có Chrome/Edge channel
+    return playwright_instance.chromium.launch(
+        headless=headless,
+        args=["--start-maximized"]
+    )
 
 
 class PortalAutomationService:
@@ -84,7 +81,7 @@ class PortalAutomationService:
         base_url: str = "https://gdbhyt.baohiemxahoi.gov.vn/",
         ma_cskcb: str = "66232",
         username: str = "066091019320",
-        password: str = "Nguyenhong123@"
+        password: str = ""
     ):
         self.base_url = base_url
         self.ma_cskcb = ma_cskcb
@@ -105,12 +102,11 @@ class PortalAutomationService:
         def log(msg: str):
             if log_func:
                 log_func(msg)
-            safe_print(f"[*] [PortalAutomation] {msg}")
+            safe_print(f"[*] [Login] {msg}")
 
-        log("Đang truy cập Cổng BHYT...")
-        page.goto(self.base_url, timeout=60000)
-        page.wait_for_load_state("domcontentloaded")
-        time.sleep(1.5)
+        log("Đang truy cập Cổng BHYT: https://gdbhyt.baohiemxahoi.gov.vn/ ...")
+        page.goto(self.base_url, timeout=90000, wait_until="load")
+        time.sleep(1.0)
 
         # Đóng các popup thông báo hoặc OTP nếu có
         try:
@@ -118,7 +114,8 @@ class PortalAutomationService:
             if btn_close_pop.is_visible(timeout=1500):
                 btn_close_pop.click(force=True)
                 time.sleep(0.5)
-        except Exception: pass
+        except Exception:
+            pass
 
         # Kiểm tra xem đã đăng nhập chưa
         try:
@@ -132,7 +129,7 @@ class PortalAutomationService:
             pass
 
         # Chưa đăng nhập -> Tự động điền form đăng nhập
-        log("Cần đăng nhập tài khoản. Đang tự động điền Mã CSKCB, Tên đăng nhập & Mật khẩu...")
+        log(f"Điền mã cơ sở: {self.ma_cskcb}, tài khoản: {self.username}...")
         
         try:
             # Điền Mã cơ sở KCB
@@ -151,30 +148,32 @@ class PortalAutomationService:
             elif page.get_by_role("textbox", name="Tên đăng nhập").is_visible(timeout=2000):
                 page.get_by_role("textbox", name="Tên đăng nhập").fill(self.username)
             
-            # Điền Mật khẩu
-            pass_inp = page.locator("input[type='password'], input[name*='Password'], input[id*='txtPassword']").first
-            if pass_inp.is_visible(timeout=3000):
-                pass_inp.click()
-                pass_inp.fill(self.password)
-            elif page.get_by_role("textbox", name="Mật khẩu").is_visible(timeout=2000):
-                page.get_by_role("textbox", name="Mật khẩu").fill(self.password)
+            # Điền Mật khẩu (nếu có)
+            if self.password:
+                pass_inp = page.locator("input[type='password'], input[name*='Password'], input[id*='txtPassword']").first
+                if pass_inp.is_visible(timeout=3000):
+                    pass_inp.click()
+                    pass_inp.fill(self.password)
+                elif page.get_by_role("textbox", name="Mật khẩu").is_visible(timeout=2000):
+                    page.get_by_role("textbox", name="Mật khẩu").fill(self.password)
             
             # Focus vào ô Captcha để người dùng nhập
             cap_inp = page.locator("input[name*='Captcha'], input[id*='Captcha'], input[placeholder*='mã hiển thị']").first
             if cap_inp.is_visible(timeout=3000):
                 cap_inp.click()
-                log("Vui lòng nhìn mã CAPTCHA trên màn hình trình duyệt, nhập vào và bấm ĐĂNG NHẬP (Chờ tối đa 120 giây)...")
+                cap_inp.focus()
+            
+            log("👉 VUI LÒNG NHÌN VÀ NHẬP MÃ HIỂN THỊ (CAPTCHA), SAU ĐÓ BẤM ĐĂNG NHẬP TRÊN TRÌNH DUYỆT...")
             
             # Chờ người dùng nhập captcha và đăng nhập thành công
             login_success = False
             start_wait = time.time()
-            while time.time() - start_wait < 120:
+            while time.time() - start_wait < 180:
                 try:
                     if page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible():
                         login_success = True
                         break
-                    # Nếu thấy menu Hồ sơ đề nghị thanh toán và không còn form đăng nhập
-                    if page.locator("#HeaderMenu").is_visible() and not page.locator("input[name*='UserName']").is_visible():
+                    if page.locator("#HeaderMenu, #roundPanel, #MainPane").is_visible() and not page.locator("input[name*='UserName']").is_visible():
                         login_success = True
                         break
                 except Exception:
@@ -182,9 +181,9 @@ class PortalAutomationService:
                 time.sleep(1)
 
             if not login_success:
-                raise Exception("Quá thời gian 120 giây chờ nhập Captcha hoặc chưa hoàn tất Đăng nhập.")
+                raise Exception("Quá thời gian 180 giây chờ nhập Captcha hoặc chưa hoàn tất Đăng nhập.")
 
-            log("Đăng nhập Cổng BHYT thành công! Đang lưu phiên làm việc...")
+            log("ĐĂNG NHẬP THÀNH CÔNG! ✅ Hệ thống đang lưu phiên làm việc...")
             
             # Lưu session state để dùng lại lần sau
             try:
@@ -194,285 +193,634 @@ class PortalAutomationService:
 
         except Exception as e:
             log(f"Lỗi đăng nhập: {str(e)}")
-            raise Exception(f"Không thể đăng nhập Cổng BHYT hoặc quá thời gian chờ nhập Captcha: {str(e)}")
+            raise Exception(f"Không thể đăng nhập Cổng BHYT: {str(e)}")
 
-    def wait_devexpress_callback(self, page, control_name: str = "gvDSKetQuaGuiHoso", timeout_sec: int = 45):
+    def _wait_for_grid_ready(self, page, timeout_ms: int = 600000, log_func: Optional[Callable[[str], None]] = None):
         """
-        Sử dụng trực tiếp DevExpress Client-Side API và InCallback() / EndCallback
-        để đợi máy chủ Cổng BHYT hoàn tất nạp dữ liệu tức thì, chuẩn xác và không bị phụ thuộc vào sleep.
+        Chờ DevExpress Grid hoàn tất nạp dữ liệu (InCallback = false và các loading panels biến mất).
+        Hỗ trợ timeout lên đến 10 phút (600,000ms), thông báo tiến trình mỗi 15s.
         """
-        try:
-            page.evaluate("""({ctrlName, timeoutMs}) => {
-                return new Promise((resolve) => {
-                    try {
-                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                        let ctrl = cc ? cc.GetByName(ctrlName) : (window[ctrlName] || null);
-                        
-                        // Nếu không tìm thấy theo tên chỉ định, tự động tìm bất kỳ GridView / Control nào đang InCallback
-                        if (!ctrl && cc && typeof cc.ForEachControl === 'function') {
-                            cc.ForEachControl((c) => {
-                                if (c && typeof c.InCallback === 'function' && c.InCallback()) {
-                                    ctrl = c;
-                                }
-                            });
-                        }
+        start_time = time.time()
+        time.sleep(1.0)
+        last_report = start_time
 
-                        // Nếu không có control nào bận và không có loading mask
-                        if (!ctrl) {
-                            const ld = document.querySelector(`#${ctrlName}_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv, .dxlpLoadingPanelWithContent`);
-                            if (!ld || ld.offsetParent === null) return resolve({status: 'no_control_idle'});
-                        }
-
-                        if (ctrl && typeof ctrl.InCallback === 'function' && !ctrl.InCallback()) {
-                            const ld = document.querySelector(`#${ctrlName}_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv, .dxlpLoadingPanelWithContent`);
-                            if (!ld || ld.offsetParent === null) return resolve({status: 'already_idle'});
-                        }
-                        
-                        let resolved = false;
-                        const timer = setTimeout(() => {
-                            if (!resolved) {
-                                resolved = true;
-                                resolve({status: 'timeout'});
-                            }
-                        }, timeoutMs);
-
-                        const onEnd = (s, e) => {
-                            if (!resolved) {
-                                resolved = true;
-                                clearTimeout(timer);
-                                try {
-                                    if (ctrl && ctrl.EndCallback && typeof ctrl.EndCallback.RemoveHandler === 'function') {
-                                        ctrl.EndCallback.RemoveHandler(onEnd);
-                                    }
-                                } catch(err) {}
-                                resolve({status: 'end_callback_success'});
-                            }
-                        };
-
-                        if (ctrl && ctrl.EndCallback && typeof ctrl.EndCallback.AddHandler === 'function') {
-                            ctrl.EndCallback.AddHandler(onEnd);
-                        } else {
-                            // Polling fallback
-                            const interval = setInterval(() => {
-                                let isBusy = Boolean(document.querySelector(`#${ctrlName}_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxlpLoadingPanelWithContent`));
-                                if (ctrl && typeof ctrl.InCallback === 'function' && ctrl.InCallback()) {
-                                    isBusy = true;
-                                } else if (cc && typeof cc.ForEachControl === 'function') {
-                                    cc.ForEachControl((c) => {
-                                        if (c && typeof c.InCallback === 'function' && c.InCallback()) isBusy = true;
-                                    });
-                                }
-                                if (!isBusy) {
-                                    clearInterval(interval);
-                                    if (!resolved) {
-                                        resolved = true;
-                                        clearTimeout(timer);
-                                        resolve({status: 'polled_idle'});
-                                    }
-                                }
-                            }, 200);
-                        }
-                    } catch(e) {
-                        resolve({status: 'error', error: e.toString()});
+        while (time.time() - start_time) * 1000 < timeout_ms:
+            is_busy = False
+            try:
+                is_busy = page.evaluate("""() => {
+                    // 1. Kiểm tra DevExpress Grid InCallback
+                    const grid = window.gvDSKetQuaGuiHoso || window.gvDanhSachHoSo;
+                    if (grid && typeof grid.InCallback === 'function' && grid.InCallback()) {
+                        return true;
                     }
-                });
-            }""", {"ctrlName": control_name, "timeoutMs": timeout_sec * 1000})
-        except Exception:
-            pass
 
-    def wait_portal_idle(self, page, timeout: int = 45000):
-        """Chờ đợi tất cả các loading mask và indicator của DevExpress biến mất."""
-        try:
-            time.sleep(0.3)
-            loading_selectors = [
-                ".dxgvLoadingDiv",
-                ".dxgvLoadingDiv_EIS",
-                ".dxgvLoadingPanel_EIS",
-                "#gvDSKetQuaGuiHoso_LD",
-                ".dxp-loadingPanel",
-                ".dxlpLoadingPanelWithContent"
-            ]
-            for sel in loading_selectors:
-                try:
-                    loaders = page.locator(sel)
-                    if loaders.count() > 0:
-                        loaders.first.wait_for(state="hidden", timeout=timeout)
-                except Exception:
-                    pass
-            time.sleep(0.5)
-        except Exception:
-            pass
+                    // Kiểm tra tất cả control DevExpress
+                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                    if (cc && typeof cc.ForEachControl === 'function') {
+                        let active = false;
+                        cc.ForEachControl(c => {
+                            if (c && typeof c.InCallback === 'function' && c.InCallback()) active = true;
+                        });
+                        if (active) return true;
+                    }
 
-    def run_flow_b(self, from_date: str, to_date: str, log_func: Optional[Callable[[str], None]] = None) -> dict:
+                    // 2. Kiểm tra Grid Loading Panel
+                    const gridLp = document.getElementById('gvDSKetQuaGuiHoso_LP') || document.getElementById('gvDanhSachHoSo_LP');
+                    if (gridLp) {
+                        const style = window.getComputedStyle(gridLp);
+                        if (style.display !== 'none' && style.visibility !== 'hidden' && (gridLp.offsetWidth > 0 || gridLp.offsetHeight > 0)) {
+                            return true;
+                        }
+                    }
+
+                    // 3. Kiểm tra Loading Panel chung
+                    const genLp = document.getElementById('_Loading');
+                    if (genLp) {
+                        const style = window.getComputedStyle(genLp);
+                        if (style.display !== 'none' && style.visibility !== 'hidden' && (genLp.offsetWidth > 0 || genLp.offsetHeight > 0)) {
+                            return true;
+                        }
+                    }
+
+                    // 4. Loading mask chung
+                    const masks = document.querySelectorAll('.dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxlpLoadingPanelWithContent');
+                    for (const m of masks) {
+                        if (m.offsetParent !== null && window.getComputedStyle(m).display !== 'none') return true;
+                    }
+
+                    return false;
+                }""")
+            except Exception:
+                is_busy = True
+
+            if not is_busy:
+                time.sleep(0.8)
+                return True
+
+            if time.time() - last_report >= 15:
+                elapsed = int(time.time() - start_time)
+                if log_func:
+                    log_func(f"⏳ Máy chủ BHYT đang xử lý dữ liệu... (Đã chờ {elapsed}s / {int(timeout_ms/1000)}s)...")
+                last_report = time.time()
+
+            time.sleep(0.8)
+
+        if log_func:
+            log_func(f"⚠️ Cảnh báo: Đã chờ tối đa {int(timeout_ms/1000)}s. Tiếp tục các thao tác...")
+        return False
+
+    def _extract_records_from_grid(self, page) -> List[Dict[str, Any]]:
         """
-        LUỒNG B: Tự động tải Danh sách đã gửi (listbh.xlsx) từ Cổng BHYT.
-        Lưu ý nghiệp vụ: Giao diện Danh sách đề nghị thanh toán không có ô Từ ngày/Đến ngày.
+        Quét toàn bộ danh sách mã giao dịch (maGD) và STT trên bảng hiện tại.
+        Kết hợp 3 cơ chế quét: Quét hàng DevExpress Grid, Quét liên kết <a>, Quét ô <td>.
+        """
+        try:
+            return page.evaluate("""() => {
+                const records = [];
+
+                // Cách 1: Quét trực tiếp các hàng dữ liệu của bảng DevExpress
+                const dataRows = Array.from(document.querySelectorAll('.dxgvDataRow_EIS, tr[id*="DXDataRow"], tr.dxgvDataRow, #gvDSKetQuaGuiHoso tr'));
+                for (let i = 0; i < dataRows.length; i++) {
+                    const row = dataRows[i];
+                    const rowText = (row.innerText || row.textContent || '');
+                    const match = rowText.match(/HSKCB[0-9A-Za-z_]+/);
+                    if (match) {
+                        const maGD = match[0];
+                        let stt = 0;
+                        if (row.cells && row.cells.length > 0) {
+                            const parsed = parseInt((row.cells[0].innerText || '').trim(), 10);
+                            if (!isNaN(parsed) && parsed > 0) stt = parsed;
+                        }
+                        if (!stt) stt = records.length + 1;
+
+                        if (!records.some(r => r.maGD === maGD)) {
+                            records.push({ stt, maGD });
+                        }
+                    }
+                }
+
+                if (records.length > 0) return records;
+
+                // Cách 2: Quét tất cả các thẻ <a> (href, onclick, text)
+                const allLinks = Array.from(document.querySelectorAll('a'));
+                for (const a of allLinks) {
+                    const rawText = (a.innerText || a.textContent || '').replace(/[\\r\\n\\t]/g, '').trim();
+                    const onclick = a.getAttribute('onclick') || '';
+                    const href = a.getAttribute('href') || '';
+                    const combined = href + ' ' + onclick + ' ' + rawText;
+
+                    const match = combined.match(/HSKCB[0-9A-Za-z_]+/);
+                    if (match) {
+                        const maGD = match[0];
+                        const tr = a.closest('tr');
+                        let stt = 0;
+                        if (tr && tr.cells && tr.cells.length > 0) {
+                            const parsed = parseInt((tr.cells[0].innerText || '').trim(), 10);
+                            if (!isNaN(parsed) && parsed > 0) stt = parsed;
+                        }
+                        if (!stt) stt = records.length + 1;
+
+                        if (!records.some(r => r.maGD === maGD)) {
+                            records.push({ stt, maGD });
+                        }
+                    }
+                }
+
+                if (records.length > 0) return records;
+
+                // Cách 3: Quét bất kỳ ô <td> nào có chứa chuỗi HSKCB
+                const allCells = Array.from(document.querySelectorAll('td'));
+                for (const td of allCells) {
+                    const match = (td.innerText || '').match(/HSKCB[0-9A-Za-z_]+/);
+                    if (match) {
+                        const maGD = match[0];
+                        const tr = td.closest('tr');
+                        let stt = 0;
+                        if (tr && tr.cells && tr.cells.length > 0) {
+                            const parsed = parseInt((tr.cells[0].innerText || '').trim(), 10);
+                            if (!isNaN(parsed) && parsed > 0) stt = parsed;
+                        }
+                        if (!stt) stt = records.length + 1;
+
+                        if (!records.some(r => r.maGD === maGD)) {
+                            records.push({ stt, maGD });
+                        }
+                    }
+                }
+
+                return records;
+            }""")
+        except Exception as e:
+            safe_print(f"[*] Lỗi extract records: {e}")
+            return []
+
+    def _download_direct_record(
+        self,
+        page,
+        ma_gd: str,
+        stt: int,
+        save_dir: str,
+        log_func: Optional[Callable[[str], None]] = None,
+        max_retries: int = 3
+    ) -> Optional[str]:
+        """
+        Tải file trực tiếp qua Direct HTTP Endpoint: ExportExcelKPG_New?maGd={maGD}.
+        Sử dụng page.request.get() với session cookie hiện tại của trình duyệt.
+        """
+        def log(msg: str):
+            if log_func: log_func(msg)
+            safe_print(f"[*] [DownloadDirect] {msg}")
+
+        download_url = f"https://gdbhyt.baohiemxahoi.gov.vn/DanhSachKetQuaGuiHoSoQD130/ExportExcelKPG_New?maGd={ma_gd}"
+        file_name = f"STT_{str(stt).zfill(4)}_{ma_gd}.xlsx"
+        file_path = os.path.join(save_dir, file_name)
+
+        # Nếu file đã có và dung lượng hợp lệ (> 1KB) thì bỏ qua
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 1024:
+            log(f"✅ [STT {stt}] Đã có sẵn file: {file_name}, bỏ qua không tải lại.")
+            return file_path
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                log(f"⚡ [STT {stt}] Đang tải hồ sơ {ma_gd} (Lần {attempt})...")
+                response = page.request.get(download_url, timeout=60000)
+                
+                if not response.ok:
+                    raise Exception(f"HTTP Status {response.status}: {response.status_text}")
+
+                body = response.body()
+                if not body or len(body) < 500:
+                    raise Exception(f"Dữ liệu tải về quá nhỏ ({len(body) if body else 0} bytes), có thể do phiên hết hạn.")
+
+                with open(file_path, "wb") as f:
+                    f.write(body)
+
+                kb_size = round(len(body) / 1024, 1)
+                log(f"✅ [STT {stt}] Tải thành công ({kb_size} KB) -> {file_name}")
+                return file_path
+            except Exception as err:
+                log(f"⚠️ [STT {stt}] Lỗi tải lần {attempt}: {err}")
+                if attempt < max_retries:
+                    time.sleep(2.0 * attempt)
+                else:
+                    log(f"❌ [STT {stt}] Thất bại sau {max_retries} lần thử: {ma_gd}")
+                    return None
+
+    def merge_excel_files(
+        self,
+        download_dir: str,
+        output_file_path: str,
+        log_func: Optional[Callable[[str], None]] = None
+    ) -> Dict[str, Any]:
+        """
+        Gộp tất cả các file .xlsx trong download_dir thành 1 file Excel duy nhất
+        và loại bỏ các dòng dữ liệu trùng lặp (chuẩn theo logic merger.js).
+        """
+        def log(msg: str):
+            if log_func: log_func(msg)
+            safe_print(f"[*] [MergeExcel] {msg}")
+
+        if not os.path.exists(download_dir):
+            raise Exception(f"Thư mục {download_dir} không tồn tại.")
+
+        files = [
+            os.path.join(download_dir, f)
+            for f in os.listdir(download_dir)
+            if f.endswith('.xlsx') and not f.startswith('~$') and not f.startswith('KetQua_TongHop')
+        ]
+
+        if not files:
+            # Tạo file rỗng nếu chưa có dữ liệu
+            empty_df = pd.DataFrame(columns=["MA_LK", "MALOI", "MOTALOI", "Ngày ra", "Tên bệnh nhân", "Mã thẻ"])
+            empty_df.to_excel(output_file_path, index=False)
+            return {
+                "total_files": 0,
+                "total_records": 0,
+                "unique_records": 0,
+                "duplicates_removed": 0,
+                "output_path": output_file_path
+            }
+
+        log(f"📊 Bắt đầu quét {len(files)} file Excel để gộp và khử trùng dữ liệu...")
+
+        all_dfs = []
+        total_data_rows = 0
+
+        for i, file_p in enumerate(files):
+            try:
+                df = pd.read_excel(file_p)
+                if not df.empty:
+                    total_data_rows += len(df)
+                    all_dfs.append(df)
+                if (i + 1) % 15 == 0 or i == len(files) - 1:
+                    log(f"  -> Đang đọc file {i + 1}/{len(files)} ({os.path.basename(file_p)})...")
+            except Exception as e:
+                log(f"⚠️ Không thể đọc file {os.path.basename(file_p)}: {e}")
+
+        if not all_dfs:
+            empty_df = pd.DataFrame(columns=["MA_LK", "MALOI", "MOTALOI", "Ngày ra", "Tên bệnh nhân", "Mã thẻ"])
+            empty_df.to_excel(output_file_path, index=False)
+            return {
+                "total_files": len(files),
+                "total_records": 0,
+                "unique_records": 0,
+                "duplicates_removed": 0,
+                "output_path": output_file_path
+            }
+
+        combined_df = pd.concat(all_dfs, ignore_index=True)
+
+        # Khử trùng dữ liệu dựa trên tất cả các cột trừ cột STT đầu tiên nếu có
+        subset_cols = [c for c in combined_df.columns if str(c).strip().upper() not in ["STT", "TT"]]
+        if not subset_cols:
+            subset_cols = list(combined_df.columns)
+
+        unique_df = combined_df.drop_duplicates(subset=subset_cols, keep='first')
+        unique_data_rows = len(unique_df)
+        duplicates_removed = total_data_rows - unique_data_rows
+
+        log(f"💾 Đang ghi file Excel tổng hợp ra: {output_file_path}...")
+        unique_df.to_excel(output_file_path, index=False)
+
+        log("🎉 GỘP HOÀN TẤT:")
+        log(f"   - Tổng số file xử lý: {len(files)} file")
+        log(f"   - Tổng số dòng đọc được: {total_data_rows} dòng")
+        log(f"   - Số dòng giữ lại (duy nhất): {unique_data_rows} dòng")
+        log(f"   - Số dòng trùng lặp đã loại bỏ: {duplicates_removed} dòng")
+        log(f"   - File kết quả: {output_file_path}")
+
+        return {
+            "total_files": len(files),
+            "total_records": total_data_rows,
+            "unique_records": unique_data_rows,
+            "duplicates_removed": duplicates_removed,
+            "output_path": output_file_path
+        }
+
+    # =========================================================================
+    # LUỒNG C MỚI (CÔNG NGHỆ DIRECT URL DOWNLOAD & KHÔNG MỞ POPUP)
+    # =========================================================================
+    def run_flow_c(
+        self,
+        from_stt: int = 1,
+        to_stt: int = 100,
+        filter_col5: str = "1",
+        log_func: Optional[Callable[[str], None]] = None
+    ) -> Dict[str, Any]:
+        """
+        LUỒNG C MỚI: Tự động tải Danh sách lỗi chi tiết QĐ 3176 siêu tốc.
+        - Chạy Chrome/Edge native có sẵn trên máy.
+        - Lọc Today, Cột 5 = 1, Hiển thị 100 dòng, sắp xếp Thời gian mới nhất lên đầu.
+        - Tải trực tiếp bằng Direct HTTP URL: ExportExcelKPG_New?maGd={maGD} (Không mở Popup).
+        - Gộp file và lọc trùng dòng dữ liệu sạch sẽ thành HoSoLoiChiTiet.xlsx.
         """
         from playwright.sync_api import sync_playwright
 
         def log(msg: str):
-            if log_func:
-                log_func(msg)
-            safe_print(f"[*] [Flow B] {msg}")
+            if log_func: log_func(msg)
+            safe_print(f"[*] [Flow C] {msg}")
 
-        log("Bắt đầu Luồng B (Tải danh sách đã gửi listbh.xlsx)...")
+        log(f"🚀 Khởi động Luồng C Mới (Direct URL Download) - Phạm vi STT: {from_stt} đến {to_stt}...")
+
+        # Xóa các file tạm cũ trong temp_errors để chuẩn bị phiên mới
+        for old_f in glob.glob(os.path.join(TEMP_ERROR_DIR, "*.*")):
+            try:
+                os.remove(old_f)
+            except Exception:
+                pass
 
         with sync_playwright() as p:
-            # Khởi chạy trình duyệt headed để hiển thị cho người dùng thao tác captcha nếu cần
-            storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
-            try:
-                browser = p.chromium.launch(headless=False)
-            except Exception as launch_err:
-                err_str = str(launch_err)
-                if "Executable doesn't exist" in err_str or "playwright install" in err_str:
-                    log("Chưa cài đặt trình duyệt Chromium cho Playwright trên máy chủ!")
-                    raise Exception("Trình duyệt Chromium chưa được cài đặt trên máy chủ. Vui lòng chạy lệnh: playwright install chromium (hoặc bấm 'Cài riêng Chromium' trên tool LaunchWebBHYT).")
-                try:
-                    log(f"Thử khởi chạy Chromium chế độ ngầm (headless): {launch_err}")
-                    browser = p.chromium.launch(headless=True)
-                except Exception as h_err:
-                    raise Exception(f"Không thể khởi chạy trình duyệt Chromium: {h_err}")
+            log("🌐 Đang khởi động trình duyệt (Google Chrome / Microsoft Edge)...")
+            browser = launch_native_browser(p, headless=False)
 
+            storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
             context = browser.new_context(
                 storage_state=storage_path,
-                viewport={'width': 1366, 'height': 768},
+                viewport=None,
                 accept_downloads=True
             )
             page = context.new_page()
+            page.set_default_timeout(600000)
+            page.set_default_navigation_timeout(600000)
 
             try:
-                # 1. Đảm bảo đã đăng nhập
+                # 1. Đảm bảo đăng nhập
                 self._ensure_login(page, log_func=log)
-                self.wait_portal_idle(page)
 
-                # 2. Điều hướng trực tiếp vào Danh sách hồ sơ KCB
-                log("Đang điều hướng đến: Danh sách đề nghị thanh toán (/DanhSachHSKCB/Index)...")
-                
-                target_url_b = f"{self.base_url.rstrip('/')}/DanhSachHSKCB/Index"
+                # 2. Điều hướng vào màn hình QĐ 3176
+                log("📌 Đang điều hướng đến: Kết quả gửi hồ sơ XML (/DanhSachKetQuaGuiHoSoQD130/Index)...")
+                target_url = f"{self.base_url.rstrip('/')}/DanhSachKetQuaGuiHoSoQD130/Index"
                 try:
-                    page.goto(target_url_b, timeout=45000)
-                    page.wait_for_load_state("domcontentloaded")
-                except Exception as g_err:
-                    log(f"Lưu ý truy cập URL: {g_err}")
-
-                # Chờ các control chính của trang hiển thị sẵn sàng
-                try:
-                    page.wait_for_selector("#gvDanhSachHoSo, #bt_TimKiem, #btnExport, #cb_TrangThaiTT", timeout=20000)
-                except Exception:
-                    # Fallback menu click nếu chưa vào đúng trang
+                    page.goto(target_url, timeout=90000, wait_until="load")
+                except Exception as e:
+                    log(f"Truy cập URL trực tiếp: {e}, đang thử click Menu...")
                     try:
-                        top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                        if top_menu.is_visible(timeout=3000): top_menu.click()
+                        page.get_by_text("Hồ sơ đề nghị thanh toán").click()
                         time.sleep(0.5)
-                        xml_menu = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
-                        if xml_menu.is_visible(timeout=3000): xml_menu.click(force=True)
+                        page.locator("#HeaderMenu_DXME2_ div").filter(has_text="Hồ sơ XML").click()
                         time.sleep(0.5)
-                        page.locator("a, span, .dxm-item").filter(has_text=re.compile(r"Danh sách", re.IGNORECASE)).first.click(force=True)
-                        page.wait_for_load_state("domcontentloaded")
-                    except Exception: pass
+                        page.get_by_text("Quyết định 3176/QĐ-BYT").nth(1).click()
+                        time.sleep(0.5)
+                        page.get_by_role("link", name="Kết quả gửi hồ sơ XML").nth(1).click()
+                    except Exception:
+                        pass
 
-                self.wait_portal_idle(page)
+                page.wait_for_selector("#roundPanel, #gvDSKetQuaGuiHoso", timeout=90000)
+                self._wait_for_grid_ready(page, timeout_ms=90000, log_func=log)
 
-                # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" qua DevExpress Client API + Fallback
-                log("Đang chọn trạng thái: 'Đã đề nghị thanh toán'...")
-                status_selected = False
+                # 3. Đặt ngày = Today
+                log("📅 Thiết lập bộ lọc: Chọn ngày 'Today'...")
                 try:
-                    status_selected = page.evaluate("""() => {
-                        try {
-                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
-                            if (cb) {
-                                const count = typeof cb.GetItemCount === 'function' ? cb.GetItemCount() : 0;
-                                for (let i = 0; i < count; i++) {
-                                    const it = cb.GetItem(i);
-                                    if (it && it.text && it.text.trim().toLowerCase().includes('đã đề nghị thanh toán')) {
-                                        cb.SetSelectedIndex(i);
-                                        if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
-                                        if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
-                                        return true;
-                                    }
-                                }
-                                cb.SetText('Đã đề nghị thanh toán');
-                                if (typeof cb.SetValue === 'function') cb.SetValue('2');
-                                if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
-                                return true;
-                            }
-                        } catch(err) {}
-                        return false;
+                    page.evaluate("""() => {
+                        const now = new Date();
+                        if (window.dt_TuNgay && typeof window.dt_TuNgay.SetValue === 'function') {
+                            window.dt_TuNgay.SetValue(now);
+                        }
+                        if (window.dt_DenNgay && typeof window.dt_DenNgay.SetValue === 'function') {
+                            window.dt_DenNgay.SetValue(now);
+                        }
                     }""")
-                    if status_selected:
-                        log("Đã chọn trạng thái: 'Đã đề nghị thanh toán' qua DevExpress API ✅")
-                except Exception as js_err:
-                    log(f"Lưu ý JS API trạng thái: {js_err}")
-
-                if not status_selected:
-                    try:
-                        btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, td[id*='cb_TrangThaiTT_B-1']").first
-                        if btn_cb.is_visible(timeout=2000):
-                            btn_cb.click(force=True)
-                            time.sleep(0.4)
-                            item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
-                            if item.is_visible(timeout=2000):
-                                item.click(force=True)
-                                log("Đã chọn trạng thái qua giao diện DOM fallback ✅")
-                    except Exception: pass
-
-                self.wait_portal_idle(page)
-
-                # 4. Bấm Tìm kiếm & Chờ nạp dữ liệu xong
-                log("Bấm Tìm kiếm dữ liệu...")
-                searched = False
-                try:
-                    searched = page.evaluate("""() => {
-                        try {
-                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
-                            if (btn && typeof btn.DoClick === 'function') {
-                                btn.DoClick();
-                                return true;
-                            }
-                        } catch(e) {}
-                        return false;
-                    }""")
-                    if searched:
-                        log("Đã kích hoạt nút Tìm kiếm qua DevExpress DoClick API ✅")
+                    # Thử click nút Today trên popup nếu có
+                    drop_btn = page.locator("#dt_TuNgay_B-1, #dt_TuNgay_B-1Img, table#dt_TuNgay img").first
+                    if drop_btn.is_visible(timeout=1000):
+                        drop_btn.click(force=True)
+                        time.sleep(0.3)
+                        today_cell = page.get_by_role("cell", name="Today", exact=True).or_(page.locator("td.dxeCalendarToday_EIS, td:has-text('Today')")).first
+                        if today_cell.is_visible(timeout=1000):
+                            today_cell.click(force=True)
                 except Exception:
                     pass
 
-                if not searched:
-                    for s_sel in ["#bt_TimKiem_CD", "#bt_TimKiem_B", "#bt_TimKiem", "#btnTimKiem_CD", "#btnTimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')"]:
-                        try:
-                            s_el = page.locator(s_sel).first
-                            if s_el.is_visible(timeout=1500):
-                                s_el.click(force=True)
-                                searched = True
-                                break
-                        except Exception: pass
+                # Bấm nút "Tìm kiếm"
+                log("🔍 Bấm nút 'Tìm kiếm' và chờ máy chủ phản hồi (tối đa 10 phút)...")
+                search_btn = page.locator("span").filter(has_text=re.compile(r"^Tìm kiếm$")).first
+                if search_btn.is_visible(timeout=3000):
+                    search_btn.click(force=True)
+                else:
+                    page.evaluate("if (window.btnTimKiem && typeof window.btnTimKiem.DoClick === 'function') window.btnTimKiem.DoClick();")
 
-                # Chờ bảng nạp xong dữ liệu
-                log("Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách đề nghị thanh toán...")
-                start_wait = time.time()
-                time.sleep(1.0)
-                while time.time() - start_wait < 45:
-                    self.wait_portal_idle(page)
-                    try:
-                        rows = page.locator("#gvDanhSachHoSo tr[id*='DXDataRow'], .dxgvDataRow_EIS, tr[id*='DXDataRow'], tr.dxgvEmptyDataRow")
-                        if rows.count() > 0:
-                            break
-                    except Exception: pass
-                    time.sleep(0.5)
+                self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                log("✅ Bảng dữ liệu đã nạp xong theo ngày Today!")
 
-                time.sleep(1.0)
+                # 4. Lọc Cột 5 (Lỗi = 1)
+                if filter_col5:
+                    log(f"🔎 Nhập bộ lọc Cột 5 = '{filter_col5}'...")
+                    col5_inp = page.locator("#gvDSKetQuaGuiHoso_DXFREditorcol5_I")
+                    if col5_inp.is_visible(timeout=5000):
+                        col5_inp.click()
+                        col5_inp.fill(filter_col5)
+                        col5_inp.press("Enter")
+                    else:
+                        page.evaluate(f"if (window.gvDSKetQuaGuiHoso) window.gvDSKetQuaGuiHoso.AutoFilterByColumn(5, '{filter_col5}');")
+                    self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                    log("✅ Lọc Cột 5 hoàn tất!")
 
-                # 5. Xuất Excel và tải file listbh.xlsx
-                log("Đang kích hoạt Xuất Excel danh sách đã gửi...")
-                
-                # Bước 5.1: Click nút "Xuất Excel" (btnExport) để mở Popup Export
-                log("Click nút 'Xuất Excel' (btnExport)...")
-                opened_popup = page.evaluate("""() => {
+                # 5. Chọn Page size = 100
+                log("📄 Thiết lập kích thước trang: 100 dòng/trang...")
+                try:
+                    page_size_inp = page.get_by_role("textbox", name="Page size:")
+                    if page_size_inp.is_visible(timeout=2000):
+                        page_size_inp.click()
+                        time.sleep(0.4)
+                        page.get_by_text("100", exact=True).first.click()
+                        self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                        log("✅ Đã chọn hiển thị 100 dòng/trang!")
+                except Exception:
+                    pass
+
+                # 6. Sắp xếp giảm dần theo Thời gian (Click 2 lần header Thời gian)
+                log("⏱️ Sắp xếp cột 'Thời gian' (Click 2 lần để mới nhất lên đầu)...")
+                try:
+                    thoi_gian_hdr = page.get_by_role("cell", name="Thời gian", exact=True).or_(page.get_by_text("Thời gian", exact=True)).first
+                    if thoi_gian_hdr.is_visible(timeout=3000):
+                        thoi_gian_hdr.click(force=True)
+                        self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                        time.sleep(0.5)
+                        thoi_gian_hdr.click(force=True)
+                        self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                        log("✅ Bảng đã được sắp xếp giảm dần theo thời gian!")
+                except Exception as s_err:
+                    log(f"Lưu ý sắp xếp: {s_err}")
+
+                # 7. VÒNG LẶP DUYỆT VÀ TẢI THEO DẢI STT BẰNG DIRECT URL
+                log(f"🎯 BẮT ĐẦU TẢI CÁC HỒ SƠ TỪ STT {from_stt} ĐẾN STT {to_stt} (DIRECT URL DOWNLOAD)...")
+                current_stt = from_stt
+                downloaded_count = 0
+                current_page_num = 1
+
+                while current_stt <= to_stt:
+                    log(f"\n📑 Đang quét dữ liệu tại Trang {current_page_num}...")
+                    self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+
+                    records = self._extract_records_from_grid(page)
+                    if not records:
+                        log("⚠️ Không tìm thấy bản ghi nào trên trang hiện tại. Đã hết dữ liệu.")
+                        break
+
+                    log(f"📋 Tìm thấy {len(records)} bản ghi trên Trang {current_page_num}. Đầu trang: STT {records[0].get('stt')} | {records[0].get('maGD')}")
+
+                    records_to_dl = [r for r in records if r.get('stt', 0) >= current_stt and r.get('stt', 0) <= to_stt]
+
+                    if not records_to_dl:
+                        records_to_dl = [
+                            {"stt": (current_page_num - 1) * 100 + (i + 1), "maGD": r.get('maGD')}
+                            for i, r in enumerate(records)
+                            if (current_page_num - 1) * 100 + (i + 1) >= current_stt and (current_page_num - 1) * 100 + (i + 1) <= to_stt
+                        ]
+
+                    log(f"⚡ Sẽ tải {len(records_to_dl)} bản ghi trên trang này...")
+
+                    for rec in records_to_dl:
+                        fp = self._download_direct_record(
+                            page=page,
+                            ma_gd=rec['maGD'],
+                            stt=rec['stt'],
+                            save_dir=TEMP_ERROR_DIR,
+                            log_func=log
+                        )
+                        if fp:
+                            downloaded_count += 1
+                        current_stt = rec['stt'] + 1
+                        time.sleep(0.2)  # Nghỉ 200ms để server không bị nghẽn
+
+                    if current_stt > to_stt:
+                        log(f"🎉 Đã tải hoàn tất đến STT {to_stt}!")
+                        break
+
+                    # Chuyển sang trang tiếp theo
+                    current_page_num += 1
+                    log(f"➡️ Chuyển sang Trang {current_page_num} tại thanh phân trang...")
+                    pager = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom")
+                    next_page_btn = pager.get_by_text(str(current_page_num), exact=True)
+
+                    if next_page_btn.count() > 0:
+                        next_page_btn.first.click(force=True)
+                        log(f"⏳ Chờ Trang {current_page_num} nạp dữ liệu...")
+                        self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                    else:
+                        log(f"⚠️ Không tìm thấy nút Trang {current_page_num}. Đã đến trang cuối.")
+                        break
+
+                log(f"\n📦 ĐÃ TẢI XONG TỔNG CỘNG {downloaded_count} FILE HỒ SƠ LỖI.")
+
+                # 8. GỘP FILE EXCEL VÀ LỌC DÒNG TRÙNG
+                log("📊 Đang tiến hành gộp dữ liệu các file Excel và loại bỏ các dòng trùng lặp...")
+                final_output_file = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
+                summary = self.merge_excel_files(TEMP_ERROR_DIR, final_output_file, log_func=log)
+
+                # Lưu context session
+                context.storage_state(path=SESSION_FILE)
+
+                log("🌟 QUY TRÌNH LUỒNG C MỚI ĐÃ HOÀN TẤT TRỌN VẸN!")
+                return {
+                    "status": "success",
+                    "downloaded_count": downloaded_count,
+                    "file_path": final_output_file,
+                    "summary": summary,
+                    "message": f"Tải thành công {downloaded_count} gói lỗi, tổng hợp thành {summary['unique_records']} bản ghi duy nhất."
+                }
+
+            except Exception as e:
+                log(f"❌ Lỗi thực thi Luồng C: {str(e)}")
+                raise e
+            finally:
+                context.close()
+                browser.close()
+
+    # =========================================================================
+    # LUỒNG B MỚI (NATIVE BROWSER & TIMEOUT 600S)
+    # =========================================================================
+    def run_flow_b(
+        self,
+        log_func: Optional[Callable[[str], None]] = None
+    ) -> Dict[str, Any]:
+        """
+        LUỒNG B MỚI: Tự động tải Danh sách đã gửi (listbh.xlsx) từ Cổng BHYT.
+        - Chạy Chrome/Edge native trên Windows.
+        - Chọn 'Đã đề nghị thanh toán', Tìm kiếm và xuất file listbh.xlsx.
+        - Timeout 600s (10 phút) để xử lý file dung lượng lớn.
+        """
+        from playwright.sync_api import sync_playwright
+
+        def log(msg: str):
+            if log_func: log_func(msg)
+            safe_print(f"[*] [Flow B] {msg}")
+
+        log("🚀 Khởi động Luồng B Mới (Tải danh sách đã gửi listbh.xlsx)...")
+
+        with sync_playwright() as p:
+            log("🌐 Đang khởi động trình duyệt (Google Chrome / Microsoft Edge)...")
+            browser = launch_native_browser(p, headless=False)
+
+            storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
+            context = browser.new_context(
+                storage_state=storage_path,
+                viewport=None,
+                accept_downloads=True
+            )
+            page = context.new_page()
+            page.set_default_timeout(600000)
+            page.set_default_navigation_timeout(600000)
+
+            try:
+                # 1. Đảm bảo đăng nhập
+                self._ensure_login(page, log_func=log)
+
+                # 2. Điều hướng vào Danh sách đề nghị thanh toán
+                log("📌 Đang điều hướng đến: Danh sách đề nghị thanh toán (/DanhSachHSKCB/Index)...")
+                target_url = f"{self.base_url.rstrip('/')}/DanhSachHSKCB/Index"
+                try:
+                    page.goto(target_url, timeout=90000, wait_until="load")
+                except Exception as e:
+                    log(f"Truy cập URL trực tiếp: {e}")
+
+                page.wait_for_selector("#gvDanhSachHoSo, #bt_TimKiem, #btnExport, #cb_TrangThaiTT", timeout=60000)
+                self._wait_for_grid_ready(page, timeout_ms=60000, log_func=log)
+
+                # 3. Chọn Trạng thái: 'Đã đề nghị thanh toán'
+                log("🏷️ Đang chọn trạng thái: 'Đã đề nghị thanh toán'...")
+                status_selected = page.evaluate("""() => {
                     try {
                         const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                        const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
+                        const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
+                        if (cb) {
+                            const count = typeof cb.GetItemCount === 'function' ? cb.GetItemCount() : 0;
+                            for (let i = 0; i < count; i++) {
+                                const it = cb.GetItem(i);
+                                if (it && it.text && it.text.trim().toLowerCase().includes('đã đề nghị thanh toán')) {
+                                    cb.SetSelectedIndex(i);
+                                    if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
+                                    if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                                    return true;
+                                }
+                            }
+                            cb.SetText('Đã đề nghị thanh toán');
+                            if (typeof cb.SetValue === 'function') cb.SetValue('2');
+                            if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                            return true;
+                        }
+                    } catch(err) {}
+                    return false;
+                }""")
+
+                if not status_selected:
+                    btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img").first
+                    if btn_cb.is_visible(timeout=2000):
+                        btn_cb.click(force=True)
+                        time.sleep(0.4)
+                        item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
+                        if item.is_visible(timeout=2000):
+                            item.click(force=True)
+
+                log("✅ Đã chọn trạng thái 'Đã đề nghị thanh toán'!")
+                self._wait_for_grid_ready(page, timeout_ms=30000, log_func=log)
+
+                # 4. Bấm Tìm kiếm
+                log("🔍 Bấm nút Tìm kiếm dữ liệu...")
+                searched = page.evaluate("""() => {
+                    try {
+                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                        const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
                         if (btn && typeof btn.DoClick === 'function') {
                             btn.DoClick();
                             return true;
@@ -480,18 +828,34 @@ class PortalAutomationService:
                     } catch(e) {}
                     return false;
                 }""")
+                if not searched:
+                    s_el = page.locator("#bt_TimKiem_CD, #bt_TimKiem, #btnTimKiem").first
+                    if s_el.is_visible(timeout=2000):
+                        s_el.click(force=True)
 
-                if not opened_popup:
-                    btn_exp = page.locator("#btnExport_CD, #btnExport, #bt_XuatExcel_CD, #bt_XuatExcel, .dxbButton:has-text('Xuất Excel')").first
-                    if btn_exp.is_visible(timeout=3000):
-                        btn_exp.click(force=True)
+                log("⏳ Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách đề nghị thanh toán (tối đa 10 phút)...")
+                self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                log("✅ Dữ liệu danh sách hồ sơ đã nạp xong!")
 
-                time.sleep(1.2)
+                # 5. Xuất Excel và tải file listbh.xlsx
+                log("📥 Đang kích hoạt Xuất Excel danh sách đã gửi...")
+                
+                # Bước 5.1: Mở popup Export
+                page.evaluate("""() => {
+                    try {
+                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                        const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
+                        if (btn && typeof btn.DoClick === 'function') btn.DoClick();
+                    } catch(e) {}
+                }""")
+                time.sleep(1.5)
 
-                # Bước 5.2: Bấm nút "Xuất excel" (btnExportExcel) trong Popup kèm theo expect_download
-                log("Đang bấm nút 'Xuất excel' (btnExportExcel) để tải file listbh.xlsx...")
-                with page.expect_download(timeout=300000) as download_info:
-                    clicked_excel = page.evaluate("""() => {
+                # Bước 5.2: Bấm nút "Xuất excel" trong Popup và nhận luồng Download
+                log("⚡ Đang bấm nút 'Xuất excel' để tải file listbh.xlsx...")
+                dest_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
+
+                with page.expect_download(timeout=600000) as download_info:
+                    clicked_exp = page.evaluate("""() => {
                         try {
                             const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
                             const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
@@ -502,31 +866,25 @@ class PortalAutomationService:
                         } catch(e) {}
                         return false;
                     }""")
+                    if not clicked_exp:
+                        btn_d = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel')").first
+                        if btn_d.is_visible(timeout=5000):
+                            btn_d.click(force=True)
 
-                    if not clicked_excel:
-                        btn_down = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel'), [id*='btnExportExcel']").first
-                        if btn_down.is_visible(timeout=5000):
-                            btn_down.click(force=True)
-                        else:
-                            page.evaluate("""() => {
-                                const btns = Array.from(document.querySelectorAll('.dxbButton, button, a, tr, td, span'));
-                                const target = btns.find(b => b.textContent && b.textContent.trim().toLowerCase() === 'xuất excel');
-                                if (target) target.click();
-                            }""")
-
-                log("Cổng BHYT đã tạo tệp Excel xong! Đang tải về máy...")
                 download = download_info.value
-                dest_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
                 download.save_as(dest_path)
-                log(f"Tải tệp danh sách đã gửi thành công: {dest_path} ✅")
+                log(f"✅ Tải tệp danh sách đã gửi thành công: {dest_path}")
 
-                # Lưu session mới nhất
                 context.storage_state(path=SESSION_FILE)
 
                 # Đọc số dòng của file tải về
-                df = pd.read_excel(dest_path)
-                row_count = len(df)
-                log(f"Đã nạp file listbh.xlsx với {row_count} dòng dữ liệu.")
+                row_count = 0
+                try:
+                    df = pd.read_excel(dest_path)
+                    row_count = len(df)
+                    log(f"📊 Đã nạp file listbh.xlsx với {row_count} dòng dữ liệu.")
+                except Exception as de:
+                    log(f"Đọc file Excel: {de}")
 
                 return {
                     "status": "success",
@@ -536,522 +894,11 @@ class PortalAutomationService:
                 }
 
             except Exception as e:
-                log(f"Lỗi thực thi Luồng B: {str(e)}")
+                log(f"❌ Lỗi thực thi Luồng B: {str(e)}")
                 raise e
             finally:
                 context.close()
                 browser.close()
 
-    def run_flow_c(self, from_date: str, to_date: str, log_func: Optional[Callable[[str], None]] = None) -> dict:
-        """
-        LUỒNG C: Tự động cào/tải Danh sách lỗi chi tiết từ QĐ 3176, gom thành HoSoLoiChiTiet.xlsx.
-        """
-        from playwright.sync_api import sync_playwright
 
-        def log(msg: str):
-            if log_func:
-                log_func(msg)
-            safe_print(f"[*] [Flow C] {msg}")
-
-        log("Bắt đầu Luồng C (Tải danh sách lỗi chi tiết)...")
-
-        # Xóa các file lỗi tạm cũ
-        for old_f in glob.glob(os.path.join(TEMP_ERROR_DIR, "*.*")):
-            try:
-                os.remove(old_f)
-            except Exception:
-                pass
-
-        with sync_playwright() as p:
-            storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
-            try:
-                browser = p.chromium.launch(headless=False)
-            except Exception as launch_err:
-                err_str = str(launch_err)
-                if "Executable doesn't exist" in err_str or "playwright install" in err_str:
-                    log("Chưa cài đặt trình duyệt Chromium cho Playwright trên máy chủ!")
-                    raise Exception("Trình duyệt Chromium chưa được cài đặt trên máy chủ. Vui lòng chạy lệnh: playwright install chromium (hoặc bấm 'Cài riêng Chromium' trên tool LaunchWebBHYT).")
-                try:
-                    log(f"Thử khởi chạy Chromium chế độ ngầm (headless): {launch_err}")
-                    browser = p.chromium.launch(headless=True)
-                except Exception as h_err:
-                    raise Exception(f"Không thể khởi chạy trình duyệt Chromium: {h_err}")
-
-            context = browser.new_context(
-                storage_state=storage_path,
-                viewport={'width': 1366, 'height': 768},
-                accept_downloads=True
-            )
-            page = context.new_page()
-
-            try:
-                # 1. Đảm bảo đã đăng nhập
-                self._ensure_login(page, log_func=log)
-                self.wait_portal_idle(page)
-
-                # 2. Điều hướng trực tiếp vào Kết quả gửi hồ sơ XML
-                log("Đang điều hướng đến: Kết quả gửi hồ sơ XML (/DanhSachKetQuaGuiHoSoQD130/Index)...")
-                target_url_c = f"{self.base_url.rstrip('/')}/DanhSachKetQuaGuiHoSoQD130/Index"
-                try:
-                    page.goto(target_url_c, timeout=45000)
-                    page.wait_for_load_state("domcontentloaded")
-                except Exception as g_err:
-                    log(f"Lưu ý truy cập URL: {g_err}")
-
-                # Chờ các control chính hiển thị hoặc fallback menu
-                try:
-                    page.wait_for_selector("#gvDSKetQuaGuiHoso, #dt_TuNgay_I, #btnTimKiem", timeout=20000)
-                except Exception:
-                    # Fallback menu click
-                    try:
-                        top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                        if top_menu.is_visible(timeout=3000): top_menu.click()
-                        time.sleep(0.5)
-                        xml_item = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
-                        if xml_item.is_visible(timeout=3000): xml_item.click(force=True)
-                        time.sleep(0.5)
-                        qd3176 = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
-                        if qd3176.is_visible(timeout=3000): qd3176.click(force=True)
-                        time.sleep(0.5)
-                        page.evaluate("""() => {
-                            const links = Array.from(document.querySelectorAll('a')).filter(a => a.textContent && a.textContent.includes('Kết quả gửi hồ sơ XML'));
-                            if (links.length > 1) { links[1].click(); return true; }
-                            else if (links.length === 1) { links[0].click(); return true; }
-                            return false;
-                        }""")
-                        page.wait_for_load_state("domcontentloaded")
-                    except Exception: pass
-
-                page.wait_for_load_state("domcontentloaded")
-                self.wait_portal_idle(page)
-
-                # Helper kiểm tra bảng nạp dữ liệu sâu với DevExpress InCallback & Loading Panels (Chu kỳ kiểm tra 10s/lần, tối đa 180s)
-                def wait_for_grid_data(timeout=180):
-                    start = time.time()
-                    last_log_time = start
-                    time.sleep(1.0)
-                    while time.time() - start < timeout:
-                        elapsed = int(time.time() - start)
-                        if time.time() - last_log_time >= 10:
-                            log(f"  [Đang đợi Cổng BHYT] Đã chờ {elapsed}s / {timeout}s...")
-                            last_log_time = time.time()
-
-                        try:
-                            # 1. Kiểm tra trạng thái InCallback từ nhân DevExpress
-                            is_busy = page.evaluate("""() => {
-                                try {
-                                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                    const grid = window.gvDSKetQuaGuiHoso || (cc ? cc.GetByName('gvDSKetQuaGuiHoso') : null);
-                                    if (grid && typeof grid.InCallback === 'function' && grid.InCallback()) return true;
-                                    if (cc && typeof cc.ForEachControl === 'function') {
-                                        let b = false;
-                                        cc.ForEachControl(c => {
-                                            if (c && typeof c.InCallback === 'function' && c.InCallback()) b = true;
-                                        });
-                                        if (b) return true;
-                                    }
-                                } catch(e) {}
-                                const ld = document.querySelector('#gvDSKetQuaGuiHoso_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv, .dxp-loadingPanel, .dxlpLoadingPanelWithContent');
-                                if (ld && ld.offsetParent !== null && window.getComputedStyle(ld).display !== 'none' && window.getComputedStyle(ld).visibility !== 'hidden') return true;
-                                return false;
-                            }""")
-
-                            if is_busy:
-                                time.sleep(0.6)
-                                continue
-
-                            # 2. Kiểm tra số dòng sau khi đã hết loading
-                            data_rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow")
-                            if data_rows.count() > 0:
-                                time.sleep(0.8)
-                                return True
-                            empty_rows = page.locator("#gvDSKetQuaGuiHoso tr.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso td.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso:has-text('Không có dữ liệu')")
-                            if empty_rows.count() > 0:
-                                time.sleep(0.6)
-                                return False
-                        except Exception: pass
-                        time.sleep(0.5)
-                    return False
-
-                # Đợi bảng danh sách và gridview hiển thị sẵn sàng
-                log("Đang chờ bảng danh sách Kết quả gửi hồ sơ XML hiển thị hoàn tất...")
-                try:
-                    page.wait_for_selector("#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable, input[name*='TuNgay'], #dt_TuNgay_I", timeout=30000)
-                    self.wait_portal_idle(page)
-                except Exception as w_err:
-                    log(f"Lưu ý chờ bảng: {w_err}")
-
-                # 3. BƯỚC 1: ĐẶT NGÀY TODAY (KẾT HỢP 3 LỚP ĐẢM BẢO 100%)
-                log("Đang đặt khoảng ngày tìm kiếm = TODAY (dt_TuNgay / dt_DenNgay)...")
-                import datetime as dt_mod
-                today_ddmmyyyy = dt_mod.datetime.now().strftime("%d/%m/%Y")
-
-                # Lớp 1: DevExpress Client API gán trực tiếp dt_TuNgay và dt_DenNgay
-                try:
-                    page.evaluate("""() => {
-                        try {
-                            const now = new Date();
-                            if (window.dt_TuNgay && typeof window.dt_TuNgay.SetDate === 'function') {
-                                window.dt_TuNgay.SetDate(now);
-                            }
-                            if (window.dt_DenNgay && typeof window.dt_DenNgay.SetDate === 'function') {
-                                window.dt_DenNgay.SetDate(now);
-                            }
-                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            if (cc) {
-                                const cTu = cc.GetByName('dt_TuNgay');
-                                if (cTu && typeof cTu.SetDate === 'function') cTu.SetDate(now);
-                                const cDen = cc.GetByName('dt_DenNgay');
-                                if (cDen && typeof cDen.SetDate === 'function') cDen.SetDate(now);
-                            }
-                        } catch(e) {}
-                    }""")
-                    log(f"Đã đặt ngày qua DevExpress API dt_TuNgay / dt_DenNgay ({today_ddmmyyyy}) ✅")
-                except Exception: pass
-
-                # Lớp 2: Điền chuỗi dd/MM/yyyy vào input DOM
-                try:
-                    for s_inp in ["#dt_TuNgay_I", "#dt_DenNgay_I", "input[id*='TuNgay']", "input[id*='DenNgay']"]:
-                        inp = page.locator(s_inp).first
-                        if inp.is_visible(timeout=1000):
-                            inp.click(click_count=3)
-                            inp.fill(today_ddmmyyyy)
-                            inp.press("Tab")
-                except Exception: pass
-
-                # Lớp 3: Mở popup lịch Từ ngày & Đến ngày và click Today
-                try:
-                    tu_btn = page.locator("#dt_TuNgay_B-1, #dt_TuNgay_B-1Img, td[id*='dt_TuNgay_B-1'], [id*='TuNgay'][id*='_B-1']").first
-                    if tu_btn.is_visible(timeout=1500):
-                        tu_btn.click(force=True)
-                        time.sleep(0.3)
-                        today_btn = page.locator("#dt_TuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
-                        if today_btn.is_visible(timeout=1500):
-                            today_btn.click(force=True)
-                            log("Đã chọn nút 'Today' trên popup Từ ngày ✅")
-                            time.sleep(0.3)
-
-                    den_btn = page.locator("#dt_DenNgay_B-1, #dt_DenNgay_B-1Img, td[id*='dt_DenNgay_B-1'], [id*='DenNgay'][id*='_B-1']").first
-                    if den_btn.is_visible(timeout=1500):
-                        den_btn.click(force=True)
-                        time.sleep(0.3)
-                        today_den = page.locator("#dt_DenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
-                        if today_den.is_visible(timeout=1500):
-                            today_den.click(force=True)
-                            log("Đã chọn nút 'Today' trên popup Đến ngày ✅")
-                            time.sleep(0.3)
-                except Exception as dt_err:
-                    log(f"Lưu ý click popup lịch: {dt_err}")
-
-                # Bấm nút Tìm kiếm (btnTimKiem)
-                log("Bấm Tìm kiếm dữ liệu (btnTimKiem)...")
-                searched = False
-                try:
-                    searched = page.evaluate("""() => {
-                        try {
-                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            const btn = window.btnTimKiem || (cc ? cc.GetByName('btnTimKiem') : null);
-                            if (btn && typeof btn.DoClick === 'function') {
-                                btn.DoClick();
-                                return true;
-                            }
-                        } catch(e) {}
-                        return false;
-                    }""")
-                except Exception: pass
-
-                if not searched:
-                    for s_sel in ["#btnTimKiem_CD", "#btnTimKiem_B", "#btnTimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')"]:
-                        try:
-                            s_btn = page.locator(s_sel).first
-                            if s_btn.is_visible(timeout=2000):
-                                s_btn.click(force=True)
-                                searched = True
-                                break
-                        except Exception: pass
-
-                log("Đang chờ máy chủ Cổng BHYT phản hồi dữ liệu tìm kiếm (InCallback monitoring, tối đa 180s)...")
-                wait_for_grid_data(timeout=180)
-                self.wait_portal_idle(page)
-
-                # 4. BƯỚC 2: CHỌN HIỂN THỊ 100 DÒNG / TRANG QUA PAGER DROPDOWN & CHỜ LOADING
-                log("Thiết lập hiển thị 100 bản ghi/trang...")
-                selected_100 = False
-                try:
-                    # Mở dropdown pager
-                    pager_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg, #gvDSKetQuaGuiHoso_DXPagerBottom .dxp-dropDownButton, .dxp-dropDownButton").first
-                    if pager_btn.is_visible(timeout=3000):
-                        pager_btn.click(force=True)
-                        time.sleep(0.6)
-
-                        # Chọn mục 100 qua JavaScript với đầy đủ Mouse Events
-                        selected_100 = page.evaluate("""() => {
-                            const lists = Array.from(document.querySelectorAll('.dxp-dropDownListBox, div[id*="_PSP_"], .dxeListBox, div[id*="PagerBottom"]'));
-                            for (const l of lists) {
-                                if (l.offsetParent !== null) {
-                                    const items = Array.from(l.querySelectorAll('td, tr, span, div, li'));
-                                    const target = items.find(it => (it.textContent || '').trim() === '100');
-                                    if (target) {
-                                        target.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true}));
-                                        target.dispatchEvent(new MouseEvent('mouseup', {bubbles: true, cancelable: true}));
-                                        target.click();
-                                        return true;
-                                    }
-                                }
-                            }
-                            return false;
-                        }""")
-
-                        if not selected_100:
-                            item_100 = page.locator("div[id*='PSP'] td, .dxp-dropDownListBox td, .dxeListBoxItem").filter(has_text=re.compile(r"^\s*100\s*$")).last
-                            if item_100.is_visible(timeout=2000):
-                                item_100.hover()
-                                item_100.click(force=True)
-                                selected_100 = True
-
-                except Exception as e:
-                    log(f"Lưu ý click chọn 100 dòng: {e}")
-
-                if selected_100:
-                    log("Đã kích hoạt chọn 100 bản ghi/trang! Đang chờ máy chủ nạp lại dữ liệu (tối đa 180s)...")
-                    time.sleep(1.0)
-                    wait_for_grid_data(timeout=180)
-                    self.wait_portal_idle(page)
-                    time.sleep(1.0)
-                    log("Máy chủ đã hoàn tất tải dữ liệu 100 bản ghi/trang ✅")
-
-                # 5. BƯỚC 3: NHẬN DIỆN CỘT LỖI & ÁP DỤNG BỘ LỌC 1 VỚI CƠ CHẾ AUTO-RETRY XÁC THỰC
-                log("Đang áp dụng bộ lọc cột Lỗi = 1...")
-                try:
-                    filter_info = page.evaluate("""() => {
-                        const table = document.querySelector('#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable');
-                        if (!table) return null;
-                        const headers = Array.from(table.querySelectorAll('.dxgvHeader_EIS, th, td[id*="_col"]')).map((h, i) => ({
-                            index: i,
-                            text: (h.textContent || '').trim().toLowerCase()
-                        }));
-                        let errIdx = 5;
-                        for (const h of headers) {
-                            if (h.text.includes('lỗi') || h.text.includes('không hợp lệ') || h.text.includes('số lỗi') || h.text.includes('chi tiết lỗi')) {
-                                errIdx = h.index;
-                                break;
-                            }
-                        }
-                        return { errIdx: errIdx };
-                    }""")
-                    err_col = filter_info.get("errIdx", 5) if filter_info else 5
-                    
-                    # Thử áp dụng lọc tối đa 2 lần để tránh rớt phím khi mạng lag
-                    for filter_attempt in range(2):
-                        col_input = page.locator(f"#gvDSKetQuaGuiHoso_DXFREditorcol{err_col}_I, #gvDSKetQuaGuiHoso_DXFREditorcol5_I, input[id*='DXFREditorcol5']").first
-                        if col_input.is_visible(timeout=3000):
-                            col_input.click(click_count=3)
-                            col_input.fill("1")
-                            col_input.press("Enter")
-                        else:
-                            page.evaluate("""(col) => {
-                                try {
-                                    const grid = window.gvDSKetQuaGuiHoso;
-                                    if (grid && typeof grid.AutoFilterByColumn === 'function') {
-                                        grid.AutoFilterByColumn(col, '1');
-                                    }
-                                } catch(e) {}
-                            }""", err_col)
-
-                        log(f"Đang chờ máy chủ áp dụng bộ lọc cột lỗi = 1 (Lần {filter_attempt + 1}, tối đa 180s)...")
-                        wait_for_grid_data(timeout=180)
-                        self.wait_portal_idle(page)
-                        time.sleep(1.0)
-
-                        # Kiểm tra xem giá trị trong ô lọc có đúng là 1 không
-                        curr_filter_val = page.evaluate(f"""() => {{
-                            const inp = document.querySelector("#gvDSKetQuaGuiHoso_DXFREditorcol{err_col}_I, #gvDSKetQuaGuiHoso_DXFREditorcol5_I");
-                            return inp ? inp.value.trim() : '1';
-                        }}""")
-                        if curr_filter_val == "1":
-                            break
-
-                    log("Đã hoàn tất lọc các ca có lỗi (cột lỗi = 1) ✅")
-                except Exception as f_err:
-                    log(f"Lưu ý khi lọc cột lỗi: {f_err}")
-
-                # 6. BƯỚC 4: LẶP QUA CÁC TRANG VÀ TẢI TỪNG FILE CHI TIẾT
-                total_downloaded = 0
-                page_idx = 1
-
-                while True:
-                    log(f"Đang quét danh sách hồ sơ lỗi tại Trang {page_idx}...")
-                    wait_for_grid_data(timeout=180)
-                    self.wait_portal_idle(page)
-
-                    rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow").all()
-                    log(f"Trang {page_idx}: Tìm thấy {len(rows)} ca lỗi cần tải chi tiết.")
-
-                    if len(rows) == 0:
-                        log("Không tìm thấy ca lỗi nào trên trang này.")
-                        break
-
-                    for idx, row in enumerate(rows):
-                        try:
-                            log(f"[{total_downloaded + 1}/{total_downloaded + len(rows) - idx}] Đang mở chi tiết ca lỗi dòng #{idx + 1}...")
-
-                            # Đảm bảo popup cũ và lớp phủ mờ mask đã đóng hoàn toàn
-                            try:
-                                page.locator(".dxpc-mask, #PopupNhanChiTietLoiHS_PW-0").wait_for(state="hidden", timeout=3000)
-                            except Exception: pass
-
-                            # Click mở chi tiết ca lỗi
-                            link = row.locator("a, span[onclick], td[onclick]").first
-                            if link.is_visible(timeout=2000):
-                                link.click(force=True)
-                            else:
-                                row.click(force=True)
-
-                            # Chờ popup hiển thị và nạp xong nội dung bên trong
-                            try:
-                                page.wait_for_selector("#PopupNhanChiTietLoiHS_PW-0, div[id*='PopupNhanChiTietLoiHS']", state="visible", timeout=15000)
-                            except Exception: pass
-                            
-                            try:
-                                page.locator("#PopupNhanChiTietLoiHS_LD, .dxlpLoadingPanelWithContent").wait_for(state="hidden", timeout=10000)
-                            except Exception: pass
-
-                            # Chờ và click "Xuất Excel" trong popup
-                            export_btn = page.locator("#PopupNhanChiTietLoiHS_PW-0 button, #PopupNhanChiTietLoiHS_PW-0 span, #PopupNhanChiTietLoiHS_PW-0 a, #PopupNhanChiTietLoiHS_PW-0 td, button, span, a").filter(has_text=re.compile(r"^Xuất Excel$", re.IGNORECASE)).first
-                            
-                            if export_btn.is_visible(timeout=10000):
-                                with page.expect_download(timeout=60000) as dl_info:
-                                    export_btn.click(force=True)
-                                
-                                dl = dl_info.value
-                                temp_file_path = os.path.join(TEMP_ERROR_DIR, f"err_p{page_idx}_{idx+1}_{int(time.time()*1000)}.xlsx")
-                                dl.save_as(temp_file_path)
-                                total_downloaded += 1
-                                log(f"  -> Đã tải thành công tệp lỗi #{total_downloaded} ✅")
-                            else:
-                                log(f"  -> Lưu ý: Không thấy nút 'Xuất Excel' trong popup của dòng #{idx + 1}.")
-
-                            # Đóng popup an toàn và chờ mask biến mất
-                            page.evaluate("""() => {
-                                try {
-                                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                    const pop = window.PopupNhanChiTietLoiHS || (cc ? cc.GetByName('PopupNhanChiTietLoiHS') : null);
-                                    if (pop && typeof pop.Hide === 'function') pop.Hide();
-                                } catch(e) {}
-                            }""")
-                            
-                            for c_sel in [".dxpc-closeBtn", "img[alt*='Close']", "img[title*='Close']", ".dxWeb_pcCloseButton_Youthful"]:
-                                c_el = page.locator(c_sel).first
-                                if c_el.is_visible(timeout=500):
-                                    c_el.click(force=True)
-                                    break
-                            
-                            try:
-                                page.locator(".dxpc-mask, #PopupNhanChiTietLoiHS_PW-0").wait_for(state="hidden", timeout=5000)
-                            except Exception: pass
-                            time.sleep(0.4)
-
-                        except Exception as row_err:
-                            log(f"  Lỗi khi tải dòng #{idx+1}: {row_err}")
-                            try:
-                                page.evaluate("if (window.PopupNhanChiTietLoiHS) window.PopupNhanChiTietLoiHS.Hide();")
-                            except Exception: pass
-
-                    # Chuyển trang tiếp theo qua pager button
-                    try:
-                        next_page_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom .dxp-button:has-text('>')").first
-                        if next_page_btn.is_visible(timeout=2000) and "dxp-disabled" not in (next_page_btn.get_attribute("class") or ""):
-                            log(f"Chuyển sang trang tiếp theo (Trang {page_idx + 1})...")
-                            next_page_btn.click(force=True)
-                            page_idx += 1
-                            time.sleep(1.0)
-                            wait_for_grid_data(timeout=30)
-                        else:
-                            log("Đã duyệt hết tất cả các trang.")
-                            break
-                    except Exception:
-                        log("Hoàn thành duyệt các trang.")
-                        break
-
-                # 7. Gom tất cả các file Excel tải về thành HoSoLoiChiTiet.xlsx
-                log(f"Đang tổng hợp {total_downloaded} tệp lỗi thành một file Excel duy nhất...")
-                merged_dest = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
-                total_error_records = self._merge_error_files(TEMP_ERROR_DIR, merged_dest, log_func=log)
-
-                # Lưu session
-
-                # 7. Gom tất cả các file Excel tải về thành HoSoLoiChiTiet.xlsx
-                log(f"Đang tổng hợp {total_downloaded} tệp lỗi thành một file Excel duy nhất...")
-                merged_dest = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
-                total_error_records = self._merge_error_files(TEMP_ERROR_DIR, merged_dest, log_func=log)
-
-                # Lưu session
-                context.storage_state(path=SESSION_FILE)
-
-                return {
-                    "status": "success",
-                    "file_path": merged_dest,
-                    "downloaded_files": total_downloaded,
-                    "total_errors": total_error_records,
-                    "message": f"Đã tải {total_downloaded} gói lỗi và tổng hợp thành công {total_error_records} dòng lỗi chi tiết vào HoSoLoiChiTiet.xlsx."
-                }
-
-            except Exception as e:
-                log(f"Lỗi thực thi Luồng C: {str(e)}")
-                raise e
-            finally:
-                context.close()
-                browser.close()
-
-    def _merge_error_files(self, source_dir: str, dest_path: str, log_func: Optional[Callable[[str], None]] = None) -> int:
-        """Gom tất cả file Excel trong source_dir thành 1 file Excel duy nhất theo đúng cấu trúc HoSoLoiChiTiet."""
-        files = glob.glob(os.path.join(source_dir, "*.xlsx")) + glob.glob(os.path.join(source_dir, "*.xls"))
-        if not files:
-            if log_func:
-                log_func("Không có tệp lỗi nào được tải về để tổng hợp.")
-            # Tạo DataFrame rỗng có cấu trúc
-            empty_df = pd.DataFrame(columns=["MA_LK", "MALOI", "MOTALOI", "Ngày ra", "Tên bệnh nhân", "Mã thẻ"])
-            empty_df.to_excel(dest_path, index=False)
-            return 0
-
-        all_dfs = []
-        for f in files:
-            try:
-                # Đọc file excel chi tiết lỗi của cổng BHYT
-                df = pd.read_excel(f)
-                if not df.empty:
-                    # Chuẩn hóa tên cột nếu có biến thể
-                    col_map = {}
-                    for c in df.columns:
-                        c_str = str(c).strip().upper()
-                        if "MA_LK" in c_str or "MÃ LIÊN KẾT" in c_str or "MÃ LK" in c_str:
-                            col_map[c] = "MA_LK"
-                        elif "MALOI" in c_str or "MÃ LỖI" in c_str:
-                            col_map[c] = "MALOI"
-                        elif "MOTALOI" in c_str or "MÔ TẢ" in c_str or "NỘI DUNG LỖI" in c_str or "CHI TIẾT LỖI" in c_str:
-                            col_map[c] = "MOTALOI"
-                        elif "NGAY_RA" in c_str or "NGÀY RA" in c_str:
-                            col_map[c] = "Ngày ra"
-                    
-                    df = df.rename(columns=col_map)
-                    all_dfs.append(df)
-            except Exception as e:
-                if log_func:
-                    log_func(f"Lỗi đọc file {os.path.basename(f)}: {e}")
-
-        if all_dfs:
-            combined_df = pd.concat(all_dfs, ignore_index=True)
-            # Bỏ trùng lặp dòng lỗi hoàn toàn giống nhau nếu có
-            combined_df = combined_df.drop_duplicates()
-            combined_df.to_excel(dest_path, index=False)
-            if log_func:
-                log_func(f"Đã lưu file tổng hợp {dest_path} ({len(combined_df)} dòng lỗi chi tiết).")
-            return len(combined_df)
-        else:
-            empty_df = pd.DataFrame(columns=["MA_LK", "MALOI", "MOTALOI", "Ngày ra"])
-            empty_df.to_excel(dest_path, index=False)
-            return 0
-
-
-# Instance mặc định
 portal_service = PortalAutomationService()

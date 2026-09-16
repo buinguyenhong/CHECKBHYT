@@ -5,7 +5,7 @@ import base64
 import asyncio
 from io import BytesIO
 from fastapi import FastAPI, Depends, Request, Response, Form, UploadFile, File, HTTPException, status, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -516,6 +516,13 @@ def login_page(request: Request):
 def admin_page(request: Request, user: User = Depends(require_admin)):
     """Bảng điều khiển dành cho phòng IT"""
     return templates.TemplateResponse(request=request, name="admin.html")
+
+
+@app.get("/portal-automation", response_class=HTMLResponse)
+def portal_automation_page(request: Request, user: User = Depends(require_admin)):
+    """Màn hình chuyên biệt độc lập: Tự động hóa Cổng BHYT (Luồng B & Luồng C Mới)"""
+    return templates.TemplateResponse(request=request, name="portal_automation.html")
+
 
 
 @app.get("/department", response_class=HTMLResponse)
@@ -1050,127 +1057,168 @@ async def upload_loi(
         raise HTTPException(status_code=400, detail=f"Lỗi đọc file Excel HoSoLoiChiTiet: {str(e)}")
 
 
-# ==========================================
-# API: BHYT PORTAL RPA AUTOMATION (PLAYWRIGHT)
-# ==========================================
+# =========================================================================
+# API: BHYT PORTAL AUTOMATION (V2 - DIRECT URL DOWNLOAD & NATIVE BROWSER)
+# =========================================================================
 
 @app.get("/api/automation/logs")
 def get_automation_logs(user: User = Depends(require_admin)):
-    """Lấy danh sách log tiến trình tự động hóa Cổng BHYT thời gian thực"""
+    """Lấy danh sách log tiến trình tự động hóa Cổng BHYT thời gian thực (JSON)"""
     return {"logs": portal_logs[-60:]}
 
 
-@app.post("/api/automation/flow-b")
-async def run_automation_flow_b(
+@app.get("/api/automation/v2/logs")
+async def stream_automation_logs(request: Request):
+    """Server-Sent Events (SSE) để truyền log tiến trình thời gian thực lên giao diện web"""
+    async def event_generator():
+        last_idx = 0
+        while True:
+            if await request.is_disconnected():
+                break
+            if len(portal_logs) > last_idx:
+                for i in range(last_idx, len(portal_logs)):
+                    yield f"data: {portal_logs[i]}\n\n"
+                last_idx = len(portal_logs)
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/automation/v2/flow-c")
+async def run_automation_v2_flow_c(
     data: dict,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
-    Kích hoạt Luồng B: Tự động đăng nhập Cổng BHYT, tải listbh.xlsx và kích hoạt Đối soát B (tìm ca FAIL).
+    Kích hoạt Luồng C Mới: Tải trực tiếp siêu tốc qua Direct URL, gộp file & lọc trùng dòng.
     """
-    from_date = data.get("from_date", "").strip()
-    to_date = data.get("to_date", "").strip()
-    if not from_date or not to_date:
-        raise HTTPException(status_code=400, detail="Vui lòng chọn khoảng ngày đối soát (Từ ngày - Đến ngày).")
+    ma_cskcb = str(data.get("maCoSoKCB", "")).strip() or "66232"
+    username = str(data.get("username", "")).strip() or "066091019320"
+    password = str(data.get("password", "")).strip()
+    filter_col5 = str(data.get("filterCol5", "1")).strip()
+    from_stt = int(data.get("fromSTT", 1))
+    to_stt = int(data.get("toSTT", 100))
 
-    # Cập nhật thông tin đăng nhập từ CSDL nếu có
-    cfg = db.query(AppConfig).first()
-    if cfg:
-        portal_service.update_config(
-            base_url=cfg.portal_url or "https://gdbhyt.baohiemxahoi.gov.vn/",
-            ma_cskcb=cfg.portal_ma_cskcb or "66232",
-            username=cfg.portal_username or "066091019320",
-            password=cfg.portal_password or "Nguyenhong123@"
-        )
+    portal_service.update_config(ma_cskcb=ma_cskcb, username=username, password=password)
 
     try:
-        add_portal_log(f"--- BẮT ĐẦU LUỒNG B (ĐỐI SOÁT B) TỪ {from_date} ĐẾN {to_date} ---")
-        # Chạy Playwright Sync trong thread riêng để không bị xung đột với Asyncio Event Loop của FastAPI
-        result = await asyncio.to_thread(portal_service.run_flow_b, from_date, to_date, add_portal_log)
-        
-        # Tự động gọi đối soát B với CSDL HIS
-        add_portal_log("Tải file listbh.xlsx thành công. Đang kích hoạt Đối soát B với CSDL HIS...")
-        clean_from = from_date.replace('-', '').replace('/', '')
-        clean_to = to_date.replace('-', '').replace('/', '')
-        
-        # Gọi engine đối soát
-        compare_res = compare_records(clean_from, clean_to, include_errors=False, user=user, db=db)
-        add_portal_log("Đối soát B hoàn tất thành công! ✅")
-        
-        return {
-            "status": "success",
-            "flow": "B",
-            "portal_result": result,
-            "compare_result": compare_res,
-            "message": "Đã tự động tải Danh sách đã gửi và hoàn thành Đối soát B!"
-        }
-    except HTTPException as he:
-        add_portal_log(f"LỖI LUỒNG B: {he.detail}")
-        return JSONResponse(status_code=he.status_code, content={"status": "error", "detail": he.detail})
-    except Exception as e:
-        add_portal_log(f"LỖI LUỒNG B: {str(e)}")
-        return JSONResponse(status_code=500, content={"status": "error", "detail": f"Lỗi thực thi Luồng B: {str(e)}"})
-
-
-@app.post("/api/automation/flow-c")
-async def run_automation_flow_c(
-    data: dict,
-    user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Kích hoạt Luồng C: Tự động cào Danh sách lỗi từ QĐ 3176, gom thành HoSoLoiChiTiet.xlsx và kích hoạt Đối soát C.
-    """
-    from_date = data.get("from_date", "").strip()
-    to_date = data.get("to_date", "").strip()
-    if not from_date or not to_date:
-        raise HTTPException(status_code=400, detail="Vui lòng chọn khoảng ngày đối soát (Từ ngày - Đến ngày).")
-
-    cfg = db.query(AppConfig).first()
-    if cfg:
-        portal_service.update_config(
-            base_url=cfg.portal_url or "https://gdbhyt.baohiemxahoi.gov.vn/",
-            ma_cskcb=cfg.portal_ma_cskcb or "66232",
-            username=cfg.portal_username or "066091019320",
-            password=cfg.portal_password or "Nguyenhong123@"
+        add_portal_log(f"--- BẮT ĐẦU LUỒNG C MỚI (STT {from_stt} -> {to_stt}) ---")
+        result = await asyncio.to_thread(
+            portal_service.run_flow_c,
+            from_stt,
+            to_stt,
+            filter_col5,
+            add_portal_log
         )
-
-    try:
-        add_portal_log(f"--- BẮT ĐẦU LUỒNG C (ĐỐI SOÁT C) TỪ {from_date} ĐẾN {to_date} ---")
-        # Chạy Playwright Sync trong thread riêng để không bị xung đột với Asyncio Event Loop của FastAPI
-        result = await asyncio.to_thread(portal_service.run_flow_c, from_date, to_date, add_portal_log)
-        
-        total_errs = result.get("total_errors", 0)
-        clean_from = from_date.replace('-', '').replace('/', '')
-        clean_to = to_date.replace('-', '').replace('/', '')
-
-        if total_errs == 0:
-            add_portal_log("Không tìm thấy gói hồ sơ có lỗi nào trên Cổng BHYT trong khoảng ngày này.")
-            # Chạy đối soát không kèm lỗi
-            compare_res = compare_records(clean_from, clean_to, include_errors=False, user=user, db=db)
-            add_portal_log("Đối soát hoàn tất! Không có lỗi chi tiết nào cần xử lý. ✅")
-            msg = "Cổng BHYT không có gói lỗi nào trong khoảng ngày này. Đã hoàn tất đối soát danh sách!"
-        else:
-            # Tự động gọi đối soát C (kèm file lỗi chi tiết) với CSDL HIS
-            add_portal_log(f"Tổng hợp {total_errs} dòng lỗi chi tiết thành công. Đang kích hoạt Đối soát C...")
-            compare_res = compare_records(clean_from, clean_to, include_errors=True, user=user, db=db)
-            add_portal_log("Đối soát C hoàn tất thành công! ✅")
-            msg = f"Đã tự động tải {total_errs} dòng lỗi chi tiết và hoàn thành Đối soát C!"
-        
         return {
             "status": "success",
             "flow": "C",
-            "portal_result": result,
-            "compare_result": compare_res,
-            "message": msg
+            "downloaded_count": result.get("downloaded_count", 0),
+            "summary": result.get("summary", {}),
+            "message": result.get("message", "Tải hoàn tất Luồng C.")
         }
-    except HTTPException as he:
-        add_portal_log(f"LỖI LUỒNG C: {he.detail}")
-        return JSONResponse(status_code=he.status_code, content={"status": "error", "detail": he.detail})
     except Exception as e:
-        add_portal_log(f"LỖI LUỒNG C: {str(e)}")
-        return JSONResponse(status_code=500, content={"status": "error", "detail": f"Lỗi thực thi Luồng C: {str(e)}"})
+        add_portal_log(f"LỖI THỰC THI LUỒNG C: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
+
+
+@app.post("/api/automation/v2/flow-b")
+async def run_automation_v2_flow_b(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Kích hoạt Luồng B Mới: Khởi chạy Chrome/Edge native tải trọn vẹn listbh.xlsx với timeout 600s.
+    """
+    ma_cskcb = str(data.get("maCoSoKCB", "")).strip() or "66232"
+    username = str(data.get("username", "")).strip() or "066091019320"
+    password = str(data.get("password", "")).strip()
+
+    portal_service.update_config(ma_cskcb=ma_cskcb, username=username, password=password)
+
+    try:
+        add_portal_log("--- BẮT ĐẦU LUỒNG B MỚI (TẢI listbh.xlsx) ---")
+        result = await asyncio.to_thread(portal_service.run_flow_b, add_portal_log)
+        return {
+            "status": "success",
+            "flow": "B",
+            "rows": result.get("rows", 0),
+            "file_path": result.get("file_path", ""),
+            "message": result.get("message", "Tải hoàn tất Luồng B.")
+        }
+    except Exception as e:
+        add_portal_log(f"LỖI THỰC THI LUỒNG B: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
+
+
+@app.post("/api/automation/v2/merge-only")
+async def run_automation_v2_merge_only(user: User = Depends(require_admin)):
+    """Gộp thủ công các file Excel có sẵn trong thư mục temp_errors."""
+    from services.portal_automation import TEMP_ERROR_DIR, UPLOAD_DIR
+    out_p = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
+    try:
+        summary = await asyncio.to_thread(portal_service.merge_excel_files, TEMP_ERROR_DIR, out_p, add_portal_log)
+        return {"status": "success", "summary": summary}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
+
+
+@app.get("/api/automation/v2/download-file")
+def download_automation_file(file_type: str = "error_detail", user: User = Depends(require_admin)):
+    """Tải file Excel kết quả về máy trạm người dùng."""
+    from services.portal_automation import UPLOAD_DIR
+    if file_type == "listbh":
+        fpath = os.path.join(UPLOAD_DIR, "listbh.xlsx")
+        fname = "listbh.xlsx"
+    else:
+        fpath = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
+        fname = "HoSoLoiChiTiet.xlsx"
+
+    if not os.path.exists(fpath):
+        raise HTTPException(status_code=404, detail=f"Chưa có tệp {fname}. Vui lòng chạy tải trước.")
+
+    return FileResponse(path=fpath, filename=fname, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.post("/api/automation/v2/import-to-system")
+async def import_automation_to_system(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Tự động nạp file vừa tải (listbh.xlsx hoặc HoSoLoiChiTiet.xlsx) vào CSDL đối soát CHECKBHYT.
+    """
+    flow = data.get("flow", "C")
+    today_str = datetime.date.today().strftime("%Y%m%d")
+
+    try:
+        add_portal_log(f"Đang kích hoạt đối soát tự động với CSDL HIS cho ngày {today_str}...")
+        include_errors = (flow == "C")
+        compare_res = compare_records(today_str, today_str, include_errors=include_errors, user=user, db=db)
+        add_portal_log("Đối soát tự động hoàn tất thành công! ✅")
+        return {
+            "status": "success",
+            "compare_result": compare_res,
+            "message": "Đã nạp file và đối soát thành công vào hệ thống!"
+        }
+    except Exception as e:
+        add_portal_log(f"Lỗi khi đối soát tự động: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
+
+
+# Fallback tương thích ngược cho các client cũ nếu có gọi endpoint cũ
+@app.post("/api/automation/flow-b")
+async def legacy_flow_b(data: dict, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return await run_automation_v2_flow_b(data, user, db)
+
+
+@app.post("/api/automation/flow-c")
+async def legacy_flow_c(data: dict, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return await run_automation_v2_flow_c(data, user, db)
+
 
 
 

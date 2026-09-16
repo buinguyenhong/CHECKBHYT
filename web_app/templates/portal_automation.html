@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cổng BHYT Automation — Tải Siêu Tốc Luồng B & Luồng C</title>
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+    <style>
+        :root {
+            --bg-color: #0b1329;
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.08) 0px, transparent 50%);
+            --header-bg: rgba(15, 23, 42, 0.75);
+            --card-bg: rgba(30, 41, 59, 0.55);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --success-hover: #059669;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --input-bg: #0f172a;
+            --input-border: rgba(255, 255, 255, 0.15);
+            --input-color: #f8fafc;
+            --log-bg: #020617;
+            --log-border: #1e293b;
+            --log-color: #38bdf8;
+        }
+        [data-theme="light"] {
+            --bg-color: #f1f5f9;
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.05) 0px, transparent 50%);
+            --header-bg: rgba(255, 255, 255, 0.85);
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-secondary: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #059669;
+            --success-hover: #047857;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --input-bg: #f8fafc;
+            --input-border: #cbd5e1;
+            --input-color: #0f172a;
+            --log-bg: #0f172a;
+            --log-border: #334155;
+            --log-color: #7dd3fc;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        body {
+            background-color: var(--bg-color);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .navbar {
+            background: var(--header-bg);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text-main);
+        }
+        .nav-logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+        }
+        .nav-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+        .nav-subtitle { font-size: 12px; color: var(--text-secondary); }
+        .nav-actions { display: flex; align-items: center; gap: 12px; }
+        .btn-nav {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn-nav:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            margin: 24px auto;
+            padding: 0 20px;
+            flex: 1;
+        }
+        .page-header {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .page-header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-main), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .page-header p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+        .tab-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .main-layout { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(10px);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+        .form-group { margin-bottom: 14px; }
+        .form-group.full { grid-column: span 2; }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--input-color);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .row-inputs { display: flex; gap: 10px; align-items: center; }
+
+        .btn-action {
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+        }
+        .btn-primary:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .badge-idle { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
+        .badge-running { background: rgba(59, 130, 246, 0.2); color: #38bdf8; animation: pulse 1.5s infinite; }
+        .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+
+        .log-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .log-box {
+            background: var(--log-bg);
+            border: 1px solid var(--log-border);
+            color: var(--log-color);
+            border-radius: 10px;
+            padding: 16px;
+            font-family: "Consolas", "Courier New", monospace;
+            font-size: 12.5px;
+            line-height: 1.6;
+            height: 380px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            flex: 1;
+        }
+
+        .result-panel {
+            display: none;
+            margin-top: 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .result-panel.active { display: block; }
+        .result-header {
+            font-size: 15px;
+            font-weight: 700;
+            color: #10b981;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .result-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .stat-box {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-num { font-size: 18px; font-weight: 800; color: var(--text-main); }
+        .stat-lbl { font-size: 11px; color: var(--text-secondary); }
+        .result-actions { display: flex; gap: 10px; }
+        .btn-sm {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/admin" class="nav-brand">
+            <div class="nav-logo">⚡</div>
+            <div>
+                <div class="nav-title">CỔNG BHYT AUTOMATION</div>
+                <div class="nav-subtitle">Công nghệ Direct URL Download & Native Browser</div>
+            </div>
+        </a>
+        <div class="nav-actions">
+            <a href="/admin" class="btn-nav">
+                <span>🔙</span> Quay lại IT Admin
+            </a>
+            <button class="btn-nav" onclick="toggleTheme()">
+                <span id="themeIcon">🌓</span> Giao diện
+            </button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <div>
+                <h1>Trung Tâm Tải Dữ Liệu Tự Động Cổng BHYT</h1>
+                <p>Khởi chạy trực tiếp Google Chrome/Microsoft Edge native, tải siêu tốc qua HTTP stream không mở popup.</p>
+            </div>
+        </div>
+
+        <!-- MODE TABS -->
+        <div class="mode-tabs">
+            <button class="tab-btn active" id="tabBtnFlowC" onclick="switchMode('C')">
+                <span>⚡</span> Luồng C: Tải Danh Sách Lỗi QĐ 3176 (Direct URL)
+            </button>
+            <button class="tab-btn" id="tabBtnFlowB" onclick="switchMode('B')">
+                <span>📦</span> Luồng B: Tải Danh Sách Đã Gửi (listbh.xlsx)
+            </button>
+        </div>
+
+        <div class="main-layout">
+            <!-- PANEL THIẾT LẬP -->
+            <div class="card">
+                <!-- FORM LUỒNG C -->
+                <div id="panelFlowC">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>⚙️</span> Cấu hình Luồng C (Lỗi chi tiết QĐ 3176)
+                        </div>
+                        <span class="badge badge-success">Direct URL API</span>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="c_maCSKCB">Mã cơ sở KCB:</label>
+                            <input type="text" id="c_maCSKCB" class="form-control" value="66232">
+                        </div>
+                        <div class="form-group">
+                            <label for="c_username">Tên đăng nhập (CCCD/Tài khoản):</label>
+                            <input type="text" id="c_username" class="form-control" value="066091019320">
+                        </div>
+                        <div class="form-group full">
+                            <label for="c_password">Mật khẩu (để trống nếu gõ tay trên màn hình):</label>
+                            <input type="password" id="c_password" class="form-control" placeholder="Để trống nếu muốn nhập tay trên trình duyệt">
+                        </div>
+                        <div class="form-group">
+                            <label for="c_filterCol5">Bộ lọc Cột 5 (Lỗi):</label>
+                            <input type="text" id="c_filterCol5" class="form-control" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Phạm vi STT cần tải:</label>
+                            <div class="row-inputs">
+                                <input type="number" id="c_fromSTT" class="form-control" value="1" min="1" placeholder="Từ">
+                                <span style="font-weight:bold; color:var(--text-secondary);">đến</span>
+                                <input type="number" id="c_toSTT" class="form-control" value="100" min="1" placeholder="Đến">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="btnRunFlowC" class="btn-action btn-primary" onclick="startFlowC()">
+                        <span>⚡</span> BẮT ĐẦU TẢI DỮ LIỆU SIÊU TỐC
+                    </button>
+                    <button id="btnMergeOnly" class="btn-action btn-secondary" onclick="startMergeOnly()">
+                        <span>📂</span> Chỉ gộp các file Excel có sẵn trong thư mục tạm
+                    </button>
+                </div>
+
+                <!-- FORM LUỒNG B -->
+                <div id="panelFlowB" style="display:none;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>⚙️</span> Cấu hình Luồng B (Danh sách đã gửi listbh.xlsx)
+                        </div>
+                        <span class="badge badge-success">Native Chrome/Edge</span>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="b_maCSKCB">Mã cơ sở KCB:</label>
+                            <input type="text" id="b_maCSKCB" class="form-control" value="66232">
+                        </div>
+                        <div class="form-group">
+                            <label for="b_username">Tên đăng nhập:</label>
+                            <input type="text" id="b_username" class="form-control" value="066091019320">
+                        </div>
+                        <div class="form-group full">
+                            <label for="b_password">Mật khẩu:</label>
+                            <input type="password" id="b_password" class="form-control" placeholder="Để trống nếu muốn nhập tay trên trình duyệt">
+                        </div>
+                        <div class="form-group full">
+                            <label>Trạng thái hồ sơ:</label>
+                            <input type="text" class="form-control" value="Đã đề nghị thanh toán" disabled>
+                        </div>
+                    </div>
+
+                    <button id="btnRunFlowB" class="btn-action btn-primary" onclick="startFlowB()">
+                        <span>📥</span> BẮT ĐẦU TẢI DANH SÁCH ĐÃ GỬI
+                    </button>
+                </div>
+            </div>
+
+            <!-- PANEL LOG & KẾT QUẢ -->
+            <div class="card log-container">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>📋</span> Nhật ký tiến trình thời gian thực
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span id="statusBadge" class="badge badge-idle">Sẵn sàng</span>
+                        <button class="btn-nav" style="padding:4px 8px; font-size:11px;" onclick="clearLog()">Xóa log</button>
+                    </div>
+                </div>
+
+                <div id="logBox" class="log-box">Hệ thống sẵn sàng. Chọn chức năng và nhấn bắt đầu để khởi chạy trình duyệt...</div>
+
+                <!-- PANEL HIỂN THỊ KẾT QUẢ -->
+                <div id="resultPanel" class="result-panel">
+                    <div class="result-header">
+                        <span>🎉</span> <span id="resultTitle">HOÀN TẤT THÀNH CÔNG</span>
+                    </div>
+                    <div class="result-stats" id="resultStats">
+                        <div class="stat-box">
+                            <div class="stat-num" id="statFiles">0</div>
+                            <div class="stat-lbl">Tệp đã tải</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-num" id="statRecords">0</div>
+                            <div class="stat-lbl">Bản ghi duy nhất</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-num" id="statDuplicates">0</div>
+                            <div class="stat-lbl">Trùng lặp đã lọc</div>
+                        </div>
+                    </div>
+                    <div class="result-actions">
+                        <a id="btnDownloadFile" href="#" class="btn-sm btn-primary">
+                            <span>📥</span> Tải file Excel về máy
+                        </a>
+                        <button id="btnImportDB" class="btn-sm btn-secondary" onclick="importToReconciliation()">
+                            <span>⚡</span> Nạp vào CSDL đối soát
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'C';
+        const logBox = document.getElementById('logBox');
+        const statusBadge = document.getElementById('statusBadge');
+        const resultPanel = document.getElementById('resultPanel');
+        const btnRunFlowC = document.getElementById('btnRunFlowC');
+        const btnRunFlowB = document.getElementById('btnRunFlowB');
+        const btnDownloadFile = document.getElementById('btnDownloadFile');
+
+        function appendLog(msg) {
+            logBox.textContent += '\n' + msg;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function clearLog() {
+            logBox.textContent = 'Hệ thống sẵn sàng.';
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.getElementById('tabBtnFlowC').classList.toggle('active', mode === 'C');
+            document.getElementById('tabBtnFlowB').classList.toggle('active', mode === 'B');
+            document.getElementById('panelFlowC').style.display = mode === 'C' ? 'block' : 'none';
+            document.getElementById('panelFlowB').style.display = mode === 'B' ? 'block' : 'none';
+            resultPanel.classList.remove('active');
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+
+        // Kết nối Server-Sent Events (SSE) để nhận log thời gian thực
+        let evtSource = null;
+        function connectLogStream() {
+            if (evtSource) { evtSource.close(); }
+            evtSource = new EventSource('/api/automation/v2/logs');
+            evtSource.onmessage = function(e) {
+                appendLog(e.data);
+            };
+            evtSource.onerror = function() {
+                // Tự động kết nối lại sau 3s nếu đứt kết nối
+                setTimeout(connectLogStream, 3000);
+            };
+        }
+        connectLogStream();
+
+        // KÍCH HOẠT LUỒNG C MỚI
+        async function startFlowC() {
+            const payload = {
+                maCoSoKCB: document.getElementById('c_maCSKCB').value.trim(),
+                username: document.getElementById('c_username').value.trim(),
+                password: document.getElementById('c_password').value,
+                filterCol5: document.getElementById('c_filterCol5').value.trim(),
+                fromSTT: parseInt(document.getElementById('c_fromSTT').value, 10) || 1,
+                toSTT: parseInt(document.getElementById('c_toSTT').value, 10) || 100
+            };
+
+            btnRunFlowC.disabled = true;
+            statusBadge.className = 'badge badge-running';
+            statusBadge.textContent = 'Đang chạy Luồng C...';
+            resultPanel.classList.remove('active');
+            appendLog('\n--- BẮT ĐẦU LUỒNG C MỚI (DIRECT URL DOWNLOAD) ---');
+
+            try {
+                const res = await fetch('/api/automation/v2/flow-c', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    statusBadge.className = 'badge badge-success';
+                    statusBadge.textContent = 'Thành công';
+                    
+                    const summary = data.summary || {};
+                    document.getElementById('resultTitle').textContent = 'HOÀN TẤT TẢI & GỘP LỖI CHI TIẾT';
+                    document.getElementById('statFiles').textContent = summary.total_files || data.downloaded_count || 0;
+                    document.getElementById('statRecords').textContent = summary.unique_records || 0;
+                    document.getElementById('statDuplicates').textContent = summary.duplicates_removed || 0;
+                    
+                    btnDownloadFile.href = '/api/automation/v2/download-file?file_type=error_detail';
+                    resultPanel.classList.add('active');
+                    appendLog('\n🎉 LUỒNG C HOÀN TẤT THÀNH CÔNG!');
+                } else {
+                    throw new Error(data.detail || data.message || 'Lỗi không xác định');
+                }
+            } catch (err) {
+                statusBadge.className = 'badge badge-error';
+                statusBadge.textContent = 'Lỗi';
+                appendLog(`❌ Lỗi thực thi: ${err.message}`);
+                alert(`Lỗi thực thi Luồng C: ${err.message}`);
+            } finally {
+                btnRunFlowC.disabled = false;
+            }
+        }
+
+        // KÍCH HOẠT LUỒNG B MỚI
+        async function startFlowB() {
+            const payload = {
+                maCoSoKCB: document.getElementById('b_maCSKCB').value.trim(),
+                username: document.getElementById('b_username').value.trim(),
+                password: document.getElementById('b_password').value
+            };
+
+            btnRunFlowB.disabled = true;
+            statusBadge.className = 'badge badge-running';
+            statusBadge.textContent = 'Đang chạy Luồng B...';
+            resultPanel.classList.remove('active');
+            appendLog('\n--- BẮT ĐẦU LUỒNG B MỚI (NATIVE BROWSER) ---');
+
+            try {
+                const res = await fetch('/api/automation/v2/flow-b', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    statusBadge.className = 'badge badge-success';
+                    statusBadge.textContent = 'Thành công';
+                    
+                    document.getElementById('resultTitle').textContent = 'TẢI THÀNH CÔNG DANH SÁCH ĐÃ GỬI (listbh.xlsx)';
+                    document.getElementById('statFiles').textContent = 1;
+                    document.getElementById('statRecords').textContent = data.rows || 0;
+                    document.getElementById('statDuplicates').textContent = 0;
+
+                    btnDownloadFile.href = '/api/automation/v2/download-file?file_type=listbh';
+                    resultPanel.classList.add('active');
+                    appendLog('\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG!');
+                } else {
+                    throw new Error(data.detail || data.message || 'Lỗi không xác định');
+                }
+            } catch (err) {
+                statusBadge.className = 'badge badge-error';
+                statusBadge.textContent = 'Lỗi';
+                appendLog(`❌ Lỗi thực thi: ${err.message}`);
+                alert(`Lỗi thực thi Luồng B: ${err.message}`);
+            } finally {
+                btnRunFlowB.disabled = false;
+            }
+        }
+
+        // CHỈ GỘP CÁC FILE EXCEL ĐÃ CÓ
+        async function startMergeOnly() {
+            appendLog('\n--- ĐANG GỘP CÁC TỆP EXCEL TRONG THƯ MỤC TẠM ---');
+            try {
+                const res = await fetch('/api/automation/v2/merge-only', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    const summary = data.summary || {};
+                    document.getElementById('resultTitle').textContent = 'HOÀN TẤT GỘP TỆP THỦ CÔNG';
+                    document.getElementById('statFiles').textContent = summary.total_files || 0;
+                    document.getElementById('statRecords').textContent = summary.unique_records || 0;
+                    document.getElementById('statDuplicates').textContent = summary.duplicates_removed || 0;
+
+                    btnDownloadFile.href = '/api/automation/v2/download-file?file_type=error_detail';
+                    resultPanel.classList.add('active');
+                    appendLog('🎉 Gộp tệp thành công!');
+                } else {
+                    throw new Error(data.detail || 'Lỗi gộp file');
+                }
+            } catch (err) {
+                appendLog(`❌ Lỗi gộp file: ${err.message}`);
+            }
+        }
+
+        // TỰ ĐỘNG NẠP VÀO HỆ THỐNG ĐỐI SOÁT CHECKBHYT
+        async function importToReconciliation() {
+            const btn = document.getElementById('btnImportDB');
+            btn.disabled = true;
+            btn.textContent = 'Đang nạp CSDL...';
+            appendLog('\n⚡ Đang kích hoạt tự động nạp dữ liệu vào CSDL đối soát CHECKBHYT...');
+
+            try {
+                const res = await fetch('/api/automation/v2/import-to-system', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ flow: currentMode })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    appendLog('✅ ĐÃ NẠP THÀNH CÔNG VÀO CSDL ĐỐI SOÁT!');
+                    alert('Nạp dữ liệu vào hệ thống đối soát thành công! Bạn có thể quay lại trang IT Admin hoặc Báo cáo để xem kết quả.');
+                } else {
+                    throw new Error(data.detail || 'Lỗi khi nạp CSDL');
+                }
+            } catch (err) {
+                appendLog(`❌ Lỗi nạp CSDL: ${err.message}`);
+                alert(`Lỗi: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚡ Nạp vào CSDL đối soát';
+            }
+        }
+    </script>
+</body>
+</html>

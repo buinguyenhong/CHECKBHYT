@@ -411,6 +411,76 @@ class ClientRPAGui:
             self.log(f"Lỗi kết nối máy chủ: {e}")
             messagebox.showwarning("Lỗi kết nối", f"Không thể kết nối tới {srv}. Vui lòng kiểm tra địa chỉ IP Server.")
 
+    def _launch_native_browser(self, p):
+        """Khởi chạy Google Chrome hoặc Microsoft Edge native trên Windows."""
+        for ch in ["chrome", "msedge"]:
+            try:
+                b = p.chromium.launch(channel=ch, headless=False, args=["--start-maximized"])
+                self.log(f"Đã mở trình duyệt {ch.upper()} có sẵn trên máy ✅")
+                return b
+            except Exception:
+                pass
+        return p.chromium.launch(headless=False, args=["--start-maximized"])
+
+    def _extract_records_from_grid(self, page):
+        """Quét danh sách maGD và STT trên bảng hiện tại."""
+        try:
+            return page.evaluate("""() => {
+                const records = [];
+                const dataRows = Array.from(document.querySelectorAll('.dxgvDataRow_EIS, tr[id*="DXDataRow"], tr.dxgvDataRow, #gvDSKetQuaGuiHoso tr'));
+                for (let i = 0; i < dataRows.length; i++) {
+                    const row = dataRows[i];
+                    const rowText = (row.innerText || row.textContent || '');
+                    const match = rowText.match(/HSKCB[0-9A-Za-z_]+/);
+                    if (match) {
+                        const maGD = match[0];
+                        let stt = 0;
+                        if (row.cells && row.cells.length > 0) {
+                            const parsed = parseInt((row.cells[0].innerText || '').trim(), 10);
+                            if (!isNaN(parsed) && parsed > 0) stt = parsed;
+                        }
+                        if (!stt) stt = records.length + 1;
+                        if (!records.some(r => r.maGD === maGD)) records.push({ stt, maGD });
+                    }
+                }
+                return records;
+            }""")
+        except Exception:
+            return []
+
+    def _download_direct_record(self, page, ma_gd, stt, save_dir, max_retries=3):
+        """Tải file trực tiếp qua endpoint ExportExcelKPG_New?maGd={maGD}."""
+        portal_base = self.portal_url.get().strip().rstrip('/') if hasattr(self, 'portal_url') else "https://gdbhyt.baohiemxahoi.gov.vn"
+        download_url = f"{portal_base}/DanhSachKetQuaGuiHoSoQD130/ExportExcelKPG_New?maGd={ma_gd}"
+        file_name = f"STT_{str(stt).zfill(4)}_{ma_gd}.xlsx"
+        file_path = os.path.join(save_dir, file_name)
+
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 1024:
+            self.log(f"✅ [STT {stt}] Đã có sẵn file: {file_name}, bỏ qua tải lại.")
+            return file_path
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.log(f"⚡ [STT {stt}] Đang tải hồ sơ {ma_gd} (Lần {attempt})...")
+                response = page.request.get(download_url, timeout=60000)
+                if not response.ok:
+                    raise Exception(f"HTTP Status {response.status}: {response.status_text}")
+                body = response.body()
+                if not body or len(body) < 500:
+                    raise Exception(f"Dữ liệu tải về quá nhỏ ({len(body) if body else 0} bytes)")
+                with open(file_path, "wb") as f:
+                    f.write(body)
+                kb_size = round(len(body) / 1024, 1)
+                self.log(f"✅ [STT {stt}] Tải thành công ({kb_size} KB) -> {file_name}")
+                return file_path
+            except Exception as err:
+                self.log(f"⚠️ [STT {stt}] Lỗi tải lần {attempt}: {err}")
+                if attempt < max_retries:
+                    time.sleep(2.0 * attempt)
+                else:
+                    self.log(f"❌ [STT {stt}] Thất bại sau {max_retries} lần thử: {ma_gd}")
+                    return None
+
     def _ensure_login(self, page):
         self.log("Đang mở Cổng Giám định BHYT...")
         page.goto(self.portal_url.get().strip(), timeout=60000)
@@ -566,8 +636,8 @@ class ClientRPAGui:
         try:
             with sync_playwright() as p:
                 storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
-                browser = p.chromium.launch(headless=False)
-                context = browser.new_context(storage_state=storage_path, viewport={'width': 1366, 'height': 768}, accept_downloads=True)
+                browser = self._launch_native_browser(p)
+                context = browser.new_context(storage_state=storage_path, viewport=None, accept_downloads=True)
                 page = context.new_page()
 
                 try:
@@ -774,6 +844,84 @@ class ClientRPAGui:
             self.btn_flow_b.configure(state=tk.NORMAL)
             self.btn_flow_c.configure(state=tk.NORMAL)
 
+    def _launch_native_browser(self, p):
+        try:
+            return p.chromium.launch(
+                headless=False,
+                channel="chrome",
+                args=["--start-maximized", "--disable-infobars", "--disable-blink-features=AutomationControlled"]
+            )
+        except Exception:
+            return p.chromium.launch(
+                headless=False,
+                args=["--start-maximized", "--disable-infobars", "--disable-blink-features=AutomationControlled"]
+            )
+
+    def _extract_records_from_grid(self, page):
+        return page.evaluate("""() => {
+            const rows = Array.from(document.querySelectorAll("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow"));
+            return rows.map((r, idx) => {
+                let maGD = '';
+                const onclickAttr = r.getAttribute('onclick') || '';
+                const match = onclickAttr.match(/['"]([^'"]+)['"]/);
+                if (match) maGD = match[1];
+                
+                const link = r.querySelector('a, span[onclick], td[onclick], input[type="checkbox"]');
+                if (!maGD && link) {
+                    const lClick = link.getAttribute('onclick') || '';
+                    const m2 = lClick.match(/['"]([^'"]+)['"]/);
+                    if (m2) maGD = m2[1];
+                    else maGD = link.value || link.textContent.trim();
+                }
+                
+                if (!maGD) {
+                    const rowId = r.getAttribute('id') || '';
+                    maGD = rowId;
+                }
+                
+                return {
+                    stt: idx + 1,
+                    maGD: maGD
+                };
+            });
+        }""")
+
+    def _download_direct_record(self, page, ma_gd, stt, temp_dir):
+        try:
+            portal_base = self.portal_url.get().strip().rstrip('/') if hasattr(self, 'portal_url') else "https://gdbhyt.baohiemxahoi.gov.vn"
+            url = f"{portal_base}/DanhSachKetQuaGuiHosoQD130/ExportChiTietLoi?maGD={ma_gd}"
+            with page.expect_download(timeout=45000) as dl_info:
+                page.evaluate(f"""() => {{
+                    const a = document.createElement('a');
+                    a.href = '{url}';
+                    a.download = '';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                }}""")
+            download = dl_info.value
+            dest_path = os.path.join(temp_dir, f"err_{stt}_{int(time.time()*1000)}.xlsx")
+            download.save_as(dest_path)
+            self.log(f"  -> Tải trực tiếp thành công bản ghi #{stt} ✅")
+            return dest_path
+        except Exception as e:
+            try:
+                with page.expect_download(timeout=30000) as dl_info:
+                    page.evaluate(f"""() => {{
+                        const rows = Array.from(document.querySelectorAll("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow"));
+                        if (rows[{stt-1}]) {{
+                            const link = rows[{stt-1}].querySelector('a, span[onclick], td[onclick]');
+                            if (link) link.click();
+                        }}
+                    }}""")
+                download = dl_info.value
+                dest_path = os.path.join(temp_dir, f"err_{stt}_{int(time.time()*1000)}.xlsx")
+                download.save_as(dest_path)
+                return dest_path
+            except Exception as e2:
+                self.log(f"  -> Không thể tải bản ghi #{stt}: {e2}")
+        return None
+
     def start_flow_c(self):
         import threading
         self.save_config()
@@ -801,386 +949,120 @@ class ClientRPAGui:
         try:
             with sync_playwright() as p:
                 storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
-                browser = p.chromium.launch(headless=False)
-                context = browser.new_context(storage_state=storage_path, viewport={'width': 1366, 'height': 768}, accept_downloads=True)
+                browser = self._launch_native_browser(p)
+                context = browser.new_context(storage_state=storage_path, viewport=None, accept_downloads=True)
                 page = context.new_page()
+                page.set_default_timeout(600000)
+                page.set_default_navigation_timeout(600000)
 
                 try:
                     self._ensure_login(page)
                     self._wait_portal_idle(page)
 
-                    # Điều hướng trực tiếp vào Kết quả gửi hồ sơ XML
+                    # 1. Điều hướng QĐ 3176
                     self.log("Đang điều hướng đến: Kết quả gửi hồ sơ XML (/DanhSachKetQuaGuiHoSoQD130/Index)...")
-                    target_url_c = f"{self.portal_url.get().strip().rstrip('/')}/DanhSachKetQuaGuiHoSoQD130/Index" if hasattr(self, 'portal_url') else "https://gdbhyt.baohiemxahoi.gov.vn/DanhSachKetQuaGuiHoSoQD130/Index"
+                    portal_base = self.portal_url.get().strip().rstrip('/') if hasattr(self, 'portal_url') else "https://gdbhyt.baohiemxahoi.gov.vn"
+                    target_url_c = f"{portal_base}/DanhSachKetQuaGuiHoSoQD130/Index"
                     try:
-                        page.goto(target_url_c, timeout=45000)
-                        page.wait_for_load_state("domcontentloaded")
-                    except Exception: pass
-
-                    # Chờ các control chính hoặc fallback menu
-                    try:
-                        page.wait_for_selector("#gvDSKetQuaGuiHoso, #dt_TuNgay_I, #btnTimKiem", timeout=20000)
+                        page.goto(target_url_c, timeout=90000, wait_until="load")
                     except Exception:
-                        try:
-                            top_menu = page.locator("#HeaderMenu").get_by_text("Hồ sơ đề nghị thanh toán", exact=True)
-                            if top_menu.is_visible(timeout=3000): top_menu.click()
-                            time.sleep(0.5)
-                            xml_item = page.locator("#HeaderMenu_DXME2_ div, #HeaderMenu div, .dxm-item").filter(has_text="Hồ sơ XML").first
-                            if xml_item.is_visible(timeout=3000): xml_item.click(force=True)
-                            time.sleep(0.5)
-                            qd3176 = page.locator(".dxm-item, a, span").filter(has_text=re.compile(r"3176")).first
-                            if qd3176.is_visible(timeout=3000): qd3176.click(force=True)
-                            time.sleep(0.5)
-                            page.evaluate("""() => {
-                                const links = Array.from(document.querySelectorAll('a')).filter(a => a.textContent && a.textContent.includes('Kết quả gửi hồ sơ XML'));
-                                if (links.length > 1) links[1].click();
-                                else if (links.length === 1) links[0].click();
-                            }""")
-                            page.wait_for_load_state("domcontentloaded")
-                        except Exception: pass
+                        pass
 
+                    page.wait_for_selector("#roundPanel, #gvDSKetQuaGuiHoso", timeout=90000)
                     self._wait_portal_idle(page)
 
-                    # Helper kiểm tra bảng nạp dữ liệu sâu với DevExpress InCallback & Loading Panels (Chu kỳ kiểm tra 10s/lần, tối đa 180s)
-                    def wait_for_grid_data(timeout=180):
-                        start = time.time()
-                        last_log_time = start
-                        time.sleep(1.0)
-                        while time.time() - start < timeout:
-                            elapsed = int(time.time() - start)
-                            if time.time() - last_log_time >= 10:
-                                self.log(f"  [Đang đợi Cổng BHYT] Đã chờ {elapsed}s / {timeout}s...")
-                                last_log_time = time.time()
-
-                            try:
-                                is_busy = page.evaluate("""() => {
-                                    try {
-                                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                        const grid = window.gvDSKetQuaGuiHoso || (cc ? cc.GetByName('gvDSKetQuaGuiHoso') : null);
-                                        if (grid && typeof grid.InCallback === 'function' && grid.InCallback()) return true;
-                                        if (cc && typeof cc.ForEachControl === 'function') {
-                                            let b = false;
-                                            cc.ForEachControl(c => {
-                                                if (c && typeof c.InCallback === 'function' && c.InCallback()) b = true;
-                                            });
-                                            if (b) return true;
-                                        }
-                                    } catch(e) {}
-                                    const ld = document.querySelector('#gvDSKetQuaGuiHoso_LD, .dxgvLoadingDiv_EIS, .dxgvLoadingPanel_EIS, .dxgvLoadingDiv, .dxp-loadingPanel, .dxlpLoadingPanelWithContent');
-                                    if (ld && ld.offsetParent !== null && window.getComputedStyle(ld).display !== 'none' && window.getComputedStyle(ld).visibility !== 'hidden') return true;
-                                    return false;
-                                }""")
-
-                                if is_busy:
-                                    time.sleep(0.6)
-                                    continue
-
-                                data_rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow")
-                                if data_rows.count() > 0:
-                                    time.sleep(0.8)
-                                    return True
-                                empty_rows = page.locator("#gvDSKetQuaGuiHoso tr.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso td.dxgvEmptyDataRow, #gvDSKetQuaGuiHoso:has-text('Không có dữ liệu')")
-                                if empty_rows.count() > 0:
-                                    time.sleep(0.6)
-                                    return False
-                            except Exception: pass
-                            time.sleep(0.5)
-                        return False
-
-                    # Đợi bảng danh sách hiển thị
-                    try:
-                        page.wait_for_selector("#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable, input[name*='TuNgay'], #dt_TuNgay_I", timeout=30000)
-                        self._wait_portal_idle(page)
-                    except Exception: pass
-
-                    # 3. BƯỚC 1: ĐẶT NGÀY TODAY (KẾT HỢP 3 LỚP ĐẢM BẢO 100%)
-                    self.log("Đang đặt khoảng ngày tìm kiếm = TODAY (dt_TuNgay / dt_DenNgay)...")
-                    import datetime as dt_mod
-                    today_ddmmyyyy = dt_mod.datetime.now().strftime("%d/%m/%Y")
-
-                    # Lớp 1: DevExpress Client API
+                    # 2. Đặt ngày = Today
+                    self.log("Thiết lập ngày 'Today'...")
                     try:
                         page.evaluate("""() => {
-                            try {
-                                const now = new Date();
-                                if (window.dt_TuNgay && typeof window.dt_TuNgay.SetDate === 'function') {
-                                    window.dt_TuNgay.SetDate(now);
-                                }
-                                if (window.dt_DenNgay && typeof window.dt_DenNgay.SetDate === 'function') {
-                                    window.dt_DenNgay.SetDate(now);
-                                }
-                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                if (cc) {
-                                    const cTu = cc.GetByName('dt_TuNgay');
-                                    if (cTu && typeof cTu.SetDate === 'function') cTu.SetDate(now);
-                                    const cDen = cc.GetByName('dt_DenNgay');
-                                    if (cDen && typeof cDen.SetDate === 'function') cDen.SetDate(now);
-                                }
-                            } catch(e) {}
-                        }""")
-                        self.log(f"Đã đặt ngày qua DevExpress API dt_TuNgay / dt_DenNgay ({today_ddmmyyyy}) ✅")
-                    except Exception: pass
-
-                    # Lớp 2: Điền chuỗi dd/MM/yyyy vào input DOM
-                    try:
-                        for s_inp in ["#dt_TuNgay_I", "#dt_DenNgay_I", "input[id*='TuNgay']", "input[id*='DenNgay']"]:
-                            inp = page.locator(s_inp).first
-                            if inp.is_visible(timeout=1000):
-                                inp.click(click_count=3)
-                                inp.fill(today_ddmmyyyy)
-                                inp.press("Tab")
-                    except Exception: pass
-
-                    # Lớp 3: Mở popup lịch Từ ngày & Đến ngày và click Today
-                    try:
-                        tu_btn = page.locator("#dt_TuNgay_B-1, #dt_TuNgay_B-1Img, td[id*='dt_TuNgay_B-1'], [id*='TuNgay'][id*='_B-1']").first
-                        if tu_btn.is_visible(timeout=1500):
-                            tu_btn.click(force=True)
-                            time.sleep(0.3)
-                            today_btn = page.locator("#dt_TuNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), .dxbButton:has-text('Today'), td:has-text('Today')").first
-                            if today_btn.is_visible(timeout=1500):
-                                today_btn.click(force=True)
-                                self.log("Đã chọn nút 'Today' trên popup Từ ngày ✅")
-                                time.sleep(0.3)
-
-                        den_btn = page.locator("#dt_DenNgay_B-1, #dt_DenNgay_B-1Img, td[id*='dt_DenNgay_B-1'], [id*='DenNgay'][id*='_B-1']").first
-                        if den_btn.is_visible(timeout=1500):
-                            den_btn.click(force=True)
-                            time.sleep(0.3)
-                            today_den = page.locator("#dt_DenNgay_DDD_C_BT, .dxeCalendarTodayButton_EIS, td[id*='_BT']:has-text('Today'), td:has-text('Today')").first
-                            if today_den.is_visible(timeout=1500):
-                                today_den.click(force=True)
-                                self.log("Đã chọn nút 'Today' trên popup Đến ngày ✅")
-                                time.sleep(0.3)
-                    except Exception as dt_err:
-                        self.log(f"Lưu ý click popup lịch: {dt_err}")
-
-                    # Bấm nút Tìm kiếm (btnTimKiem)
-                    self.log("Bấm Tìm kiếm dữ liệu (btnTimKiem)...")
-                    searched = False
-                    try:
-                        searched = page.evaluate("""() => {
-                            try {
-                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                const btn = window.btnTimKiem || window.bt_TimKiem || (cc ? (cc.GetByName('btnTimKiem') || cc.GetByName('bt_TimKiem')) : null);
-                                if (btn && typeof btn.DoClick === 'function') {
-                                    btn.DoClick();
-                                    return true;
-                                }
-                            } catch(e) {}
-                            return false;
+                            const now = new Date();
+                            if (window.dt_TuNgay && typeof window.dt_TuNgay.SetValue === 'function') window.dt_TuNgay.SetValue(now);
+                            if (window.dt_DenNgay && typeof window.dt_DenNgay.SetValue === 'function') window.dt_DenNgay.SetValue(now);
                         }""")
                     except Exception: pass
 
-                    if not searched:
-                        for s_sel in ["#btnTimKiem_CD", "#btnTimKiem_B", "#btnTimKiem", "#bt_TimKiem_CD", "#bt_TimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')"]:
-                            try:
-                                s_btn = page.locator(s_sel).first
-                                if s_btn.is_visible(timeout=2000):
-                                    s_btn.click(force=True)
-                                    searched = True
-                                    break
-                            except Exception: pass
+                    # 3. Bấm Tìm kiếm
+                    self.log("Bấm nút Tìm kiếm (chờ tối đa 10 phút)...")
+                    search_btn = page.locator("span").filter(has_text=re.compile(r"^Tìm kiếm$")).first
+                    if search_btn.is_visible(timeout=3000):
+                        search_btn.click(force=True)
+                    else:
+                        page.evaluate("if (window.btnTimKiem && typeof window.btnTimKiem.DoClick === 'function') window.btnTimKiem.DoClick();")
 
-                    self.log("Đang chờ máy chủ Cổng BHYT phản hồi dữ liệu tìm kiếm (InCallback monitoring, tối đa 180s)...")
-                    wait_for_grid_data(timeout=180)
+                    time.sleep(1.0)
                     self._wait_portal_idle(page)
 
-                    # 4. BƯỚC 2: CHỌN HIỂN THỊ 100 DÒNG / TRANG QUA PAGER DROPDOWN & CHỜ LOADING
-                    self.log("Thiết lập hiển thị 100 bản ghi/trang...")
-                    selected_100 = False
+                    # 4. Lọc Cột 5 = 1 (Lỗi)
+                    self.log("Áp dụng bộ lọc Cột 5 = 1 (Lỗi)...")
+                    col5_inp = page.locator("#gvDSKetQuaGuiHoso_DXFREditorcol5_I")
+                    if col5_inp.is_visible(timeout=5000):
+                        col5_inp.click()
+                        col5_inp.fill("1")
+                        col5_inp.press("Enter")
+                    else:
+                        page.evaluate("if (window.gvDSKetQuaGuiHoso) window.gvDSKetQuaGuiHoso.AutoFilterByColumn(5, '1');")
+                    time.sleep(1.0)
+                    self._wait_portal_idle(page)
+
+                    # 5. Chọn Page size = 100
                     try:
-                        pager_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom_DDBImg, #gvDSKetQuaGuiHoso_DXPagerBottom .dxp-dropDownButton, .dxp-dropDownButton").first
-                        if pager_btn.is_visible(timeout=3000):
-                            pager_btn.click(force=True)
-                            time.sleep(0.6)
-
-                            selected_100 = page.evaluate("""() => {
-                                const lists = Array.from(document.querySelectorAll('.dxp-dropDownListBox, div[id*="_PSP_"], .dxeListBox, div[id*="PagerBottom"]'));
-                                for (const l of lists) {
-                                    if (l.offsetParent !== null) {
-                                        const items = Array.from(l.querySelectorAll('td, tr, span, div, li'));
-                                        const target = items.find(it => (it.textContent || '').trim() === '100');
-                                        if (target) {
-                                            target.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true}));
-                                            target.dispatchEvent(new MouseEvent('mouseup', {bubbles: true, cancelable: true}));
-                                            target.click();
-                                            return true;
-                                        }
-                                    }
-                                }
-                                return false;
-                            }""")
-
-                            if not selected_100:
-                                item_100 = page.locator("div[id*='PSP'] td, .dxp-dropDownListBox td, .dxeListBoxItem").filter(has_text=re.compile(r"^\s*100\s*$")).last
-                                if item_100.is_visible(timeout=2000):
-                                    item_100.hover()
-                                    item_100.click(force=True)
-                                    selected_100 = True
-
-                    except Exception as e:
-                        self.log(f"Lưu ý click chọn 100 dòng: {e}")
-
-                    if selected_100:
-                        self.log("Đã kích hoạt chọn 100 bản ghi/trang! Đang chờ máy chủ nạp lại dữ liệu (tối đa 180s)...")
-                        time.sleep(1.0)
-                        wait_for_grid_data(timeout=180)
-                        self._wait_portal_idle(page)
-                        time.sleep(1.0)
-                        self.log("Máy chủ đã hoàn tất tải dữ liệu 100 bản ghi/trang ✅")
-
-                    # 5. BƯỚC 3: NHẬN DIỆN CỘT LỖI & ÁP DỤNG BỘ LỌC 1 VỚI CƠ CHẾ AUTO-RETRY XÁC THỰC
-                    self.log("Đang áp dụng bộ lọc cột Lỗi = 1...")
-                    try:
-                        filter_info = page.evaluate("""() => {
-                            const table = document.querySelector('#gvDSKetQuaGuiHoso, #gvDSKetQuaGuiHoso_DXMainTable');
-                            if (!table) return null;
-                            const headers = Array.from(table.querySelectorAll('.dxgvHeader_EIS, th, td[id*="_col"]')).map((h, i) => ({
-                                index: i,
-                                text: (h.textContent || '').trim().toLowerCase()
-                            }));
-                            let errIdx = 5;
-                            for (const h of headers) {
-                                if (h.text.includes('lỗi') || h.text.includes('không hợp lệ') || h.text.includes('số lỗi') || h.text.includes('chi tiết lỗi')) {
-                                    errIdx = h.index;
-                                    break;
-                            }
-                            }
-                            return { errIdx: errIdx };
-                        }""")
-                        err_col = filter_info.get("errIdx", 5) if filter_info else 5
-                        
-                        # Thử áp dụng lọc tối đa 2 lần để tránh rớt phím khi mạng lag
-                        for filter_attempt in range(2):
-                            col_input = page.locator(f"#gvDSKetQuaGuiHoso_DXFREditorcol{err_col}_I, #gvDSKetQuaGuiHoso_DXFREditorcol5_I, input[id*='DXFREditorcol5']").first
-                            if col_input.is_visible(timeout=3000):
-                                col_input.click(click_count=3)
-                                col_input.fill("1")
-                                col_input.press("Enter")
-                            else:
-                                page.evaluate("""(col) => {
-                                    try {
-                                        const grid = window.gvDSKetQuaGuiHoso;
-                                        if (grid && typeof grid.AutoFilterByColumn === 'function') {
-                                            grid.AutoFilterByColumn(col, '1');
-                                        }
-                                    } catch(e) {}
-                                }""", err_col)
-
-                            self.log(f"Đang chờ máy chủ áp dụng bộ lọc cột lỗi = 1 (Lần {filter_attempt + 1}, tối đa 180s)...")
-                            wait_for_grid_data(timeout=180)
-                            self._wait_portal_idle(page)
+                        page_size_inp = page.get_by_role("textbox", name="Page size:")
+                        if page_size_inp.is_visible(timeout=2000):
+                            page_size_inp.click()
+                            time.sleep(0.4)
+                            page.get_by_text("100", exact=True).first.click()
                             time.sleep(1.0)
+                            self._wait_portal_idle(page)
+                    except Exception: pass
 
-                            # Kiểm tra xem giá trị trong ô lọc có đúng là 1 không
-                            curr_filter_val = page.evaluate(f"""() => {{
-                                const inp = document.querySelector("#gvDSKetQuaGuiHoso_DXFREditorcol{err_col}_I, #gvDSKetQuaGuiHoso_DXFREditorcol5_I");
-                                return inp ? inp.value.trim() : '1';
-                            }}""")
-                            if curr_filter_val == "1":
-                                break
+                    # 6. Sắp xếp giảm dần theo Thời gian
+                    try:
+                        thoi_gian_hdr = page.get_by_role("cell", name="Thời gian", exact=True).or_(page.get_by_text("Thời gian", exact=True)).first
+                        if thoi_gian_hdr.is_visible(timeout=3000):
+                            thoi_gian_hdr.click(force=True)
+                            time.sleep(1.0)
+                            self._wait_portal_idle(page)
+                            thoi_gian_hdr.click(force=True)
+                            time.sleep(1.0)
+                            self._wait_portal_idle(page)
+                    except Exception: pass
 
-                        self.log("Đã hoàn tất lọc các ca có lỗi (cột lỗi = 1) ✅")
-                    except Exception as f_err:
-                        self.log(f"Lưu ý khi lọc cột lỗi: {f_err}")
+                    # 7. Quét dữ liệu và Direct URL download
+                    self.log("BẮT ĐẦU TẢI DANH SÁCH LỖI (DIRECT URL DOWNLOAD)...")
+                    downloaded_count = 0
+                    p_num = 1
+                    max_records_to_dl = 100
 
-                    # 6. BƯỚC 4: LẶP QUA CÁC TRANG VÀ TẢI TỪNG FILE CHI TIẾT
-                    total_dl = 0
-                    p_idx = 1
-                    while True:
-                        self.log(f"Đang quét danh sách hồ sơ lỗi tại Trang {p_idx}...")
-                        wait_for_grid_data(timeout=180)
+                    while downloaded_count < max_records_to_dl:
+                        self.log(f"Quét dữ liệu Trang {p_num}...")
                         self._wait_portal_idle(page)
-
-                        rows = page.locator("#gvDSKetQuaGuiHoso tr[id*='DXDataRow'], #gvDSKetQuaGuiHoso tr.dxgvDataRow_EIS, #gvDSKetQuaGuiHoso tr.dxgvDataRow").all()
-                        self.log(f"Trang {p_idx}: Tìm thấy {len(rows)} ca lỗi cần tải chi tiết.")
-
-                        if len(rows) == 0:
-                            self.log("Không tìm thấy ca lỗi nào trên trang này.")
+                        records = self._extract_records_from_grid(page)
+                        if not records:
+                            self.log("Không tìm thấy bản ghi lỗi nào trên trang này.")
                             break
 
-                        for idx, row in enumerate(rows):
-                            try:
-                                self.log(f"[{total_dl + 1}/{total_dl + len(rows) - idx}] Đang mở chi tiết ca lỗi dòng #{idx + 1}...")
-
-                                # Đảm bảo popup cũ và lớp phủ mờ mask đã đóng hoàn toàn
-                                try:
-                                    page.locator(".dxpc-mask, #PopupNhanChiTietLoiHS_PW-0").wait_for(state="hidden", timeout=3000)
-                                except Exception: pass
-
-                                # Click mở chi tiết ca lỗi
-                                link = row.locator("a, span[onclick], td[onclick]").first
-                                if link.is_visible(timeout=2000):
-                                    link.click(force=True)
-                                else:
-                                    row.click(force=True)
-
-                                # Chờ popup hiển thị và nạp xong nội dung bên trong
-                                try:
-                                    page.wait_for_selector("#PopupNhanChiTietLoiHS_PW-0, div[id*='PopupNhanChiTietLoiHS']", state="visible", timeout=15000)
-                                except Exception: pass
-                                
-                                try:
-                                    page.locator("#PopupNhanChiTietLoiHS_LD, .dxlpLoadingPanelWithContent").wait_for(state="hidden", timeout=10000)
-                                except Exception: pass
-
-                                # Chờ và click "Xuất Excel" trong popup
-                                exp_btn = page.locator("#PopupNhanChiTietLoiHS_PW-0 button, #PopupNhanChiTietLoiHS_PW-0 span, #PopupNhanChiTietLoiHS_PW-0 a, #PopupNhanChiTietLoiHS_PW-0 td, button, span, a").filter(has_text=re.compile(r"^Xuất Excel$", re.IGNORECASE)).first
-                                
-                                if exp_btn.is_visible(timeout=10000):
-                                    with page.expect_download(timeout=60000) as d_info:
-                                        exp_btn.click(force=True)
-                                    d = d_info.value
-                                    t_path = os.path.join(TEMP_DIR, f"err_p{p_idx}_{idx+1}_{int(time.time()*1000)}.xlsx")
-                                    d.save_as(t_path)
-                                    total_dl += 1
-                                    self.log(f"  -> Đã tải thành công tệp lỗi #{total_dl} ✅")
-                                else:
-                                    self.log(f"  -> Lưu ý: Không thấy nút 'Xuất Excel' trong popup dòng #{idx + 1}.")
-
-                                # Đóng popup an toàn và chờ mask biến mất
-                                page.evaluate("""() => {
-                                    try {
-                                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                        const pop = window.PopupNhanChiTietLoiHS || (cc ? cc.GetByName('PopupNhanChiTietLoiHS') : null);
-                                        if (pop && typeof pop.Hide === 'function') pop.Hide();
-                                    } catch(e) {}
-                                }""")
-                                
-                                for c_s in [".dxpc-closeBtn", "img[alt*='Close']", "img[title*='Close']", ".dxWeb_pcCloseButton_Youthful"]:
-                                    ce = page.locator(c_s).first
-                                    if ce.is_visible(timeout=500):
-                                        ce.click(force=True)
-                                        break
-                                
-                                try:
-                                    page.locator(".dxpc-mask, #PopupNhanChiTietLoiHS_PW-0").wait_for(state="hidden", timeout=5000)
-                                except Exception: pass
-                                time.sleep(0.4)
-
-                            except Exception as re:
-                                self.log(f"  Lỗi tải dòng #{idx+1}: {re}")
-                                try:
-                                    page.evaluate("if (window.PopupNhanChiTietLoiHS) window.PopupNhanChiTietLoiHS.Hide();")
-                                except Exception: pass
-
-                        # Chuyển trang tiếp theo qua pager button
-                        try:
-                            next_btn = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom .dxp-button:has-text('>')").first
-                            if next_btn.is_visible(timeout=2000) and "dxp-disabled" not in (next_btn.get_attribute("class") or ""):
-                                self.log(f"Chuyển sang trang tiếp theo (Trang {p_idx + 1})...")
-                                next_btn.click(force=True)
-                                p_idx += 1
-                                time.sleep(1.0)
-                                wait_for_grid_data(timeout=30)
-                            else:
-                                self.log("Đã duyệt hết tất cả các trang.")
+                        self.log(f"Tìm thấy {len(records)} bản ghi lỗi trên trang {p_num}...")
+                        for rec in records:
+                            fp = self._download_direct_record(page, rec['maGD'], rec['stt'], TEMP_DIR)
+                            if fp: downloaded_count += 1
+                            time.sleep(0.2)
+                            if downloaded_count >= max_records_to_dl:
                                 break
-                        except Exception:
-                            self.log("Hoàn thành duyệt các trang.")
+
+                        if downloaded_count >= max_records_to_dl:
                             break
 
+                        p_num += 1
+                        pager = page.locator("#gvDSKetQuaGuiHoso_DXPagerBottom")
+                        next_btn = pager.get_by_text(str(p_num), exact=True)
+                        if next_btn.count() > 0:
+                            next_btn.first.click(force=True)
+                            time.sleep(1.0)
+                            self._wait_portal_idle(page)
+                        else:
+                            break
+
+                    self.log(f"Đã tải thành công tổng cộng {downloaded_count} gói hồ sơ lỗi.")
                     context.storage_state(path=SESSION_FILE)
 
                 finally:
