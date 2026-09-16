@@ -513,17 +513,32 @@ class ClientRPAGui:
 
             login_ok = False
             start_wait = time.time()
-            while time.time() - start_wait < 120:
+            last_log_t = start_wait
+
+            while time.time() - start_wait < 180:
                 try:
-                    if page.locator("#HeaderMenu").is_visible() or page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible():
+                    has_logout = page.locator("a:has-text('Đăng xuất'), a:has-text('Thoát'), #btnLogout").is_visible()
+                    has_menu = page.locator("#HeaderMenu").is_visible() or page.get_by_text("Hồ sơ đề nghị thanh toán").is_visible()
+                    has_login_btn = page.locator("input[value='Đăng nhập'], #btnLogin, #btnDangNhap").is_visible()
+                    has_pass_inp = page.locator("input[type='password']").is_visible()
+
+                    if (has_logout or has_menu) and not has_login_btn and not has_pass_inp:
                         login_ok = True
                         break
                 except Exception:
                     pass
+
+                now = time.time()
+                if now - last_log_t >= 10:
+                    elapsed = int(now - start_wait)
+                    remaining = max(0, 180 - elapsed)
+                    self.log(f"⏳ Đang chờ bạn nhập Captcha và bấm Đăng nhập... (Đã chờ {elapsed}s / còn lại {remaining}s)")
+                    last_log_t = now
+
                 time.sleep(1)
 
             if not login_ok:
-                raise Exception("Quá thời gian chờ nhập Captcha hoặc chưa hoàn tất đăng nhập.")
+                raise Exception("Quá thời gian 180 giây chờ nhập Captcha hoặc chưa hoàn tất đăng nhập.")
 
             self.log("Đăng nhập thành công! Đang lưu phiên làm việc...")
             try:

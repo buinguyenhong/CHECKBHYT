@@ -56,6 +56,25 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-16 10:35 - Antigravity (Sửa Lỗi Nhận Diện Sai Đăng Nhập Thành Công Khi Chưa Nhập Captcha)
+
+### Mục tiêu
+- Sửa lỗi hệ thống tự động báo "ĐĂNG NHẬP THÀNH CÔNG! ✅" ngay trong 0.1 giây khi người dùng chưa kịp gõ Captcha.
+
+### Nguyên nhân
+- Trước đây điều kiện kiểm tra đăng nhập có chứa `#roundPanel` và `#MainPane`. Trên Cổng BHYT, đây là 2 container giao diện DevExpress luôn tồn tại ngay trên trang đăng nhập (bọc quanh form đăng nhập). Do đó hệ thống nhận diện nhầm là đã đăng nhập thành công và lập tức chuyển trang.
+
+### Thay đổi
+- `portal_downloader/downloader_server.py`, `web_app/services/portal_automation.py`, `client_runner/client_agent.py`:
+  - Loại bỏ hoàn toàn `#roundPanel` và `#MainPane` khỏi điều kiện kiểm tra đăng nhập.
+  - Chỉ công nhận đăng nhập thành công khi thỏa mãn đồng thời:
+    1. Nhìn thấy nút Đăng xuất (`#btnLogout` / `a:has-text('Đăng xuất')`) hoặc Menu điều hướng (`#HeaderMenu` / `"Hồ sơ đề nghị thanh toán"`).
+    2. Nút bấm Đăng nhập (`input[value='Đăng nhập']` / `#btnLogin`) và ô mật khẩu `input[type='password']` đã biến mất hoàn toàn.
+  - Thêm log đếm ngược thời gian chờ Captcha định kỳ 10 giây/lần: `⏳ Đang chờ bạn nhập Captcha và bấm Đăng nhập... (Đã chờ {elapsed}s / còn lại {remaining}s)`.
+
+### Kiểm tra
+- `python -m py_compile portal_downloader/downloader_server.py web_app/services/portal_automation.py client_runner/client_agent.py` -> PASS (Exit code 0).
+
 ## 2026-09-16 10:15 - Antigravity (Tạo Công Cụ Chạy Trực Tiếp Tại Chỗ, Nâng Cấp Luồng B Cả Tháng Với Timeout 20 Phút & Heartbeat 10s)
 
 ### Mục tiêu
