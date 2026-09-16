@@ -83,8 +83,10 @@ File quan trọng:
 - `web_app/services/his_service.py`: kết nối SQL HIS, cache, chuẩn hóa SQL, sinh reset SQL.
 - `web_app/services/excel_service.py`: đọc `listbh.xlsx`, `HoSoLoiChiTiet.xlsx`.
 - `web_app/services/compare_service.py`: logic đối soát và lưu trạng thái.
-- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT thế hệ mới chạy trên Server/LAN (Native Chrome/Edge, Direct URL Download `ExportExcelKPG_New?maGd=...` cho Luồng C, timeout 600s cho Luồng B, khử trùng dữ liệu tự động).
-- `client_runner/`: bộ công cụ RPA Runner chạy trực tiếp trên máy trạm Client PC (`client_agent.py`, `Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
+- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT thế hệ mới (Native Chrome/Edge, Direct URL Download `ExportExcelKPG_New?maGd=...` cho Luồng C, Luồng B tải cả tháng với timeout 1200s kèm Heartbeat định kỳ 10s, khử trùng dữ liệu tự động).
+- `portal_downloader/`: bộ công cụ tải & gộp hồ sơ BHYT chạy trực tiếp tại chỗ trên máy đang thao tác (`downloader_server.py`, `Chay_Tool_Tai_BHYT.bat`, `templates/index.html`), bật trình duyệt trực tiếp trước mặt người dùng và 1-click gửi file lên Máy chủ CHECKBHYT để đối soát CSDL.
+- `Chay_Tool_Tai_BHYT.bat`: tệp thực thi 1-click tại thư mục gốc khởi động nhanh công cụ tải dữ liệu BHYT cục bộ.
+- `client_runner/`: bộ công cụ RPA Runner chạy trên máy trạm (`client_agent.py`, `Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
 - `web_app/xml_validator/`: thư mục chứa mô-đun đối soát và kiểm tra cấu trúc hồ sơ XML BHYT (in-process).
   - `xml_parser.py`: Đọc tệp XML, giải mã Container XML ký số và gom nhóm theo MA_LK.
   - `rule_engine.py`: Chứa 26 quy tắc nghiệp vụ BHYT kiểm tra lỗi.

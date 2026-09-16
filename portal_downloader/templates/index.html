@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cổng BHYT Automation — Tải Siêu Tốc Luồng B & Luồng C</title>
+    <title>CheckBHYT — Công Cụ Tải & Gộp Hồ Sơ Cổng BHYT Trực Tiếp</title>
     <script>
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -12,8 +12,8 @@
         :root {
             --bg-color: #0b1329;
             --bg-gradient: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.08) 0px, transparent 50%);
-            --header-bg: rgba(15, 23, 42, 0.75);
-            --card-bg: rgba(30, 41, 59, 0.55);
+            --header-bg: rgba(15, 23, 42, 0.8);
+            --card-bg: rgba(30, 41, 59, 0.6);
             --border-color: rgba(255, 255, 255, 0.1);
             --text-main: #f8fafc;
             --text-secondary: #94a3b8;
@@ -33,7 +33,7 @@
         [data-theme="light"] {
             --bg-color: #f1f5f9;
             --bg-gradient: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.05) 0px, transparent 50%);
-            --header-bg: rgba(255, 255, 255, 0.85);
+            --header-bg: rgba(255, 255, 255, 0.88);
             --card-bg: #ffffff;
             --border-color: #e2e8f0;
             --text-main: #0f172a;
@@ -62,14 +62,15 @@
             display: flex;
             flex-direction: column;
         }
+
         .navbar {
             background: var(--header-bg);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border-color);
-            padding: 12px 28px;
+            padding: 12px 24px;
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
             position: sticky;
             top: 0;
             z-index: 50;
@@ -84,112 +85,143 @@
         .nav-logo {
             width: 36px;
             height: 36px;
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            border-radius: 10px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
-        .nav-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
-        .nav-subtitle { font-size: 12px; color: var(--text-secondary); }
+        .nav-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.3px; }
+        .nav-subtitle { font-size: 0.72rem; color: var(--text-secondary); }
         .nav-actions { display: flex; align-items: center; gap: 12px; }
+
         .btn-nav {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
             cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             gap: 6px;
             transition: all 0.2s;
+            text-decoration: none;
         }
-        .btn-nav:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-nav:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
 
         .container {
-            max-width: 1200px;
+            max-width: 1300px;
             width: 100%;
-            margin: 24px auto;
-            padding: 0 20px;
+            margin: 0 auto;
+            padding: 20px;
             flex: 1;
         }
+
         .page-header {
-            margin-bottom: 24px;
+            margin-bottom: 18px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
         }
-        .page-header h1 {
-            font-size: 24px;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--text-main), var(--primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .page-header h1 { font-size: 1.45rem; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
+        .page-header p { font-size: 0.85rem; color: var(--text-secondary); }
+
+        .server-config-bar {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
         }
-        .page-header p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+        .server-config-bar label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .server-config-bar input {
+            flex: 1;
+            min-width: 220px;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--input-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
 
         .mode-tabs {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             border-bottom: 1px solid var(--border-color);
-            padding-bottom: 12px;
+            padding-bottom: 10px;
         }
         .tab-btn {
             background: transparent;
-            border: 1px solid var(--border-color);
+            border: none;
             color: var(--text-secondary);
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 700;
+            font-size: 0.95rem;
+            font-weight: 600;
+            padding: 8px 18px;
+            border-radius: 6px;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 8px;
             transition: all 0.2s;
         }
+        .tab-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.05); }
         .tab-btn.active {
+            color: white;
             background: var(--primary);
-            color: #fff;
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
         }
 
         .main-layout {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 430px 1fr;
             gap: 20px;
         }
-        @media (max-width: 900px) {
+        @media (max-width: 1000px) {
             .main-layout { grid-template-columns: 1fr; }
         }
 
         .card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 14px;
-            padding: 22px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
         }
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 18px;
+            margin-bottom: 16px;
             padding-bottom: 12px;
             border-bottom: 1px solid var(--border-color);
         }
         .card-title {
-            font-size: 16px;
+            font-size: 1.05rem;
             font-weight: 700;
+            color: var(--text-main);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -198,174 +230,148 @@
         .form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 14px;
+            gap: 12px;
             margin-bottom: 16px;
         }
-        .form-group { margin-bottom: 14px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
         .form-group.full { grid-column: span 2; }
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-        }
+        .form-group label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
         .form-control {
-            width: 100%;
-            padding: 10px 14px;
             background: var(--input-bg);
             border: 1px solid var(--input-border);
             color: var(--input-color);
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            outline: none;
             transition: border-color 0.2s;
         }
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-        }
-        .row-inputs { display: flex; gap: 10px; align-items: center; }
+        .form-control:focus { border-color: var(--primary); }
+
+        .row-inputs { display: flex; align-items: center; gap: 8px; }
+        .row-inputs input { width: 100%; }
 
         .btn-action {
             width: 100%;
-            padding: 14px 20px;
-            border-radius: 10px;
-            font-size: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.95rem;
             font-weight: 700;
             cursor: pointer;
-            border: none;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
             transition: all 0.2s;
-            margin-bottom: 10px;
+            margin-top: 10px;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: #fff;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+            background: linear-gradient(135deg, var(--primary), #2563eb);
+            color: white;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
         }
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
-        }
-        .btn-primary:disabled {
-            background: #64748b;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
         }
         .btn-secondary {
-            background: rgba(255, 255, 255, 0.05);
+            background: transparent;
             border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.05);
             color: var(--text-main);
         }
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
+        .btn-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
         }
 
         .badge {
-            padding: 4px 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px;
             border-radius: 20px;
-            font-size: 12px;
-            font-weight: 700;
+            font-size: 0.72rem;
+            font-weight: 600;
         }
-        .badge-idle { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
-        .badge-running { background: rgba(59, 130, 246, 0.2); color: #38bdf8; animation: pulse 1.5s infinite; }
-        .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-        .badge-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+        .badge-running { background: rgba(59, 130, 246, 0.15); color: var(--primary); }
+        .badge-error { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .badge-idle { background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); }
 
-        @keyframes pulse {
-            0% { opacity: 0.7; }
-            50% { opacity: 1; }
-            100% { opacity: 0.7; }
-        }
-
-        .log-container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
+        .log-container { display: flex; flex-direction: column; height: 580px; }
         .log-box {
             background: var(--log-bg);
             border: 1px solid var(--log-border);
             color: var(--log-color);
-            border-radius: 10px;
-            padding: 16px;
-            font-family: "Consolas", "Courier New", monospace;
-            font-size: 12.5px;
-            line-height: 1.6;
-            height: 380px;
+            border-radius: 8px;
+            padding: 14px;
+            font-family: "Cascadia Code", Consolas, Menlo, Monaco, monospace;
+            font-size: 0.82rem;
+            line-height: 1.55;
+            flex: 1;
             overflow-y: auto;
             white-space: pre-wrap;
-            flex: 1;
+            word-break: break-word;
         }
 
         .result-panel {
-            display: none;
-            margin-top: 16px;
-            background: rgba(16, 185, 129, 0.1);
+            margin-top: 14px;
+            background: rgba(16, 185, 129, 0.06);
             border: 1px solid rgba(16, 185, 129, 0.3);
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: 8px;
+            padding: 14px;
+            display: none;
         }
-        .result-panel.active { display: block; }
-        .result-header {
-            font-size: 15px;
-            font-weight: 700;
-            color: #10b981;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .result-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 14px;
-        }
+        .result-panel.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        .result-header { font-size: 0.92rem; font-weight: 700; color: var(--success); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .result-stats { display: flex; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
         .stat-box {
-            background: rgba(0, 0, 0, 0.2);
-            padding: 8px 12px;
-            border-radius: 8px;
-            text-align: center;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 6px;
         }
-        .stat-num { font-size: 18px; font-weight: 800; color: var(--text-main); }
-        .stat-lbl { font-size: 11px; color: var(--text-secondary); }
-        .result-actions { display: flex; gap: 10px; }
+        .stat-num { font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
+        .stat-lbl { font-size: 0.7rem; color: var(--text-secondary); }
+
+        .result-actions { display: flex; gap: 10px; flex-wrap: wrap; }
         .btn-sm {
-            flex: 1;
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 700;
-            text-align: center;
-            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
             cursor: pointer;
             border: none;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
             gap: 6px;
+            text-decoration: none;
+            transition: all 0.2s;
         }
+        .btn-sm.btn-primary { background: var(--primary); color: white; }
+        .btn-sm.btn-primary:hover { background: var(--primary-hover); }
+        .btn-sm.btn-success { background: var(--success); color: white; }
+        .btn-sm.btn-success:hover { background: var(--success-hover); }
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <a href="/admin" class="nav-brand">
+        <div class="nav-brand">
             <div class="nav-logo">⚡</div>
             <div>
-                <div class="nav-title">CỔNG BHYT AUTOMATION</div>
-                <div class="nav-subtitle">Công nghệ Direct URL Download & Native Browser</div>
+                <div class="nav-title">CHECKBHYT — LOCAL PORTAL DOWNLOADER</div>
+                <div class="nav-subtitle">Kích hoạt trực tiếp trên máy đang thao tác — Bật trình duyệt trước mặt bạn</div>
             </div>
-        </a>
+        </div>
         <div class="nav-actions">
-            <a href="/admin" class="btn-nav">
-                <span>🔙</span> Quay lại IT Admin
-            </a>
             <button class="btn-nav" onclick="toggleTheme()">
                 <span id="themeIcon">🌓</span> Giao diện
             </button>
@@ -375,9 +381,16 @@
     <div class="container">
         <div class="page-header">
             <div>
-                <h1>Trung Tâm Tải Dữ Liệu Tự Động Cổng BHYT</h1>
-                <p>Khởi chạy trực tiếp Google Chrome/Microsoft Edge native, tải siêu tốc qua HTTP stream không mở popup.</p>
+                <h1>Trung Tâm Tải Dữ Liệu Cổng BHYT Trực Tiếp</h1>
+                <p>Khởi chạy Google Chrome/Microsoft Edge ngay trên màn hình máy này. Tải xong có thể đẩy thẳng lên Máy chủ CHECKBHYT để đối soát.</p>
             </div>
+        </div>
+
+        <!-- SERVER CONFIG BAR -->
+        <div class="server-config-bar">
+            <label for="serverUrl">🌐 Địa chỉ Máy chủ CHECKBHYT:</label>
+            <input type="text" id="serverUrl" value="http://127.0.0.1:8000" placeholder="Ví dụ: http://192.168.1.100:8000 hoặc http://127.0.0.1:8000">
+            <button class="btn-nav" onclick="saveServerConfig()">💾 Lưu URL</button>
         </div>
 
         <!-- MODE TABS -->
@@ -386,7 +399,7 @@
                 <span>⚡</span> Luồng C: Tải Danh Sách Lỗi QĐ 3176 (Direct URL)
             </button>
             <button class="tab-btn" id="tabBtnFlowB" onclick="switchMode('B')">
-                <span>📦</span> Luồng B: Tải Danh Sách Đã Gửi (listbh.xlsx)
+                <span>📦</span> Luồng B: Tải Danh Sách Đã Gửi Cả Tháng (listbh.xlsx)
             </button>
         </div>
 
@@ -397,7 +410,7 @@
                 <div id="panelFlowC">
                     <div class="card-header">
                         <div class="card-title">
-                            <span>⚙️</span> Cấu hình Luồng C (Lỗi chi tiết QĐ 3176)
+                            <span>⚙️</span> Cấu hình Luồng C (Hồ sơ lỗi QĐ 3176)
                         </div>
                         <span class="badge badge-success">Direct URL API</span>
                     </div>
@@ -412,8 +425,8 @@
                             <input type="text" id="c_username" class="form-control" value="066091019320">
                         </div>
                         <div class="form-group full">
-                            <label for="c_password">Mật khẩu (để trống nếu gõ tay trên màn hình):</label>
-                            <input type="password" id="c_password" class="form-control" placeholder="Để trống nếu muốn nhập tay trên trình duyệt">
+                            <label for="c_password">Mật khẩu (để trống nếu muốn nhập tay trên trình duyệt):</label>
+                            <input type="password" id="c_password" class="form-control" placeholder="Để trống nếu muốn gõ tay">
                         </div>
                         <div class="form-group">
                             <label for="c_filterCol5">Bộ lọc Cột 5 (Lỗi):</label>
@@ -433,7 +446,7 @@
                         <span>⚡</span> BẮT ĐẦU TẢI DỮ LIỆU SIÊU TỐC
                     </button>
                     <button id="btnMergeOnly" class="btn-action btn-secondary" onclick="startMergeOnly()">
-                        <span>📂</span> Chỉ gộp các file Excel có sẵn trong thư mục tạm
+                        <span>📂</span> Chỉ gộp các file Excel có sẵn trong thư mục tải
                     </button>
                 </div>
 
@@ -443,7 +456,7 @@
                         <div class="card-title">
                             <span>⚙️</span> Cấu hình Luồng B (Danh sách đã gửi listbh.xlsx)
                         </div>
-                        <span class="badge badge-success">Native Chrome/Edge</span>
+                        <span class="badge badge-success">Toàn Bộ Cả Tháng</span>
                     </div>
 
                     <div class="form-grid">
@@ -457,16 +470,16 @@
                         </div>
                         <div class="form-group full">
                             <label for="b_password">Mật khẩu:</label>
-                            <input type="password" id="b_password" class="form-control" placeholder="Để trống nếu muốn nhập tay trên trình duyệt">
+                            <input type="password" id="b_password" class="form-control" placeholder="Để trống nếu muốn gõ tay">
                         </div>
                         <div class="form-group full">
                             <label>Phạm vi tải:</label>
-                            <input type="text" class="form-control" value="Toàn bộ hồ sơ của cả tháng (Timeout 20 phút kèm Heartbeat 10s)" disabled style="color:var(--success); font-weight:600;">
+                            <input type="text" class="form-control" value="Toàn bộ hồ sơ của cả tháng (Timeout 20 phút kèm Heartbeat)" disabled style="color:var(--success); font-weight:600;">
                         </div>
                     </div>
 
                     <button id="btnRunFlowB" class="btn-action btn-primary" onclick="startFlowB()">
-                        <span>📥</span> BẮT ĐẦU TẢI DANH SÁCH ĐÃ GỬI
+                        <span>📥</span> BẮT ĐẦU TẢI DANH SÁCH CẢ THÁNG
                     </button>
                 </div>
             </div>
@@ -483,7 +496,7 @@
                     </div>
                 </div>
 
-                <div id="logBox" class="log-box">Hệ thống sẵn sàng. Chọn chức năng và nhấn bắt đầu để khởi chạy trình duyệt...</div>
+                <div id="logBox" class="log-box">Hệ thống sẵn sàng. Chọn chức năng và nhấn bắt đầu để khởi chạy trình duyệt trên màn hình của bạn...</div>
 
                 <!-- PANEL HIỂN THỊ KẾT QUẢ -->
                 <div id="resultPanel" class="result-panel">
@@ -493,13 +506,13 @@
                     <div class="result-stats" id="resultStats">
                         <div class="stat-box">
                             <div class="stat-num" id="statFiles">0</div>
-                            <div class="stat-lbl">Tệp đã tải</div>
+                            <div class="stat-lbl">Tệp xử lý</div>
                         </div>
                         <div class="stat-box">
                             <div class="stat-num" id="statRecords">0</div>
-                            <div class="stat-lbl">Bản ghi duy nhất</div>
+                            <div class="stat-lbl">Bản ghi</div>
                         </div>
-                        <div class="stat-box">
+                        <div class="stat-box" id="statDupBox">
                             <div class="stat-num" id="statDuplicates">0</div>
                             <div class="stat-lbl">Trùng lặp đã lọc</div>
                         </div>
@@ -508,8 +521,8 @@
                         <a id="btnDownloadFile" href="#" class="btn-sm btn-primary">
                             <span>📥</span> Tải file Excel về máy
                         </a>
-                        <button id="btnImportDB" class="btn-sm btn-secondary" onclick="importToReconciliation()">
-                            <span>⚡</span> Nạp vào CSDL đối soát
+                        <button id="btnPushServer" class="btn-sm btn-success" onclick="pushFileToServer()">
+                            <span>⚡</span> Gửi lên Máy chủ & Kích hoạt đối soát CSDL
                         </button>
                     </div>
                 </div>
@@ -525,6 +538,7 @@
         const btnRunFlowC = document.getElementById('btnRunFlowC');
         const btnRunFlowB = document.getElementById('btnRunFlowB');
         const btnDownloadFile = document.getElementById('btnDownloadFile');
+        const serverUrlInput = document.getElementById('serverUrl');
 
         function appendLog(msg) {
             logBox.textContent += '\n' + msg;
@@ -551,16 +565,45 @@
             localStorage.setItem('theme', next);
         }
 
+        // Tải cấu hình từ backend
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.server_url) serverUrlInput.value = data.server_url;
+                    if (data.ma_cskcb) {
+                        document.getElementById('c_maCSKCB').value = data.ma_cskcb;
+                        document.getElementById('b_maCSKCB').value = data.ma_cskcb;
+                    }
+                    if (data.username) {
+                        document.getElementById('c_username').value = data.username;
+                        document.getElementById('b_username').value = data.username;
+                    }
+                }
+            } catch (e) {}
+        }
+        loadConfig();
+
+        async function saveServerConfig() {
+            const url = serverUrlInput.value.trim();
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ server_url: url })
+            });
+            alert('Đã lưu URL máy chủ: ' + url);
+        }
+
         // Kết nối Server-Sent Events (SSE) để nhận log thời gian thực
         let evtSource = null;
         function connectLogStream() {
             if (evtSource) { evtSource.close(); }
-            evtSource = new EventSource('/api/automation/v2/logs');
+            evtSource = new EventSource('/api/logs');
             evtSource.onmessage = function(e) {
                 appendLog(e.data);
             };
             evtSource.onerror = function() {
-                // Tự động kết nối lại sau 3s nếu đứt kết nối
                 setTimeout(connectLogStream, 3000);
             };
         }
@@ -569,6 +612,7 @@
         // KÍCH HOẠT LUỒNG C MỚI
         async function startFlowC() {
             const payload = {
+                server_url: serverUrlInput.value.trim(),
                 maCoSoKCB: document.getElementById('c_maCSKCB').value.trim(),
                 username: document.getElementById('c_username').value.trim(),
                 password: document.getElementById('c_password').value,
@@ -584,7 +628,7 @@
             appendLog('\n--- BẮT ĐẦU LUỒNG C MỚI (DIRECT URL DOWNLOAD) ---');
 
             try {
-                const res = await fetch('/api/automation/v2/flow-c', {
+                const res = await fetch('/api/flow-c', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -596,12 +640,13 @@
                     statusBadge.textContent = 'Thành công';
                     
                     const summary = data.summary || {};
-                    document.getElementById('resultTitle').textContent = 'HOÀN TẤT TẢI & GỘP LỖI CHI TIẾT';
+                    document.getElementById('resultTitle').textContent = 'HOÀN TẤT TẢI & GỘP LỖI CHI TIẾT (HoSoLoiChiTiet.xlsx)';
                     document.getElementById('statFiles').textContent = summary.total_files || data.downloaded_count || 0;
                     document.getElementById('statRecords').textContent = summary.unique_records || 0;
                     document.getElementById('statDuplicates').textContent = summary.duplicates_removed || 0;
+                    document.getElementById('statDupBox').style.display = 'block';
                     
-                    btnDownloadFile.href = '/api/automation/v2/download-file?file_type=error_detail';
+                    btnDownloadFile.href = '/api/download-file?file_type=error_detail';
                     resultPanel.classList.add('active');
                     appendLog('\n🎉 LUỒNG C HOÀN TẤT THÀNH CÔNG!');
                 } else {
@@ -620,6 +665,7 @@
         // KÍCH HOẠT LUỒNG B MỚI
         async function startFlowB() {
             const payload = {
+                server_url: serverUrlInput.value.trim(),
                 maCoSoKCB: document.getElementById('b_maCSKCB').value.trim(),
                 username: document.getElementById('b_username').value.trim(),
                 password: document.getElementById('b_password').value
@@ -629,10 +675,10 @@
             statusBadge.className = 'badge badge-running';
             statusBadge.textContent = 'Đang chạy Luồng B...';
             resultPanel.classList.remove('active');
-            appendLog('\n--- BẮT ĐẦU LUỒNG B MỚI (NATIVE BROWSER) ---');
+            appendLog('\n--- BẮT ĐẦU LUỒNG B MỚI (TẢI CẢ THÁNG - HEARTBEAT 10S) ---');
 
             try {
-                const res = await fetch('/api/automation/v2/flow-b', {
+                const res = await fetch('/api/flow-b', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -646,9 +692,9 @@
                     document.getElementById('resultTitle').textContent = 'TẢI THÀNH CÔNG DANH SÁCH ĐÃ GỬI (listbh.xlsx)';
                     document.getElementById('statFiles').textContent = 1;
                     document.getElementById('statRecords').textContent = data.rows || 0;
-                    document.getElementById('statDuplicates').textContent = 0;
+                    document.getElementById('statDupBox').style.display = 'none';
 
-                    btnDownloadFile.href = '/api/automation/v2/download-file?file_type=listbh';
+                    btnDownloadFile.href = '/api/download-file?file_type=listbh';
                     resultPanel.classList.add('active');
                     appendLog('\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG!');
                 } else {
@@ -666,9 +712,9 @@
 
         // CHỈ GỘP CÁC FILE EXCEL ĐÃ CÓ
         async function startMergeOnly() {
-            appendLog('\n--- ĐANG GỘP CÁC TỆP EXCEL TRONG THƯ MỤC TẠM ---');
+            appendLog('\n--- ĐANG GỘP CÁC TỆP EXCEL TRONG THƯ MỤC TẢI ---');
             try {
-                const res = await fetch('/api/automation/v2/merge-only', { method: 'POST' });
+                const res = await fetch('/api/merge-only', { method: 'POST' });
                 const data = await res.json();
                 if (data.status === 'success') {
                     const summary = data.summary || {};
@@ -676,8 +722,9 @@
                     document.getElementById('statFiles').textContent = summary.total_files || 0;
                     document.getElementById('statRecords').textContent = summary.unique_records || 0;
                     document.getElementById('statDuplicates').textContent = summary.duplicates_removed || 0;
+                    document.getElementById('statDupBox').style.display = 'block';
 
-                    btnDownloadFile.href = '/api/automation/v2/download-file?file_type=error_detail';
+                    btnDownloadFile.href = '/api/download-file?file_type=error_detail';
                     resultPanel.classList.add('active');
                     appendLog('🎉 Gộp tệp thành công!');
                 } else {
@@ -688,32 +735,35 @@
             }
         }
 
-        // TỰ ĐỘNG NẠP VÀO HỆ THỐNG ĐỐI SOÁT CHECKBHYT
-        async function importToReconciliation() {
-            const btn = document.getElementById('btnImportDB');
+        // GỬI FILE VỪA TẢI LÊN MÁY CHỦ CHECKBHYT
+        async function pushFileToServer() {
+            const btn = document.getElementById('btnPushServer');
             btn.disabled = true;
-            btn.textContent = 'Đang nạp CSDL...';
-            appendLog('\n⚡ Đang kích hoạt tự động nạp dữ liệu vào CSDL đối soát CHECKBHYT...');
+            btn.textContent = 'Đang gửi file lên Máy chủ...';
+            appendLog('\n📤 Đang gửi tệp sang Máy chủ CHECKBHYT để kích hoạt đối soát CSDL tự động...');
 
             try {
-                const res = await fetch('/api/automation/v2/import-to-system', {
+                const res = await fetch('/api/push-to-server', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ flow: currentMode })
+                    body: JSON.stringify({
+                        server_url: serverUrlInput.value.trim(),
+                        flow: currentMode
+                    })
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    appendLog('✅ ĐÃ NẠP THÀNH CÔNG VÀO CSDL ĐỐI SOÁT!');
-                    alert('Nạp dữ liệu vào hệ thống đối soát thành công! Bạn có thể quay lại trang IT Admin hoặc Báo cáo để xem kết quả.');
+                    appendLog('✅ GỬI FILE VÀ ĐỐI SOÁT THÀNH CÔNG TRÊN MÁY CHỦ!');
+                    alert('Đã gửi file thành công lên Máy chủ! Hệ thống đã nạp và hoàn tất đối soát CSDL.');
                 } else {
-                    throw new Error(data.detail || 'Lỗi khi nạp CSDL');
+                    throw new Error(data.detail || 'Lỗi khi gửi lên máy chủ');
                 }
             } catch (err) {
-                appendLog(`❌ Lỗi nạp CSDL: ${err.message}`);
-                alert(`Lỗi: ${err.message}`);
+                appendLog(`❌ Lỗi gửi máy chủ: ${err.message}`);
+                alert(`Lỗi gửi máy chủ: ${err.message}`);
             } finally {
                 btn.disabled = false;
-                btn.textContent = '⚡ Nạp vào CSDL đối soát';
+                btn.innerHTML = '<span>⚡</span> Gửi lên Máy chủ & Kích hoạt đối soát CSDL';
             }
         }
     </script>

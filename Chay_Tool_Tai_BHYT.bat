@@ -11,16 +11,16 @@ echo =======================================================
 echo.
 
 set PY_EXE=python
-if exist "..\.venv\Scripts\python.exe" (
-    set PY_EXE=..\.venv\Scripts\python.exe
+if exist ".venv\Scripts\python.exe" (
+    set PY_EXE=.venv\Scripts\python.exe
 )
 
-cd /d "%~dp0..\portal_downloader"
+cd /d "%~dp0portal_downloader"
 echo [*] Dang khoi dong cong cu tai: http://localhost:8765 ...
 %PY_EXE% downloader_server.py
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [!] Dang thu voi python he thong...
+    echo [!] Khong the khoi chay bang .venv, dang thu voi python he thong...
     python downloader_server.py
 )
 

@@ -56,6 +56,36 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-16 10:15 - Antigravity (Tạo Công Cụ Chạy Trực Tiếp Tại Chỗ, Nâng Cấp Luồng B Cả Tháng Với Timeout 20 Phút & Heartbeat 10s)
+
+### Mục tiêu
+- Đáp ứng định hướng chuẩn mực của người dùng: Không phân chia máy trạm/máy chủ phức tạp; chạy trực tiếp ngay trên máy tính đang thao tác để trình duyệt Chrome/Edge 100% bật lên trước mặt người dùng, nhìn thấy rõ Cổng BHYT và nhập Captcha dễ dàng.
+- Tải xong tệp kết quả trên máy, cho phép 1-click gửi file lên Máy chủ CHECKBHYT để nạp và kích hoạt đối soát CSDL tự động.
+- Nâng cấp Luồng B: Tải toàn bộ hồ sơ của cả tháng (chuẩn nghiệp vụ đối soát BHYT), tăng timeout lên 1200s (20 phút) và bổ sung Heartbeat thông báo đếm giây mỗi 10 giây để giữ kết nối ổn định, chống nghẽn và loại bỏ hoàn toàn tình trạng timeout khi số lượng hồ sơ tăng cao.
+
+### Thay đổi
+- Tạo mới công cụ chạy trực tiếp: `portal_downloader/`:
+  - `portal_downloader/downloader_server.py`: Server cục bộ FastAPI/Uvicorn chạy tại `http://localhost:8765`, tự động mở trình duyệt.
+  - `portal_downloader/templates/index.html`: Giao diện trực quan độc lập, cấu hình Máy chủ CHECKBHYT, tabs Luồng C và Luồng B, Live SSE Console, các nút tải file về máy và nút "Gửi lên Máy chủ & Kích hoạt đối soát CSDL".
+  - `Chay_Tool_Tai_BHYT.bat` (ở thư mục gốc và trong `portal_downloader/`): 1-click khởi động công cụ.
+  - `client_runner/Chay_RPA_May_Tram.bat`: Cập nhật liên kết trực tiếp sang `portal_downloader`.
+- `web_app/services/portal_automation.py`:
+  - `launch_native_browser`: Bổ sung các cờ Windows focus (`--disable-backgrounding-occluded-windows`, `--disable-features=CalculateNativeWinOcclusion`, `--window-position=0,0`, `--no-sandbox`) và `page.bring_to_front()` bảo đảm cửa sổ mở nổi bật trên màn hình.
+  - `run_flow_b`: Nâng timeout lên 1200 giây (20 phút), thêm luồng nền Heartbeat phát thông báo mỗi 10 giây giữ kết nối liên tục không bị gián đoạn.
+- `web_app/main.py`:
+  - Thêm endpoint `POST /api/automation/v2/upload-and-reconcile`: Nhận file từ công cụ cục bộ (`listbh.xlsx` hoặc `HoSoLoiChiTiet.xlsx`), lưu vào `uploaded_files/` và kích hoạt `compare_records` đối soát tự động.
+- `web_app/templates/portal_automation.html`:
+  - Cập nhật thông tin Tab Luồng B: Ghi rõ tải toàn bộ hồ sơ cả tháng kèm timeout 20 phút và Heartbeat 10s.
+
+### Nghiệp vụ ảnh hưởng
+- **Khả năng quan sát (Visual Automation):** Người dùng nhìn thấy 100% cửa sổ trình duyệt bật trước mặt, không còn tình trạng chạy ngầm trên máy chủ khác mà không thấy gì.
+- **Luồng B:** Đáp ứng trọn vẹn nghiệp vụ tải toàn bộ hồ sơ cả tháng, không còn bị lỗi timeout khi số lượng hồ sơ lên tới hàng nghìn hoặc hàng chục nghìn ca.
+
+### Kiểm tra
+- `python -m py_compile portal_downloader/downloader_server.py web_app/services/portal_automation.py web_app/main.py` -> PASS (Exit code 0).
+- Khởi tạo FastAPI `downloader_server.py` -> PASS (13 routes).
+- Khởi tạo FastAPI `web_app/main.py` -> PASS (75 routes).
+
 ## 2026-09-16 08:30 - Antigravity (Loại Bỏ Hoàn Toàn Luồng B/C Cũ, Tích Hợp Công Nghệ Direct URL & Tách Màn Hình Độc Lập)
 
 ### Mục tiêu

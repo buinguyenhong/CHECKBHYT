@@ -54,14 +54,22 @@ def add_portal_log(msg: str):
 def launch_native_browser(playwright_instance, headless: bool = False):
     """
     Khởi chạy Google Chrome hoặc Microsoft Edge có sẵn trên Windows.
-    Không yêu cầu tải gói Playwright Chromium cồng kềnh.
+    Ép cửa sổ luôn hiển thị nổi bật lên màn hình (Foreground & Maximized).
     """
+    browser_args = [
+        "--start-maximized",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-features=CalculateNativeWinOcclusion",
+        "--window-position=0,0",
+        "--no-sandbox"
+    ]
     for channel in ["chrome", "msedge"]:
         try:
             browser = playwright_instance.chromium.launch(
                 channel=channel,
                 headless=headless,
-                args=["--start-maximized"]
+                args=browser_args
             )
             safe_print(f"[*] Đã khởi chạy trình duyệt: {channel.upper()} có sẵn trên máy.")
             return browser
@@ -71,7 +79,7 @@ def launch_native_browser(playwright_instance, headless: bool = False):
     # Fallback nếu không có Chrome/Edge channel
     return playwright_instance.chromium.launch(
         headless=headless,
-        args=["--start-maximized"]
+        args=browser_args
     )
 
 
@@ -542,6 +550,10 @@ class PortalAutomationService:
             page = context.new_page()
             page.set_default_timeout(600000)
             page.set_default_navigation_timeout(600000)
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
 
             try:
                 # 1. Đảm bảo đăng nhập
@@ -759,8 +771,12 @@ class PortalAutomationService:
                 accept_downloads=True
             )
             page = context.new_page()
-            page.set_default_timeout(600000)
-            page.set_default_navigation_timeout(600000)
+            page.set_default_timeout(1200000)
+            page.set_default_navigation_timeout(1200000)
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
 
             try:
                 # 1. Đảm bảo đăng nhập
@@ -833,12 +849,12 @@ class PortalAutomationService:
                     if s_el.is_visible(timeout=2000):
                         s_el.click(force=True)
 
-                log("⏳ Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách đề nghị thanh toán (tối đa 10 phút)...")
-                self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
-                log("✅ Dữ liệu danh sách hồ sơ đã nạp xong!")
+                log("⏳ Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách đề nghị thanh toán cả tháng (tối đa 20 phút)...")
+                self._wait_for_grid_ready(page, timeout_ms=1200000, log_func=log)
+                log("✅ Dữ liệu danh sách hồ sơ cả tháng đã nạp xong!")
 
                 # 5. Xuất Excel và tải file listbh.xlsx
-                log("📥 Đang kích hoạt Xuất Excel danh sách đã gửi...")
+                log("📥 Đang kích hoạt Xuất Excel danh sách đã gửi (toàn bộ cả tháng)...")
                 
                 # Bước 5.1: Mở popup Export
                 page.evaluate("""() => {
@@ -850,29 +866,49 @@ class PortalAutomationService:
                 }""")
                 time.sleep(1.5)
 
-                # Bước 5.2: Bấm nút "Xuất excel" trong Popup và nhận luồng Download
-                log("⚡ Đang bấm nút 'Xuất excel' để tải file listbh.xlsx...")
+                # Bước 5.2: Bấm nút "Xuất excel" trong Popup và nhận luồng Download với Heartbeat
+                log("⚡ Đang bấm nút 'Xuất excel' để tải file listbh.xlsx (Thời gian chờ tối đa 20 phút kèm Heartbeat)...")
                 dest_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
 
-                with page.expect_download(timeout=600000) as download_info:
-                    clicked_exp = page.evaluate("""() => {
-                        try {
-                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
-                            if (btn && typeof btn.DoClick === 'function') {
-                                btn.DoClick();
-                                return true;
-                            }
-                        } catch(e) {}
-                        return false;
-                    }""")
-                    if not clicked_exp:
-                        btn_d = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel')").first
-                        if btn_d.is_visible(timeout=5000):
-                            btn_d.click(force=True)
+                import threading
+                stop_hb = threading.Event()
 
-                download = download_info.value
-                download.save_as(dest_path)
+                def heartbeat_worker():
+                    start_t = time.time()
+                    while not stop_hb.wait(10.0):
+                        elapsed = int(time.time() - start_t)
+                        log(f"⏳ [Heartbeat] Đang chờ Cổng BHYT xử lý xuất file cả tháng... (Đã chờ {elapsed}s / tối đa 1200s - Kết nối bình thường)")
+
+                hb_thread = threading.Thread(target=heartbeat_worker, daemon=True)
+                hb_thread.start()
+
+                try:
+                    with page.expect_download(timeout=1200000) as download_info:
+                        clicked_exp = page.evaluate("""() => {
+                            try {
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
+                                if (btn && typeof btn.DoClick === 'function') {
+                                    btn.DoClick();
+                                    return true;
+                                }
+                            } catch(e) {}
+                            return false;
+                        }""")
+                        if not clicked_exp:
+                            btn_d = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel')").first
+                            if btn_d.is_visible(timeout=5000):
+                                btn_d.click(force=True)
+
+                    download = download_info.value
+                    download.save_as(dest_path)
+                finally:
+                    stop_hb.set()
+                    try:
+                        hb_thread.join(timeout=1.0)
+                    except Exception:
+                        pass
+
                 log(f"✅ Tải tệp danh sách đã gửi thành công: {dest_path}")
 
                 context.storage_state(path=SESSION_FILE)

@@ -1209,6 +1209,40 @@ async def import_automation_to_system(
         return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
 
 
+@app.post("/api/automation/v2/upload-and-reconcile")
+async def upload_and_reconcile_from_tool(
+    file: UploadFile = File(...),
+    flow: str = Form("C"),
+    db: Session = Depends(get_db)
+):
+    """
+    Nhận file tải về từ tool local runner (listbh.xlsx hoặc HoSoLoiChiTiet.xlsx),
+    lưu vào thư mục uploaded_files và tự động kích hoạt đối soát với CSDL HIS.
+    """
+    from services.portal_automation import UPLOAD_DIR
+    target_filename = "listbh.xlsx" if flow.upper() == "B" else "HoSoLoiChiTiet.xlsx"
+    dest_path = os.path.join(UPLOAD_DIR, target_filename)
+
+    content = await file.read()
+    with open(dest_path, "wb") as f:
+        f.write(content)
+
+    today_str = datetime.date.today().strftime("%Y%m%d")
+    admin_user = db.query(User).filter(User.role == "admin").first()
+    if not admin_user:
+        admin_user = db.query(User).first()
+
+    include_errors = (flow.upper() == "C")
+    compare_res = compare_records(today_str, today_str, include_errors=include_errors, user=admin_user, db=db)
+    return {
+        "status": "success",
+        "flow": flow,
+        "filename": target_filename,
+        "compare_result": compare_res,
+        "message": f"Đã nhận file {target_filename} và hoàn tất đối soát CSDL!"
+    }
+
+
 # Fallback tương thích ngược cho các client cũ nếu có gọi endpoint cũ
 @app.post("/api/automation/flow-b")
 async def legacy_flow_b(data: dict, user: User = Depends(require_admin), db: Session = Depends(get_db)):
