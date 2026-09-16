@@ -467,11 +467,11 @@
             border: 2px solid var(--primary);
             border-radius: 8px;
             color: var(--input-color);
-            font-size: 18px;
+            font-family: "Consolas", "Courier New", monospace;
+            font-size: 20px;
             font-weight: 700;
             text-align: center;
-            letter-spacing: 3px;
-            text-transform: uppercase;
+            letter-spacing: 4px;
             outline: none;
         }
         .captcha-btn-submit {
@@ -686,7 +686,7 @@
             <div id="captchaOcrHint" class="captcha-ocr-hint"></div>
 
             <div class="captcha-input-group">
-                <input type="text" id="captchaModalInput" class="captcha-input" placeholder="GÕ MÃ TẠI ĐÂY" maxlength="10" autocomplete="off" />
+                <input type="text" id="captchaModalInput" class="captcha-input" placeholder="Nhập mã Captcha (phân biệt hoa thường)" maxlength="10" autocomplete="off" autocapitalize="none" spellcheck="false" />
                 <button type="button" id="captchaBtnSubmit" class="captcha-btn-submit" onclick="submitCaptchaRemote()">XÁC NHẬN</button>
             </div>
 

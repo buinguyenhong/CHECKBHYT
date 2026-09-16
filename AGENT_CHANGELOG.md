@@ -56,6 +56,24 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-16 14:18 - Antigravity (Sửa Lỗi Bị Ép Viết Hoa Trên Ô Nhập Captcha Phân Biệt Hoa Thường)
+
+### Mục tiêu
+- Sửa lỗi người dùng chỉ có thể gõ chữ in hoa trên Popup Captcha máy trạm, trong khi Cổng BHYT phân biệt ký tự hoa thường (Case-sensitive).
+
+### Nguyên nhân
+- Lớp CSS `.captcha-input` có khai báo `text-transform: uppercase;`, làm toàn bộ ký tự gõ vào bị hiển thị ép thành chữ in HOA gây nhầm lẫn thị giác.
+
+### Thay đổi
+- `web_app/templates/portal_automation.html` & `portal_downloader/templates/index.html`:
+  - Loại bỏ `text-transform: uppercase;` trong định kiểu CSS `.captcha-input`.
+  - Bổ sung `font-family: 'Consolas', 'Courier New', monospace;`, tăng cỡ chữ lên 20px và giãn cách ký tự 4px để phân biệt rõ ký tự hoa, thường, số (tránh nhầm lẫn `o`/`O`, `c`/`C`, `l`/`1`/`I`).
+  - Thêm `autocapitalize="none"` và `spellcheck="false"` vào thẻ `<input id="captchaModalInput">`.
+  - Cập nhật placeholder trực quan: `Nhập mã Captcha (phân biệt hoa thường)`.
+
+### Kiểm tra
+- Đã kiểm tra trực quan code HTML/CSS trên cả Web App và Local Downloader Tool -> Hoàn toàn chuẩn xác.
+
 ## 2026-09-16 13:55 - Antigravity (Tích Hợp Auto-OCR Captcha & Cầu Nối Nhập Captcha Từ Xa Máy Trạm)
 
 ### Mục tiêu

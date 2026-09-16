@@ -1168,7 +1168,7 @@ Nhằm giải quyết triệt để vấn đề máy trạm không thể nhìn t
 2. **Lớp 2 - Cầu nối Nhập Captcha từ xa qua Server-Sent Events (SSE):**
    - Nếu mã Auto-OCR chưa chuẩn hoặc Cổng BHYT yêu cầu nhập lại: Server mã hóa ảnh Captcha thành Base64 và phát sự kiện `[CAPTCHA_REQUIRED] data:image/png;base64,...###<ocr_suggestion>`.
    - Giao diện Web trên máy trạm ngay lập tức bật Modal Popup hiển thị ảnh Captcha kèm gợi ý OCR, autofocus vào ô nhập liệu.
-   - Người dùng máy trạm chỉ cần nhìn ảnh trên màn hình, xác nhận hoặc sửa lại mã và bấm Enter / "Xác nhận".
+   - Người dùng máy trạm chỉ cần nhìn ảnh trên màn hình, xác nhận hoặc sửa lại mã và bấm Enter / "Xác nhận". Ô nhập liệu sử dụng font Monospace, tắt tự động viết hoa (`autocapitalize="none"`), phân biệt chính xác chữ HOA - chữ thường theo đúng yêu cầu Cổng BHYT.
    - Máy trạm gửi mã qua API `/api/automation/v2/submit-captcha`. Server nhận giá trị, tự động điền vào Cổng BHYT và hoàn tất đăng nhập.
    - Khi đăng nhập thành công, Server phát `[CAPTCHA_SUCCESS]` để Web máy trạm tự động ẩn Popup.
 
