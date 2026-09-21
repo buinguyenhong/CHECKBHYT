@@ -260,6 +260,13 @@ try:
         columns_rec = [r[1] for r in res_rec]
         if "his_unlock_status" not in columns_rec:
             conn.execute(text("ALTER TABLE records ADD COLUMN his_unlock_status VARCHAR DEFAULT 'NORMAL'"))
+
+        # Tự động tạo các Composite Index và Index đơn hiệu năng cao cho bảng records
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_records_type_status_ngay ON records (type_group, status, ngay_ra_vien)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_records_dept_type_status ON records (ten_khoa, type_group, status)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_records_status ON records (status)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_records_type_group ON records (type_group)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_records_ngay_ra_vien ON records (ngay_ra_vien)"))
 except Exception as e:
     print(f"[*] Thong tin di tru tu dong: {e}")
 
@@ -1547,10 +1554,17 @@ def get_department_records(
         
     records = query.order_by(Record.status.asc(), Record.ngay_ra_vien.asc()).all()
     
-    # Làm giàu dữ liệu hướng dẫn sửa lỗi từ danh mục
+    # Làm giàu dữ liệu hướng dẫn sửa lỗi từ danh mục (Tối ưu từ điển băm O(1))
     from models import ErrorDefinition
     import re
     defs = db.query(ErrorDefinition).all()
+    defs_by_code = {}
+    for d in defs:
+        d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code or "").upper())
+        if d_clean:
+            if d_clean not in defs_by_code:
+                defs_by_code[d_clean] = []
+            defs_by_code[d_clean].append(d)
     
     result = []
     for r in records:
@@ -1576,9 +1590,9 @@ def get_department_records(
         }
         
         r_clean = re.sub(r'[^A-Z0-9]', '', str(r.maloi or "").upper())
-        for d in defs:
-            d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code).upper())
-            if d_clean == r_clean:
+        matched_defs = defs_by_code.get(r_clean)
+        if matched_defs:
+            for d in matched_defs:
                 if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
                     item["root_cause"] = d.root_cause
                     item["resolution"] = d.resolution
@@ -1871,9 +1885,17 @@ def get_admin_loi_records(
         
     records = query.order_by(Record.status.asc(), Record.ngay_ra_vien.asc()).all()
     
+    # Làm giàu dữ liệu hướng dẫn sửa lỗi từ danh mục (Tối ưu từ điển băm O(1))
     from models import ErrorDefinition
     import re
     defs = db.query(ErrorDefinition).all()
+    defs_by_code = {}
+    for d in defs:
+        d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code or "").upper())
+        if d_clean:
+            if d_clean not in defs_by_code:
+                defs_by_code[d_clean] = []
+            defs_by_code[d_clean].append(d)
     
     result = []
     for r in records:
@@ -1899,9 +1921,9 @@ def get_admin_loi_records(
         }
         
         r_clean = re.sub(r'[^A-Z0-9]', '', str(r.maloi or "").upper())
-        for d in defs:
-            d_clean = re.sub(r'[^A-Z0-9]', '', str(d.error_code).upper())
-            if d_clean == r_clean:
+        matched_defs = defs_by_code.get(r_clean)
+        if matched_defs:
+            for d in matched_defs:
                 if not d.keyword or (d.keyword and r.motaloi and d.keyword in r.motaloi):
                     item["root_cause"] = d.root_cause
                     item["resolution"] = d.resolution

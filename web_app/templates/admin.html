@@ -1210,6 +1210,23 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination Bar for Loi -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; flex-wrap: wrap; gap: 10px;">
+                <div id="loiPaginationInfo" style="font-size: 13px; color: var(--text-secondary);">Hiển thị 0 / 0 bản ghi</div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <label style="font-size: 13px; color: var(--text-secondary);">Số dòng:</label>
+                    <select id="loiPageSize" class="form-control" style="width: 75px; padding: 4px 8px; font-size: 13px;" onchange="changeLoiPageSize(this.value)">
+                        <option value="30">30</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                    <button class="btn btn-secondary" id="btnLoiPrev" onclick="changeLoiPage(-1)" style="padding: 4px 10px; font-size: 13px;">Trang trước</button>
+                    <span id="loiPageNum" style="align-self: center; font-weight: 700; padding: 0 10px; font-size: 13px;">1 / 1</span>
+                    <button class="btn btn-secondary" id="btnLoiNext" onclick="changeLoiPage(1)" style="padding: 4px 10px; font-size: 13px;">Trang sau</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1218,7 +1235,8 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Danh sách ca FAIL (<span id="failCountText">0</span> ca)</h2>
-                <div style="display:flex; gap:10px; align-items:center;">
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="text" id="fail_search" class="form-control" style="width:200px; padding:6px 12px;" placeholder="Tìm kiếm nhanh ca FAIL..." oninput="debouncedFilterFail()">
                     <label for="failMonthFilter" style="color:var(--text-secondary); font-size:14px; font-weight:bold; margin-right:4px;">Lọc theo tháng:</label>
                     <select id="failMonthFilter" onchange="filterFailByMonth()" style="padding:6px 12px; background:var(--input-bg); border:1px solid var(--input-border); color:var(--text-main); border-radius:6px; outline:none; font-size:14px; cursor:pointer;">
                         <option value="all">Tất cả các tháng</option>
@@ -1249,6 +1267,23 @@
                         <!-- Ajax data -->
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination Bar for Fail -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; flex-wrap: wrap; gap: 10px;">
+                <div id="failPaginationInfo" style="font-size: 13px; color: var(--text-secondary);">Hiển thị 0 / 0 bản ghi</div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <label style="font-size: 13px; color: var(--text-secondary);">Số dòng:</label>
+                    <select id="failPageSize" class="form-control" style="width: 75px; padding: 4px 8px; font-size: 13px;" onchange="changeFailPageSize(this.value)">
+                        <option value="30">30</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                    <button class="btn btn-secondary" id="btnFailPrev" onclick="changeFailPage(-1)" style="padding: 4px 10px; font-size: 13px;">Trang trước</button>
+                    <span id="failPageNum" style="align-self: center; font-weight: 700; padding: 0 10px; font-size: 13px;">1 / 1</span>
+                    <button class="btn btn-secondary" id="btnFailNext" onclick="changeFailPage(1)" style="padding: 4px 10px; font-size: 13px;">Trang sau</button>
+                </div>
             </div>
         </div>
     </div>
@@ -2861,7 +2896,37 @@
         }
     }
 
+    // ========== TIỆN ÍCH DEBOUNCE CHỐNG DỘI KHI NHẬP LIỆU ==========
+    function debounce(func, wait = 250) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    // ========== PHÂN TRANG TAB LỖI (TAB 3) ==========
     let allLoiRecords = [];
+    let loiPagination = {
+        currentPage: 1,
+        pageSize: 50,
+        filtered: []
+    };
+
+    function changeLoiPageSize(size) {
+        loiPagination.pageSize = parseInt(size, 10) || 50;
+        loiPagination.currentPage = 1;
+        renderLoiPage();
+    }
+
+    function changeLoiPage(delta) {
+        const totalPages = Math.ceil(loiPagination.filtered.length / loiPagination.pageSize) || 1;
+        const newPage = loiPagination.currentPage + delta;
+        if (newPage >= 1 && newPage <= totalPages) {
+            loiPagination.currentPage = newPage;
+            renderLoiPage();
+        }
+    }
 
     // Fetch Loi Records (Tab 3)
     async function fetchLoiRecords() {
@@ -2869,20 +2934,19 @@
         const toDate = document.getElementById('sync_to').value;
         if (!fromDate || !toDate) {
             const tbody = document.getElementById('loiBody');
-            tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--text-secondary);">Vui lòng chọn khoảng ngày đối soát ở Tab 1 và nhấn Tải lại dữ liệu.</td></tr>';
             return;
         }
 
         const url = `/api/records/admin/loi?from_date=${fromDate.replace(/-/g, '')}&to_date=${toDate.replace(/-/g, '')}`;
         const tbody = document.getElementById('loiBody');
-        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">Đang tải danh sách dữ liệu lỗi...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--text-secondary);">Đang tải danh sách dữ liệu lỗi...</td></tr>';
 
         try {
             const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
                 allLoiRecords = data;
-                document.getElementById('loiCountText').innerText = data.length;
                 
                 // Populate departments dropdown dynamically
                 const depts = new Set();
@@ -2910,66 +2974,6 @@
                     }
                 }
 
-                tbody.innerHTML = '';
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-secondary);">Không có hồ sơ lỗi nào cần xử lý trong khoảng thời gian này.</td></tr>';
-                    return;
-                }
-                
-                let stt = 1;
-                data.forEach(r => {
-                    const tr = document.createElement('tr');
-                    const warnClass = getWarningClass(r.ngay_ra_vien);
-                    if (warnClass) {
-                        tr.className = warnClass;
-                    }
-                    
-                    let formattedDate = '';
-                    if (r.ngay_ra_vien) {
-                        if (r.ngay_ra_vien.includes('-')) {
-                            const parts = r.ngay_ra_vien.split(' ')[0].split('-');
-                            if (parts.length === 3) {
-                                formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                            } else {
-                                formattedDate = r.ngay_ra_vien;
-                            }
-                        } else {
-                            formattedDate = r.ngay_ra_vien;
-                        }
-                    }
-                    
-                    const ttStr = (r.tong_tien && r.tong_tien > 0) ? new Intl.NumberFormat('vi-VN').format(r.tong_tien) + ' đ' : '-';
-                    const tbStr = (r.tien_bhyt && r.tien_bhyt > 0) ? new Intl.NumberFormat('vi-VN').format(r.tien_bhyt) + ' đ' : '-';
-                    
-                    tr.innerHTML = `
-                        <td>${stt++}</td>
-                        <td><strong>${r.ma_lk}</strong></td>
-                        <td>${r.ho_ten}</td>
-                        <td><code>${r.ma_the}</code></td>
-                        <td>${formattedDate}</td>
-                        <td style="font-weight:600; color:#38bdf8;">${ttStr}</td>
-                        <td style="font-weight:600; color:#34d399;">${tbStr}</td>
-                        <td>${r.ten_khoa}</td>
-                        <td>${r.loai_ca}</td>
-                        <td><span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; font-weight:bold;">${r.maloi || ''}</span></td>
-                        <td class="wrap-cell" style="max-width:260px;" title="${r.motaloi || ''}">${r.motaloi || ''}</td>
-                        <td class="wrap-cell" style="max-width:200px; color:var(--text-secondary);" title="${r.root_cause || ''}">${r.root_cause || ''}</td>
-                        <td class="wrap-cell" style="max-width:200px; color:var(--success); font-weight:500;" title="${r.resolution || ''}">${r.resolution || ''}</td>
-                        <td class="wrap-cell" style="max-width:180px; font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
-                        <td>
-                            ${r.status === 'WAITING_RESEND'
-                                ? '<span class="badge badge-waiting">Chờ gửi lại</span>'
-                                : '<span class="badge badge-pending">PENDING</span>'}
-                        </td>
-                        <td>
-                            <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
-                            <button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="showHistoryModal('${r.ma_lk}')">Lịch sử</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-                
-                // Áp dụng bộ lọc ngay nếu đang có chọn khoa hoặc tìm kiếm
                 filterLoiTable();
             } else {
                 const text = await res.text();
@@ -2984,62 +2988,143 @@
             }
         } catch (e) {
             console.error("Lỗi fetchLoiRecords:", e);
-            tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--danger);">Lỗi kết nối LAN: ${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--danger);">Lỗi kết nối LAN: ${e.message}</td></tr>`;
         }
     }
 
     function filterLoiTable() {
-        const query = document.getElementById('loi_search').value.toLowerCase().trim();
+        const query = (document.getElementById('loi_search')?.value || '').toLowerCase().trim();
         const selectedDept = document.getElementById('loi_filter_dept')?.value || 'All';
-        const rows = document.querySelectorAll('#loiBody tr');
-        let visibleCount = 0;
         
-        rows.forEach(row => {
-            if (row.cells.length < 14) return;
-            
-            const maLk = (row.cells[1]?.textContent || '').toLowerCase().trim();
-            const hoTen = (row.cells[2]?.textContent || '').toLowerCase().trim();
-            const maThe = (row.cells[3]?.textContent || '').toLowerCase().trim();
-            const ngayRa = (row.cells[4]?.textContent || '').toLowerCase().trim();
-            const tenKhoaRaw = (row.cells[7]?.textContent || '').trim();
-            const tenKhoa = tenKhoaRaw.toLowerCase();
-            const loaiCa = (row.cells[8]?.textContent || '').toLowerCase().trim();
-            const maLoi = (row.cells[9]?.textContent || '').toLowerCase().trim();
-            const moTaLoi = (row.cells[10]?.textContent || '').toLowerCase().trim();
-            const nguyenNhan = (row.cells[11]?.textContent || '').toLowerCase().trim();
-            const huongXuLy = (row.cells[12]?.textContent || '').toLowerCase().trim();
-            const ghiChu = (row.cells[13]?.textContent || '').toLowerCase().trim();
-            
-            const matchesQuery = query === '' || 
-                maLk.includes(query) || 
-                hoTen.includes(query) || 
-                maThe.includes(query) || 
-                ngayRa.includes(query) ||
-                tenKhoa.includes(query) || 
-                loaiCa.includes(query) ||
-                maLoi.includes(query) || 
-                moTaLoi.includes(query) ||
-                nguyenNhan.includes(query) ||
-                huongXuLy.includes(query) ||
-                ghiChu.includes(query);
-                
-            const matchesDept = (selectedDept === 'All') || (tenKhoaRaw === selectedDept) || (tenKhoa === selectedDept.toLowerCase());
-            
-            const visible = matchesQuery && matchesDept;
-            row.style.display = visible ? '' : 'none';
-            if (visible) visibleCount++;
+        loiPagination.filtered = allLoiRecords.filter(r => {
+            const matchesDept = (selectedDept === 'All') || (r.ten_khoa === selectedDept);
+            if (!matchesDept) return false;
+            if (!query) return true;
+            return (r.ma_lk && r.ma_lk.toLowerCase().includes(query)) ||
+                   (r.ho_ten && r.ho_ten.toLowerCase().includes(query)) ||
+                   (r.ma_the && r.ma_the.toLowerCase().includes(query)) ||
+                   (r.ten_khoa && r.ten_khoa.toLowerCase().includes(query)) ||
+                   (r.loai_ca && r.loai_ca.toLowerCase().includes(query)) ||
+                   (r.maloi && r.maloi.toLowerCase().includes(query)) ||
+                   (r.motaloi && r.motaloi.toLowerCase().includes(query)) ||
+                   (r.root_cause && r.root_cause.toLowerCase().includes(query)) ||
+                   (r.resolution && r.resolution.toLowerCase().includes(query)) ||
+                   (r.note && r.note.toLowerCase().includes(query));
         });
-        
-        if (query !== "" || selectedDept !== "All") {
-            const actualRows = Array.from(rows).filter(r => r.cells.length >= 14);
-            document.getElementById('loiCountText').innerText = `${visibleCount} (lọc từ ${actualRows.length})`;
-        } else {
-            const actualRows = Array.from(rows).filter(r => r.cells.length >= 14);
-            document.getElementById('loiCountText').innerText = actualRows.length;
-        }
+
+        loiPagination.currentPage = 1;
+        renderLoiPage();
     }
 
+    const debouncedFilterLoi = debounce(() => filterLoiTable(), 250);
+
+    function renderLoiPage() {
+        const total = loiPagination.filtered.length;
+        const totalPages = Math.ceil(total / loiPagination.pageSize) || 1;
+        if (loiPagination.currentPage > totalPages) loiPagination.currentPage = totalPages;
+        if (loiPagination.currentPage < 1) loiPagination.currentPage = 1;
+
+        const startIdx = (loiPagination.currentPage - 1) * loiPagination.pageSize;
+        const endIdx = startIdx + loiPagination.pageSize;
+        const pageData = loiPagination.filtered.slice(startIdx, endIdx);
+
+        // Update counts and pagination bar
+        document.getElementById('loiCountText').innerText = total;
+        const infoEl = document.getElementById('loiPaginationInfo');
+        if (infoEl) {
+            infoEl.innerText = total === 0 ? 'Hiển thị 0 / 0 bản ghi' : `Hiển thị ${startIdx + 1} - ${Math.min(endIdx, total)} / ${total} bản ghi (lọc từ ${allLoiRecords.length})`;
+        }
+        const pageNumEl = document.getElementById('loiPageNum');
+        if (pageNumEl) pageNumEl.innerText = `${loiPagination.currentPage} / ${totalPages}`;
+        
+        const btnPrev = document.getElementById('btnLoiPrev');
+        const btnNext = document.getElementById('btnLoiNext');
+        if (btnPrev) btnPrev.disabled = (loiPagination.currentPage <= 1);
+        if (btnNext) btnNext.disabled = (loiPagination.currentPage >= totalPages);
+
+        const tbody = document.getElementById('loiBody');
+        tbody.innerHTML = '';
+        if (pageData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--text-secondary);">Không có hồ sơ lỗi nào phù hợp với bộ lọc.</td></tr>';
+            return;
+        }
+
+        let stt = startIdx + 1;
+        pageData.forEach(r => {
+            const tr = document.createElement('tr');
+            const warnClass = getWarningClass(r.ngay_ra_vien);
+            if (warnClass) {
+                tr.className = warnClass;
+            }
+            
+            let formattedDate = '';
+            if (r.ngay_ra_vien) {
+                if (r.ngay_ra_vien.includes('-')) {
+                    const parts = r.ngay_ra_vien.split(' ')[0].split('-');
+                    if (parts.length === 3) {
+                        formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    } else {
+                        formattedDate = r.ngay_ra_vien;
+                    }
+                } else {
+                    formattedDate = r.ngay_ra_vien;
+                }
+            }
+            
+            const ttStr = (r.tong_tien && r.tong_tien > 0) ? new Intl.NumberFormat('vi-VN').format(r.tong_tien) + ' đ' : '-';
+            const tbStr = (r.tien_bhyt && r.tien_bhyt > 0) ? new Intl.NumberFormat('vi-VN').format(r.tien_bhyt) + ' đ' : '-';
+            
+            tr.innerHTML = `
+                <td>${stt++}</td>
+                <td><strong>${r.ma_lk}</strong></td>
+                <td>${r.ho_ten}</td>
+                <td><code>${r.ma_the}</code></td>
+                <td>${formattedDate}</td>
+                <td style="font-weight:600; color:#38bdf8;">${ttStr}</td>
+                <td style="font-weight:600; color:#34d399;">${tbStr}</td>
+                <td>${r.ten_khoa}</td>
+                <td>${r.loai_ca}</td>
+                <td><span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; font-weight:bold;">${r.maloi || ''}</span></td>
+                <td class="wrap-cell" style="max-width:260px;" title="${r.motaloi || ''}">${r.motaloi || ''}</td>
+                <td class="wrap-cell" style="max-width:200px; color:var(--text-secondary);" title="${r.root_cause || ''}">${r.root_cause || ''}</td>
+                <td class="wrap-cell" style="max-width:200px; color:var(--success); font-weight:500;" title="${r.resolution || ''}">${r.resolution || ''}</td>
+                <td class="wrap-cell" style="max-width:180px; font-style:italic;">${r.note || '<span style="color:var(--text-secondary);">Chưa ghi chú</span>'}</td>
+                <td>
+                    ${r.status === 'WAITING_RESEND'
+                        ? '<span class="badge badge-waiting">Chờ gửi lại</span>'
+                        : '<span class="badge badge-pending">PENDING</span>'}
+                </td>
+                <td>
+                    <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="openAdminModal(${r.id}, '${r.note || ''}')">Sửa / Duyệt</button>
+                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="showHistoryModal('${r.ma_lk}')">Lịch sử</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // ========== PHÂN TRANG TAB FAIL (TAB 2) ==========
     let allFailRecords = [];
+    let failPagination = {
+        currentPage: 1,
+        pageSize: 50,
+        filtered: []
+    };
+
+    function changeFailPageSize(size) {
+        failPagination.pageSize = parseInt(size, 10) || 50;
+        failPagination.currentPage = 1;
+        renderFailPage();
+    }
+
+    function changeFailPage(delta) {
+        const totalPages = Math.ceil(failPagination.filtered.length / failPagination.pageSize) || 1;
+        const newPage = failPagination.currentPage + delta;
+        if (newPage >= 1 && newPage <= totalPages) {
+            failPagination.currentPage = newPage;
+            renderFailPage();
+        }
+    }
 
     // Fetch Fail Records (Tab 2)
     async function fetchFailRecords() {
@@ -3095,24 +3180,60 @@
     function filterFailByMonth() {
         const monthFilter = document.getElementById('failMonthFilter');
         const selectedMonth = monthFilter ? monthFilter.value : 'all';
+        const query = (document.getElementById('fail_search')?.value || '').toLowerCase().trim();
         
-        let filtered = allFailRecords;
-        if (selectedMonth !== 'all') {
-            filtered = allFailRecords.filter(r => r.ngay_ra_vien && r.ngay_ra_vien.startsWith(selectedMonth));
+        failPagination.filtered = allFailRecords.filter(r => {
+            if (selectedMonth !== 'all') {
+                if (!r.ngay_ra_vien || !r.ngay_ra_vien.startsWith(selectedMonth)) return false;
+            }
+            if (!query) return true;
+            return (r.ma_lk && r.ma_lk.toLowerCase().includes(query)) ||
+                   (r.ho_ten && r.ho_ten.toLowerCase().includes(query)) ||
+                   (r.ma_the && r.ma_the.toLowerCase().includes(query)) ||
+                   (r.ten_khoa && r.ten_khoa.toLowerCase().includes(query)) ||
+                   (r.loai_ca && r.loai_ca.toLowerCase().includes(query)) ||
+                   (r.note && r.note.toLowerCase().includes(query));
+        });
+        
+        failPagination.currentPage = 1;
+        renderFailPage();
+    }
+
+    const debouncedFilterFail = debounce(() => filterFailByMonth(), 250);
+
+    function renderFailPage() {
+        const total = failPagination.filtered.length;
+        const totalPages = Math.ceil(total / failPagination.pageSize) || 1;
+        if (failPagination.currentPage > totalPages) failPagination.currentPage = totalPages;
+        if (failPagination.currentPage < 1) failPagination.currentPage = 1;
+
+        const startIdx = (failPagination.currentPage - 1) * failPagination.pageSize;
+        const endIdx = startIdx + failPagination.pageSize;
+        const pageData = failPagination.filtered.slice(startIdx, endIdx);
+
+        // Update counts and pagination bar
+        document.getElementById('failCountText').innerText = total;
+        const infoEl = document.getElementById('failPaginationInfo');
+        if (infoEl) {
+            infoEl.innerText = total === 0 ? 'Hiển thị 0 / 0 bản ghi' : `Hiển thị ${startIdx + 1} - ${Math.min(endIdx, total)} / ${total} bản ghi (lọc từ ${allFailRecords.length})`;
         }
-        
-        // Cập nhật số lượng hiển thị
-        document.getElementById('failCountText').innerText = filtered.length;
-        
+        const pageNumEl = document.getElementById('failPageNum');
+        if (pageNumEl) pageNumEl.innerText = `${failPagination.currentPage} / ${totalPages}`;
+
+        const btnPrev = document.getElementById('btnFailPrev');
+        const btnNext = document.getElementById('btnFailNext');
+        if (btnPrev) btnPrev.disabled = (failPagination.currentPage <= 1);
+        if (btnNext) btnNext.disabled = (failPagination.currentPage >= totalPages);
+
         const tbody = document.getElementById('failBody');
         tbody.innerHTML = '';
 
-        if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào cần xử lý trong khoảng thời gian này.</td></tr>`;
+        if (pageData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào phù hợp với bộ lọc.</td></tr>`;
             return;
         }
 
-        filtered.forEach(r => {
+        pageData.forEach(r => {
             const tr = document.createElement('tr');
             const warnClass = getWarningClass(r.ngay_ra_vien);
             if (warnClass) {

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean, Float
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean, Float, Index
 from sqlalchemy.orm import relationship
 import datetime
 from database import Base
@@ -69,6 +69,14 @@ class Record(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     logs = relationship("RecordLog", back_populates="record", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_records_type_status_ngay", "type_group", "status", "ngay_ra_vien"),
+        Index("ix_records_dept_type_status", "ten_khoa", "type_group", "status"),
+        Index("ix_records_status", "status"),
+        Index("ix_records_type_group", "type_group"),
+        Index("ix_records_ngay_ra_vien", "ngay_ra_vien"),
+    )
 
 class RecordLog(Base):
     __tablename__ = "record_logs"

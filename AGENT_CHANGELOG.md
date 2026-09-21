@@ -56,6 +56,35 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-21 10:00 - Antigravity (Tối Ưu Hiệu Năng Toàn Diện: Phân Trang Frontend, Index CSDL và Tra Cứu Danh Mục O(1))
+
+### Mục tiêu
+- Khắc phục triệt để tình trạng hệ thống bị treo đứng / đơ lag ("Trang không phản hồi - Page Unresponsive") khi số lượng hồ sơ tăng lớn gấp đôi (hàng chục nghìn records), đặc biệt tại Tab Danh sách Lỗi, Tab Danh sách FAIL và Màn hình Khoa lâm sàng.
+
+### Nguyên nhân
+1. **Frontend:** Trước đây cả 3 bảng dữ liệu lớn đều nhồi toàn bộ 100% dữ liệu vào DOM cùng lúc (tạo từ 70.000 - 150.000 thẻ DOM trên main thread), lọc tìm kiếm trực tiếp trên DOM không có debounce gây layout thrashing.
+2. **Database:** Bảng `records` thiếu các Composite Index cốt lõi trên `(type_group, status, ngay_ra_vien)` và `(ten_khoa, type_group, status)`, khiến SQLite phải Table Scan quét toàn bảng mỗi khi truy vấn. (Tuân thủ yêu cầu: giữ nguyên chế độ DELETE journal mode).
+3. **Backend API:** Thuật toán so khớp lỗi trong `main.py` dùng vòng lặp lồng $O(N \times M)$ với `re.sub` chạy lặp lại hàng trăm nghìn lần cho mỗi request.
+
+### Thay đổi
+1. **Frontend (`admin.html` & `department.html`):**
+   - Triển khai phân trang client `loiPagination`, `failPagination`, và `deptPagination` (tùy chọn 30, 50, 100, 200 dòng/trang). Mỗi lần render chỉ tạo 30-50 dòng DOM trong 5ms.
+   - Thêm thanh phân trang hiển thị rõ: "Hiển thị X - Y / Z bản ghi", số trang và nút Trang trước / Trang sau.
+   - Bổ sung hàm tiện ích `debounce` (250ms) cho các ô tìm kiếm nhanh (`#loi_search`, `#fail_search`, `#deptSearch`), loại bỏ hiện tượng đơ giật khi gõ phím.
+2. **Cơ sở dữ liệu (`models.py` & `main.py`):**
+   - Khai báo `__table_args__` trong model `Record` và tự động thực thi migration `CREATE INDEX IF NOT EXISTS` khi WebApp khởi động:
+     - `ix_records_type_status_ngay`: `(type_group, status, ngay_ra_vien)`
+     - `ix_records_dept_type_status`: `(ten_khoa, type_group, status)`
+     - `ix_records_status`, `ix_records_type_group`, `ix_records_ngay_ra_vien`.
+3. **Backend API (`main.py`):**
+   - Chuyển đổi logic so khớp danh mục lỗi trong `get_admin_loi_records` và `get_department_records` sang bảng băm `defs_by_code: dict[str, list[ErrorDefinition]]` tra cứu $O(1)$, giảm thời gian xử lý xuống ~19.4 lần.
+
+### Kiểm tra
+- Đã chạy benchmark `test_benchmark_matching.py` với 10.000 records: tốc độ tra cứu tăng gấp 19.4x (từ 0.2157s xuống 0.0111s), kết quả khớp 100%.
+- Biên dịch cú pháp Python `python -m py_compile web_app/models.py web_app/main.py` -> PASS.
+- Khởi tạo FastAPI `web_app/main.py` -> PASS (77 routes).
+- Kiểm tra `PRAGMA index_list(records)` trên cả `web_app/app_state.db` và `app_state.db` -> Đầy đủ 9 indexes.
+
 ## 2026-09-16 14:18 - Antigravity (Sửa Lỗi Bị Ép Viết Hoa Trên Ô Nhập Captcha Phân Biệt Hoa Thường)
 
 ### Mục tiêu

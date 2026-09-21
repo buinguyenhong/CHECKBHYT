@@ -718,8 +718,9 @@
         <div class="data-panel">
             <div class="panel-header">
                 <h2>Danh sách bệnh nhân lỗi BHYT</h2>
-                <div class="filter-controls">
-                    <select class="form-select" id="statusFilter">
+                <div class="filter-controls" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="text" id="deptSearch" class="form-control" style="width: 220px; padding: 6px 12px; background:var(--card-bg, #1e293b); border:1px solid var(--border-color, #334155); color:var(--text-primary, #f8fafc); border-radius:6px; font-size:13px;" placeholder="Tìm Mã LK, Họ tên, Mã lỗi..." oninput="debouncedFilterDept()">
+                    <select class="form-select" id="statusFilter" style="padding:6px 12px; font-size:13px;">
                         <option value="ALL">Tất cả trạng thái</option>
                         <option value="PENDING">Chưa xử lý</option>
                         <option value="RESOLVED">Đã xử lý</option>
@@ -759,6 +760,23 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination Bar for Department -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; flex-wrap: wrap; gap: 10px;">
+                <div id="deptPaginationInfo" style="font-size: 13px; color: var(--text-secondary);">Hiển thị 0 / 0 bản ghi</div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <label style="font-size: 13px; color: var(--text-secondary);">Số dòng:</label>
+                    <select id="deptPageSize" class="form-control" style="width: 75px; padding: 4px 8px; font-size: 13px; background:var(--card-bg, #1e293b); border:1px solid var(--border-color, #334155); color:var(--text-primary, #f8fafc); border-radius:6px;" onchange="changeDeptPageSize(this.value)">
+                        <option value="30">30</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                    <button class="btn btn-secondary" id="btnDeptPrev" onclick="changeDeptPage(-1)" style="padding: 4px 10px; font-size: 13px;">Trang trước</button>
+                    <span id="deptPageNum" style="align-self: center; font-weight: 700; padding: 0 10px; font-size: 13px;">1 / 1</span>
+                    <button class="btn btn-secondary" id="btnDeptNext" onclick="changeDeptPage(1)" style="padding: 4px 10px; font-size: 13px;">Trang sau</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1059,6 +1077,59 @@
         }
     }
 
+    // ========== TIỆN ÍCH DEBOUNCE CHỐNG DỘI KHI NHẬP LIỆU ==========
+    function debounce(func, wait = 250) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    // ========== PHÂN TRANG MÀN HÌNH KHOA (TAB 1) ==========
+    let deptPagination = {
+        currentPage: 1,
+        pageSize: 50,
+        filtered: []
+    };
+
+    function changeDeptPageSize(size) {
+        deptPagination.pageSize = parseInt(size, 10) || 50;
+        deptPagination.currentPage = 1;
+        renderTable();
+    }
+
+    function changeDeptPage(delta) {
+        const totalPages = Math.ceil(deptPagination.filtered.length / deptPagination.pageSize) || 1;
+        const newPage = deptPagination.currentPage + delta;
+        if (newPage >= 1 && newPage <= totalPages) {
+            deptPagination.currentPage = newPage;
+            renderTable();
+        }
+    }
+
+    function filterDeptRecords() {
+        const query = (document.getElementById('deptSearch')?.value || '').toLowerCase().trim();
+        if (!query) {
+            deptPagination.filtered = records;
+        } else {
+            deptPagination.filtered = records.filter(r => {
+                return (r.ma_lk && r.ma_lk.toLowerCase().includes(query)) ||
+                       (r.ho_ten && r.ho_ten.toLowerCase().includes(query)) ||
+                       (r.ma_the && r.ma_the.toLowerCase().includes(query)) ||
+                       (r.maloi && r.maloi.toLowerCase().includes(query)) ||
+                       (r.motaloi && r.motaloi.toLowerCase().includes(query)) ||
+                       (r.root_cause && r.root_cause.toLowerCase().includes(query)) ||
+                       (r.resolution && r.resolution.toLowerCase().includes(query)) ||
+                       (r.note && r.note.toLowerCase().includes(query));
+            });
+        }
+        deptPagination.currentPage = 1;
+        renderTable();
+    }
+
+    const debouncedFilterDept = debounce(() => filterDeptRecords(), 250);
+
     // ========== RECORDS (TAB 1) ==========
     async function fetchRecords() {
         try {
@@ -1066,7 +1137,7 @@
             const res = await fetch(`/api/records/dept?status=${status}`);
             if (res.ok) {
                 records = await res.json();
-                renderTable();
+                filterDeptRecords();
                 updateKPIs();
             }
         } catch (e) {
@@ -1111,15 +1182,37 @@
     }
 
     function renderTable() {
+        const total = deptPagination.filtered.length;
+        const totalPages = Math.ceil(total / deptPagination.pageSize) || 1;
+        if (deptPagination.currentPage > totalPages) deptPagination.currentPage = totalPages;
+        if (deptPagination.currentPage < 1) deptPagination.currentPage = 1;
+
+        const startIdx = (deptPagination.currentPage - 1) * deptPagination.pageSize;
+        const endIdx = startIdx + deptPagination.pageSize;
+        const pageData = deptPagination.filtered.slice(startIdx, endIdx);
+
+        // Update pagination bar
+        const infoEl = document.getElementById('deptPaginationInfo');
+        if (infoEl) {
+            infoEl.innerText = total === 0 ? 'Hiển thị 0 / 0 bản ghi' : `Hiển thị ${startIdx + 1} - ${Math.min(endIdx, total)} / ${total} bản ghi (lọc từ ${records.length})`;
+        }
+        const pageNumEl = document.getElementById('deptPageNum');
+        if (pageNumEl) pageNumEl.innerText = `${deptPagination.currentPage} / ${totalPages}`;
+
+        const btnPrev = document.getElementById('btnDeptPrev');
+        const btnNext = document.getElementById('btnDeptNext');
+        if (btnPrev) btnPrev.disabled = (deptPagination.currentPage <= 1);
+        if (btnNext) btnNext.disabled = (deptPagination.currentPage >= totalPages);
+
         const tbody = document.getElementById('recordsBody');
         tbody.innerHTML = '';
 
-        if (records.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ nào tương ứng.</td></tr>`;
+        if (pageData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ nào tương ứng.</td></tr>`;
             return;
         }
 
-        records.forEach((r, idx) => {
+        pageData.forEach((r, idx) => {
             const tr = document.createElement('tr');
             const rowClass = getRowClass(r);
             if (rowClass) tr.className = rowClass;
@@ -1143,7 +1236,7 @@
             }
 
             tr.innerHTML = `
-                <td style="font-weight:700; color:var(--text-secondary);">${idx + 1}</td>
+                <td style="font-weight:700; color:var(--text-secondary);">${startIdx + idx + 1}</td>
                 <td><strong>${r.ma_lk}</strong></td>
                 <td>${r.ho_ten}</td>
                 <td><code style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:13px;">${r.ma_the}</code></td>
