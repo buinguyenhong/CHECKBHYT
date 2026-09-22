@@ -166,6 +166,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
+            min-width: 0;
         }
         @media (max-width: 900px) {
             .main-layout { grid-template-columns: 1fr; }
@@ -178,6 +179,8 @@
             padding: 22px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
             backdrop-filter: blur(10px);
+            min-width: 0;
+            overflow: hidden;
         }
         .card-header {
             display: flex;
@@ -257,6 +260,15 @@
             transform: none;
             box-shadow: none;
         }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+        }
+        .btn-danger:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(220, 38, 38, 0.45);
+        }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-color);
@@ -287,6 +299,8 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-width: 0;
+            overflow: hidden;
         }
         .log-box {
             background: var(--log-bg);
@@ -299,7 +313,11 @@
             line-height: 1.6;
             height: 380px;
             overflow-y: auto;
+            overflow-x: hidden;
             white-space: pre-wrap;
+            word-break: break-all;
+            overflow-wrap: anywhere;
+            min-width: 0;
             flex: 1;
         }
 
@@ -517,6 +535,65 @@
             </div>
         </div>
 
+        <!-- CỤM CẤU HÌNH DÙNG CHUNG CHO CẢ 2 LUỒNG -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                <div class="card-title">
+                    <span>⚙️</span> Cấu hình Dùng Chung (Tài khoản Cổng BHYT & Khoảng ngày Đối soát CSDL)
+                </div>
+                <span class="badge badge-idle">Áp dụng chung cho cả Luồng B & C</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <!-- NHÓM 1: THÔNG TIN ĐĂNG NHẬP CỔNG BHYT -->
+                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>🔐</span> Tài khoản Cổng BHYT (gdbhyt.baohiemxahoi.gov.vn)
+                    </div>
+                    <div class="form-grid" style="margin-bottom: 0;">
+                        <div class="form-group">
+                            <label for="common_maCSKCB">Mã cơ sở KCB:</label>
+                            <input type="text" id="common_maCSKCB" class="form-control" value="66232">
+                        </div>
+                        <div class="form-group">
+                            <label for="common_username">Tên đăng nhập (CCCD/Tài khoản):</label>
+                            <input type="text" id="common_username" class="form-control" value="066091019320">
+                        </div>
+                        <div class="form-group full">
+                            <label for="common_password">Mật khẩu (để trống nếu muốn nhập tay trên trình duyệt):</label>
+                            <input type="password" id="common_password" class="form-control" placeholder="Để trống nếu muốn gõ tay">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NHÓM 2: KHOẢNG NGÀY ĐỐI SOÁT CSDL SQL HIS -->
+                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--success); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 6px;"><span>📅</span> Khoảng ngày Đối soát CSDL SQL HIS</span>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" class="btn-nav" style="padding: 2px 8px; font-size: 11px;" onclick="setDateRange('today')">Hôm nay</button>
+                            <button type="button" class="btn-nav" style="padding: 2px 8px; font-size: 11px;" onclick="setDateRange('month')">Tháng này</button>
+                        </div>
+                    </div>
+                    <div class="form-grid" style="margin-bottom: 0;">
+                        <div class="form-group">
+                            <label for="sync_fromDate">Từ ngày (Ngày ra viện / Khám):</label>
+                            <input type="date" id="sync_fromDate" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="sync_toDate">Đến ngày (Ngày ra viện / Khám):</label>
+                            <input type="date" id="sync_toDate" class="form-control">
+                        </div>
+                        <div class="form-group full">
+                            <span style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                                💡 Khoảng ngày này dùng để truy vấn bệnh nhân từ CSDL SQL HIS khi bấm <b>"Nạp vào CSDL đối soát"</b> (giống hệt trang IT Admin).
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- MODE TABS -->
         <div class="mode-tabs">
             <button class="tab-btn active" id="tabBtnFlowC" onclick="switchMode('C')">
@@ -534,23 +611,15 @@
                 <div id="panelFlowC">
                     <div class="card-header">
                         <div class="card-title">
-                            <span>⚙️</span> Cấu hình Luồng C (Lỗi chi tiết QĐ 3176)
+                            <span>⚡</span> Tùy chọn Luồng C (Tải Lỗi Chi Tiết QĐ 3176)
                         </div>
                         <span class="badge badge-success">Direct URL API</span>
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label for="c_maCSKCB">Mã cơ sở KCB:</label>
-                            <input type="text" id="c_maCSKCB" class="form-control" value="66232">
-                        </div>
-                        <div class="form-group">
-                            <label for="c_username">Tên đăng nhập (CCCD/Tài khoản):</label>
-                            <input type="text" id="c_username" class="form-control" value="066091019320">
-                        </div>
                         <div class="form-group full">
-                            <label for="c_password">Mật khẩu (để trống nếu gõ tay trên màn hình):</label>
-                            <input type="password" id="c_password" class="form-control" placeholder="Để trống nếu muốn nhập tay trên trình duyệt">
+                            <label>Phạm vi quét trên Cổng BHYT:</label>
+                            <input type="text" class="form-control" value="Tự động chọn ngày = Today trên Cổng BHYT, sắp xếp mới nhất lên đầu" disabled style="color:var(--text-secondary); font-size:12px;">
                         </div>
                         <div class="form-group">
                             <label for="c_filterCol5">Bộ lọc Cột 5 (Lỗi):</label>
@@ -569,6 +638,9 @@
                     <button id="btnRunFlowC" class="btn-action btn-primary" onclick="startFlowC()">
                         <span>⚡</span> BẮT ĐẦU TẢI DỮ LIỆU SIÊU TỐC
                     </button>
+                    <button id="btnStopFlowC" class="btn-action btn-danger" style="display:none;" onclick="stopCurrentFlow()">
+                        <span>🛑</span> DỪNG TIẾN TRÌNH ĐANG CHẠY
+                    </button>
                     <button id="btnMergeOnly" class="btn-action btn-secondary" onclick="startMergeOnly()">
                         <span>📂</span> Chỉ gộp các file Excel có sẵn trong thư mục tạm
                     </button>
@@ -578,32 +650,23 @@
                 <div id="panelFlowB" style="display:none;">
                     <div class="card-header">
                         <div class="card-title">
-                            <span>⚙️</span> Cấu hình Luồng B (Danh sách đã gửi listbh.xlsx)
+                            <span>📦</span> Tùy chọn Luồng B (Tải Danh Sách Đã Gửi listbh.xlsx)
                         </div>
-                        <span class="badge badge-success">Native Chrome/Edge</span>
+                        <span class="badge badge-success">Cả Tháng Hiện Tại</span>
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label for="b_maCSKCB">Mã cơ sở KCB:</label>
-                            <input type="text" id="b_maCSKCB" class="form-control" value="66232">
-                        </div>
-                        <div class="form-group">
-                            <label for="b_username">Tên đăng nhập:</label>
-                            <input type="text" id="b_username" class="form-control" value="066091019320">
-                        </div>
                         <div class="form-group full">
-                            <label for="b_password">Mật khẩu:</label>
-                            <input type="password" id="b_password" class="form-control" placeholder="Để trống nếu muốn nhập tay trên trình duyệt">
-                        </div>
-                        <div class="form-group full">
-                            <label>Phạm vi tải:</label>
+                            <label>Phạm vi tải trên Cổng BHYT:</label>
                             <input type="text" class="form-control" value="Toàn bộ hồ sơ của cả tháng (Timeout 20 phút kèm Heartbeat 10s)" disabled style="color:var(--success); font-weight:600;">
                         </div>
                     </div>
 
                     <button id="btnRunFlowB" class="btn-action btn-primary" onclick="startFlowB()">
                         <span>📥</span> BẮT ĐẦU TẢI DANH SÁCH ĐÃ GỬI
+                    </button>
+                    <button id="btnStopFlowB" class="btn-action btn-danger" style="display:none;" onclick="stopCurrentFlow()">
+                        <span>🛑</span> DỪNG TIẾN TRÌNH ĐANG CHẠY
                     </button>
                 </div>
             </div>
@@ -616,6 +679,7 @@
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span id="statusBadge" class="badge badge-idle">Sẵn sàng</span>
+                        <button id="btnStopFlowHeader" class="btn-action btn-danger" style="display:none; width:auto; padding:4px 10px; font-size:12px; margin-bottom:0;" onclick="stopCurrentFlow()"><span>🛑</span> Dừng</button>
                         <button class="btn-nav" style="padding:4px 8px; font-size:11px;" onclick="clearLog()">Xóa log</button>
                     </div>
                 </div>
@@ -685,6 +749,7 @@
     </div>
 
     <script>
+        const myClientToken = 'cli_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
         let currentMode = 'C';
         const logBox = document.getElementById('logBox');
         const statusBadge = document.getElementById('statusBadge');
@@ -694,6 +759,10 @@
         const btnDownloadFile = document.getElementById('btnDownloadFile');
 
         function appendLog(msg) {
+            // Lọc chuỗi Base64 dài nếu vô tình lọt vào log để không làm giãn ngang giao diện
+            if (msg.includes('data:image/png;base64,')) {
+                msg = msg.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, '[Ảnh Captcha Base64]');
+            }
             logBox.textContent += '\n' + msg;
             logBox.scrollTop = logBox.scrollHeight;
         }
@@ -718,6 +787,38 @@
             localStorage.setItem('theme', next);
         }
 
+        function setRunningState(isRunning, flowName = '') {
+            const btnStopC = document.getElementById('btnStopFlowC');
+            const btnStopB = document.getElementById('btnStopFlowB');
+            const btnStopH = document.getElementById('btnStopFlowHeader');
+            const disp = isRunning ? 'flex' : 'none';
+            if (btnStopC) btnStopC.style.display = disp;
+            if (btnStopB) btnStopB.style.display = disp;
+            if (btnStopH) btnStopH.style.display = disp;
+
+            btnRunFlowC.disabled = isRunning;
+            btnRunFlowB.disabled = isRunning;
+
+            if (isRunning) {
+                statusBadge.className = 'badge badge-running';
+                statusBadge.textContent = `Đang chạy Luồng ${flowName}...`;
+            }
+        }
+
+        async function stopCurrentFlow() {
+            if (!confirm('Bạn có chắc chắn muốn DỪNG tiến trình đang chạy? Tác vụ sẽ bị hủy và trình duyệt sẽ đóng lại.')) {
+                return;
+            }
+            appendLog('🛑 Đang gửi yêu cầu dừng tiến trình lên máy chủ...');
+            try {
+                const res = await fetch('/api/automation/v2/stop', { method: 'POST' });
+                const data = await res.json();
+                appendLog(`🛑 ${data.message || 'Đã gửi lệnh dừng'}`);
+            } catch (err) {
+                appendLog(`❌ Lỗi gửi lệnh dừng: ${err.message}`);
+            }
+        }
+
         // Kết nối Server-Sent Events (SSE) để nhận log thời gian thực
         let evtSource = null;
         function connectLogStream() {
@@ -725,15 +826,24 @@
             evtSource = new EventSource('/api/automation/v2/logs');
             evtSource.onmessage = function(e) {
                 const msg = e.data;
-                if (msg.includes('[CAPTCHA_REQUIRED]')) {
-                    handleCaptchaRequired(msg);
-                } else if (msg.includes('[CAPTCHA_SUCCESS]')) {
+                if (msg.includes('[CAPTCHA_REQUIRED')) {
+                    const tokenMatch = msg.match(/\[CAPTCHA_REQUIRED:?([^\]]*)\]/);
+                    const targetToken = tokenMatch && tokenMatch[1] ? tokenMatch[1].trim() : '';
+                    // Chỉ bật popup trên máy trạm đã bấm nút (hoặc nếu sự kiện chung không có token)
+                    if (!targetToken || targetToken === myClientToken) {
+                        handleCaptchaRequired(msg);
+                        appendLog("📸 [CAPTCHA] Yêu cầu nhập Captcha từ máy chủ -> Đang mở Popup xác nhận trên máy của bạn...");
+                    } else {
+                        appendLog("⏳ [CAPTCHA] Máy chủ đang chờ máy trạm yêu cầu giải Captcha...");
+                    }
+                } else if (msg.includes('[CAPTCHA_SUCCESS')) {
                     handleCaptchaSuccess();
+                    appendLog("✅ [CAPTCHA] Xác thực Captcha thành công!");
+                } else {
+                    appendLog(msg);
                 }
-                appendLog(msg);
             };
             evtSource.onerror = function() {
-                // Tự động kết nối lại sau 3s nếu đứt kết nối
                 setTimeout(connectLogStream, 3000);
             };
         }
@@ -748,9 +858,9 @@
 
         function handleCaptchaRequired(rawMsg) {
             try {
-                // Format: [CAPTCHA_REQUIRED] data:image/png;base64,...###suggested_code
-                const marker = '[CAPTCHA_REQUIRED]';
-                const payload = rawMsg.substring(rawMsg.indexOf(marker) + marker.length).trim();
+                const idx = rawMsg.indexOf('data:image/png;base64,');
+                if (idx === -1) return;
+                const payload = rawMsg.substring(idx).trim();
                 const parts = payload.split('###');
                 const imgSrc = parts[0].trim();
                 const ocrSuggestion = parts.length > 1 ? parts[1].trim() : '';
@@ -835,20 +945,53 @@
             }
         }
 
+        function initDateRanges() {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${yyyy}-${mm}-${dd}`;
+            const firstDayStr = `${yyyy}-${mm}-01`;
+
+            const fromInp = document.getElementById('sync_fromDate');
+            const toInp = document.getElementById('sync_toDate');
+            if (fromInp && !fromInp.value) fromInp.value = firstDayStr;
+            if (toInp && !toInp.value) toInp.value = todayStr;
+        }
+
+        function setDateRange(type) {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${yyyy}-${mm}-${dd}`;
+            const firstDayStr = `${yyyy}-${mm}-01`;
+
+            const fromInp = document.getElementById('sync_fromDate');
+            const toInp = document.getElementById('sync_toDate');
+            if (type === 'today') {
+                fromInp.value = todayStr;
+                toInp.value = todayStr;
+            } else {
+                fromInp.value = firstDayStr;
+                toInp.value = todayStr;
+            }
+        }
+        initDateRanges();
+
         // KÍCH HOẠT LUỒNG C MỚI
         async function startFlowC() {
             const payload = {
-                maCoSoKCB: document.getElementById('c_maCSKCB').value.trim(),
-                username: document.getElementById('c_username').value.trim(),
-                password: document.getElementById('c_password').value,
+                maCoSoKCB: document.getElementById('common_maCSKCB').value.trim(),
+                username: document.getElementById('common_username').value.trim(),
+                password: document.getElementById('common_password').value,
                 filterCol5: document.getElementById('c_filterCol5').value.trim(),
                 fromSTT: parseInt(document.getElementById('c_fromSTT').value, 10) || 1,
-                toSTT: parseInt(document.getElementById('c_toSTT').value, 10) || 100
+                toSTT: parseInt(document.getElementById('c_toSTT').value, 10) || 100,
+                clientToken: myClientToken
             };
 
-            btnRunFlowC.disabled = true;
-            statusBadge.className = 'badge badge-running';
-            statusBadge.textContent = 'Đang chạy Luồng C...';
+            setRunningState(true, 'C');
             resultPanel.classList.remove('active');
             appendLog('\n--- BẮT ĐẦU LUỒNG C MỚI (DIRECT URL DOWNLOAD) ---');
 
@@ -872,7 +1015,11 @@
                     
                     btnDownloadFile.href = '/api/automation/v2/download-file?file_type=error_detail';
                     resultPanel.classList.add('active');
-                    appendLog('\n🎉 LUỒNG C HOÀN TẤT THÀNH CÔNG!');
+                    appendLog('\n🎉 LUỒNG C HOÀN TẤT THÀNH CÔNG! Bạn có thể bấm "Nạp vào CSDL đối soát" để kiểm tra ngay.');
+                } else if (data.status === 'stopped') {
+                    statusBadge.className = 'badge badge-idle';
+                    statusBadge.textContent = 'Đã dừng';
+                    appendLog('\n🛑 Luồng C đã dừng theo yêu cầu của bạn.');
                 } else {
                     throw new Error(data.detail || data.message || 'Lỗi không xác định');
                 }
@@ -882,23 +1029,22 @@
                 appendLog(`❌ Lỗi thực thi: ${err.message}`);
                 alert(`Lỗi thực thi Luồng C: ${err.message}`);
             } finally {
-                btnRunFlowC.disabled = false;
+                setRunningState(false);
             }
         }
 
         // KÍCH HOẠT LUỒNG B MỚI
         async function startFlowB() {
             const payload = {
-                maCoSoKCB: document.getElementById('b_maCSKCB').value.trim(),
-                username: document.getElementById('b_username').value.trim(),
-                password: document.getElementById('b_password').value
+                maCoSoKCB: document.getElementById('common_maCSKCB').value.trim(),
+                username: document.getElementById('common_username').value.trim(),
+                password: document.getElementById('common_password').value,
+                clientToken: myClientToken
             };
 
-            btnRunFlowB.disabled = true;
-            statusBadge.className = 'badge badge-running';
-            statusBadge.textContent = 'Đang chạy Luồng B...';
+            setRunningState(true, 'B');
             resultPanel.classList.remove('active');
-            appendLog('\n--- BẮT ĐẦU LUỒNG B MỚI (NATIVE BROWSER) ---');
+            appendLog('\n--- BẮT ĐẦU LUỒNG B MỚI (NATIVE BROWSER - TẢI CẢ THÁNG) ---');
 
             try {
                 const res = await fetch('/api/automation/v2/flow-b', {
@@ -919,7 +1065,11 @@
 
                     btnDownloadFile.href = '/api/automation/v2/download-file?file_type=listbh';
                     resultPanel.classList.add('active');
-                    appendLog('\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG!');
+                    appendLog('\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG! Bạn có thể bấm "Nạp vào CSDL đối soát" để so khớp CSDL cả tháng.');
+                } else if (data.status === 'stopped') {
+                    statusBadge.className = 'badge badge-idle';
+                    statusBadge.textContent = 'Đã dừng';
+                    appendLog('\n🛑 Luồng B đã dừng theo yêu cầu của bạn.');
                 } else {
                     throw new Error(data.detail || data.message || 'Lỗi không xác định');
                 }
@@ -929,7 +1079,7 @@
                 appendLog(`❌ Lỗi thực thi: ${err.message}`);
                 alert(`Lỗi thực thi Luồng B: ${err.message}`);
             } finally {
-                btnRunFlowB.disabled = false;
+                setRunningState(false);
             }
         }
 
@@ -959,26 +1109,39 @@
 
         // TỰ ĐỘNG NẠP VÀO HỆ THỐNG ĐỐI SOÁT CHECKBHYT
         async function importToReconciliation() {
+            const fromDate = document.getElementById('sync_fromDate').value;
+            const toDate = document.getElementById('sync_toDate').value;
+            if (!fromDate || !toDate) {
+                alert('Vui lòng chọn khoảng ngày đối soát CSDL!');
+                return;
+            }
+
             const btn = document.getElementById('btnImportDB');
             btn.disabled = true;
-            btn.textContent = 'Đang nạp CSDL...';
-            appendLog('\n⚡ Đang kích hoạt tự động nạp dữ liệu vào CSDL đối soát CHECKBHYT...');
+            btn.textContent = 'Đang đối soát CSDL...';
+            appendLog(`\n⚡ Đang kích hoạt đối soát CSDL HIS (${currentMode === 'B' ? 'Tìm ca FAIL với listbh' : 'So khớp ca LỖI chi tiết'}) từ ${fromDate} đến ${toDate}...`);
 
             try {
                 const res = await fetch('/api/automation/v2/import-to-system', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ flow: currentMode })
+                    body: JSON.stringify({
+                        flow: currentMode,
+                        fromDate: fromDate,
+                        toDate: toDate
+                    })
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    appendLog('✅ ĐÃ NẠP THÀNH CÔNG VÀO CSDL ĐỐI SOÁT!');
-                    alert('Nạp dữ liệu vào hệ thống đối soát thành công! Bạn có thể quay lại trang IT Admin hoặc Báo cáo để xem kết quả.');
+                    const stats = data.compare_result || {};
+                    appendLog(`✅ ĐÃ ĐỐI SOÁT CSDL THÀNH CÔNG!`);
+                    appendLog(`📊 Kết quả: Tổng: ${stats.total || 0} ca | Đã gửi: ${stats.sent || 0} | Lỗi Cổng: ${stats.loi || 0} | Chưa gửi FAIL: ${stats.fail || 0}`);
+                    alert(`Nạp file và đối soát CSDL thành công cho khoảng ngày ${fromDate} đến ${toDate}!\n- Tổng ca: ${stats.total || 0}\n- Đã gửi: ${stats.sent || 0}\n- Lỗi Cổng: ${stats.loi || 0}\n- Chưa gửi FAIL: ${stats.fail || 0}\nBạn có thể quay lại trang IT Admin để xem bảng chi tiết.`);
                 } else {
-                    throw new Error(data.detail || 'Lỗi khi nạp CSDL');
+                    throw new Error(data.detail || 'Lỗi khi đối soát CSDL');
                 }
             } catch (err) {
-                appendLog(`❌ Lỗi nạp CSDL: ${err.message}`);
+                appendLog(`❌ Lỗi đối soát CSDL: ${err.message}`);
                 alert(`Lỗi: ${err.message}`);
             } finally {
                 btn.disabled = false;

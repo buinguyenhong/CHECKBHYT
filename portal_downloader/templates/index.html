@@ -198,6 +198,7 @@
             display: grid;
             grid-template-columns: 430px 1fr;
             gap: 20px;
+            min-width: 0;
         }
         @media (max-width: 1000px) {
             .main-layout { grid-template-columns: 1fr; }
@@ -209,6 +210,7 @@
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            min-width: 0;
         }
         .card-header {
             display: flex;
@@ -275,6 +277,15 @@
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
         }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+        }
+        .btn-danger:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+        }
         .btn-secondary {
             background: transparent;
             border: 1px solid var(--border-color);
@@ -304,7 +315,7 @@
         .badge-error { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
         .badge-idle { background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); }
 
-        .log-container { display: flex; flex-direction: column; height: 580px; }
+        .log-container { display: flex; flex-direction: column; height: 580px; min-width: 0; }
         .log-box {
             background: var(--log-bg);
             border: 1px solid var(--log-border);
@@ -316,8 +327,11 @@
             line-height: 1.55;
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             white-space: pre-wrap;
-            word-break: break-word;
+            word-break: break-all;
+            overflow-wrap: anywhere;
+            min-width: 0;
         }
 
         .result-panel {
@@ -530,6 +544,65 @@
             <button class="btn-nav" onclick="saveServerConfig()">💾 Lưu URL</button>
         </div>
 
+        <!-- CỤM CẤU HÌNH DÙNG CHUNG CHO CẢ 2 LUỒNG -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                <div class="card-title">
+                    <span>⚙️</span> Cấu hình Dùng Chung (Tài khoản Cổng BHYT & Khoảng ngày Đối soát CSDL)
+                </div>
+                <span class="badge badge-idle">Áp dụng chung cho cả Luồng B & C</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <!-- NHÓM 1: THÔNG TIN ĐĂNG NHẬP CỔNG BHYT -->
+                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>🔐</span> Tài khoản Cổng BHYT (gdbhyt.baohiemxahoi.gov.vn)
+                    </div>
+                    <div class="form-grid" style="margin-bottom: 0;">
+                        <div class="form-group">
+                            <label for="common_maCSKCB">Mã cơ sở KCB:</label>
+                            <input type="text" id="common_maCSKCB" class="form-control" value="66232">
+                        </div>
+                        <div class="form-group">
+                            <label for="common_username">Tên đăng nhập (CCCD/Tài khoản):</label>
+                            <input type="text" id="common_username" class="form-control" value="066091019320">
+                        </div>
+                        <div class="form-group full">
+                            <label for="common_password">Mật khẩu (để trống nếu muốn nhập tay trên trình duyệt):</label>
+                            <input type="password" id="common_password" class="form-control" placeholder="Để trống nếu muốn gõ tay">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NHÓM 2: KHOẢNG NGÀY ĐỐI SOÁT CSDL SQL HIS -->
+                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--success); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 6px;"><span>📅</span> Khoảng ngày Đối soát CSDL SQL HIS</span>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" class="btn-nav" style="padding: 2px 8px; font-size: 11px;" onclick="setDateRange('today')">Hôm nay</button>
+                            <button type="button" class="btn-nav" style="padding: 2px 8px; font-size: 11px;" onclick="setDateRange('month')">Tháng này</button>
+                        </div>
+                    </div>
+                    <div class="form-grid" style="margin-bottom: 0;">
+                        <div class="form-group">
+                            <label for="sync_fromDate">Từ ngày (Ngày ra viện / Khám):</label>
+                            <input type="date" id="sync_fromDate" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="sync_toDate">Đến ngày (Ngày ra viện / Khám):</label>
+                            <input type="date" id="sync_toDate" class="form-control">
+                        </div>
+                        <div class="form-group full">
+                            <span style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                                💡 Khi bấm <b>"Gửi lên Máy chủ & Kích hoạt đối soát CSDL"</b>, máy chủ sẽ đối soát dữ liệu theo khoảng ngày này.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- MODE TABS -->
         <div class="mode-tabs">
             <button class="tab-btn active" id="tabBtnFlowC" onclick="switchMode('C')">
@@ -547,23 +620,15 @@
                 <div id="panelFlowC">
                     <div class="card-header">
                         <div class="card-title">
-                            <span>⚙️</span> Cấu hình Luồng C (Hồ sơ lỗi QĐ 3176)
+                            <span>⚡</span> Tùy chọn Luồng C (Hồ sơ lỗi QĐ 3176)
                         </div>
                         <span class="badge badge-success">Direct URL API</span>
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label for="c_maCSKCB">Mã cơ sở KCB:</label>
-                            <input type="text" id="c_maCSKCB" class="form-control" value="66232">
-                        </div>
-                        <div class="form-group">
-                            <label for="c_username">Tên đăng nhập (CCCD/Tài khoản):</label>
-                            <input type="text" id="c_username" class="form-control" value="066091019320">
-                        </div>
                         <div class="form-group full">
-                            <label for="c_password">Mật khẩu (để trống nếu muốn nhập tay trên trình duyệt):</label>
-                            <input type="password" id="c_password" class="form-control" placeholder="Để trống nếu muốn gõ tay">
+                            <label>Phạm vi quét trên Cổng BHYT:</label>
+                            <input type="text" class="form-control" value="Tự động chọn ngày = Today trên Cổng BHYT, sắp xếp mới nhất lên đầu" disabled style="color:var(--text-secondary); font-size:12px;">
                         </div>
                         <div class="form-group">
                             <label for="c_filterCol5">Bộ lọc Cột 5 (Lỗi):</label>
@@ -582,6 +647,9 @@
                     <button id="btnRunFlowC" class="btn-action btn-primary" onclick="startFlowC()">
                         <span>⚡</span> BẮT ĐẦU TẢI DỮ LIỆU SIÊU TỐC
                     </button>
+                    <button id="btnStopFlowC" class="btn-action btn-danger" onclick="stopCurrentFlow()" style="display:none;">
+                        <span>🛑</span> DỪNG TIẾN TRÌNH ĐANG CHẠY
+                    </button>
                     <button id="btnMergeOnly" class="btn-action btn-secondary" onclick="startMergeOnly()">
                         <span>📂</span> Chỉ gộp các file Excel có sẵn trong thư mục tải
                     </button>
@@ -591,32 +659,23 @@
                 <div id="panelFlowB" style="display:none;">
                     <div class="card-header">
                         <div class="card-title">
-                            <span>⚙️</span> Cấu hình Luồng B (Danh sách đã gửi listbh.xlsx)
+                            <span>📦</span> Tùy chọn Luồng B (Danh sách đã gửi listbh.xlsx)
                         </div>
                         <span class="badge badge-success">Toàn Bộ Cả Tháng</span>
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label for="b_maCSKCB">Mã cơ sở KCB:</label>
-                            <input type="text" id="b_maCSKCB" class="form-control" value="66232">
-                        </div>
-                        <div class="form-group">
-                            <label for="b_username">Tên đăng nhập:</label>
-                            <input type="text" id="b_username" class="form-control" value="066091019320">
-                        </div>
                         <div class="form-group full">
-                            <label for="b_password">Mật khẩu:</label>
-                            <input type="password" id="b_password" class="form-control" placeholder="Để trống nếu muốn gõ tay">
-                        </div>
-                        <div class="form-group full">
-                            <label>Phạm vi tải:</label>
+                            <label>Phạm vi tải trên Cổng BHYT:</label>
                             <input type="text" class="form-control" value="Toàn bộ hồ sơ của cả tháng (Timeout 20 phút kèm Heartbeat)" disabled style="color:var(--success); font-weight:600;">
                         </div>
                     </div>
 
                     <button id="btnRunFlowB" class="btn-action btn-primary" onclick="startFlowB()">
                         <span>📥</span> BẮT ĐẦU TẢI DANH SÁCH CẢ THÁNG
+                    </button>
+                    <button id="btnStopFlowB" class="btn-action btn-danger" onclick="stopCurrentFlow()" style="display:none;">
+                        <span>🛑</span> DỪNG TIẾN TRÌNH ĐANG CHẠY
                     </button>
                 </div>
             </div>
@@ -629,6 +688,7 @@
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span id="statusBadge" class="badge badge-idle">Sẵn sàng</span>
+                        <button id="btnStopHeader" class="btn-nav" style="padding:4px 8px; font-size:11px; background:#ef4444; color:white; border-color:#dc2626; display:none;" onclick="stopCurrentFlow()">🛑 Dừng</button>
                         <button class="btn-nav" style="padding:4px 8px; font-size:11px;" onclick="clearLog()">Xóa log</button>
                     </div>
                 </div>
@@ -707,8 +767,39 @@
         const serverUrlInput = document.getElementById('serverUrl');
 
         function appendLog(msg) {
+            if (typeof msg === 'string' && msg.includes('data:image/')) {
+                msg = msg.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '[HÌNH ẢNH CAPTCHA BASE64]');
+            }
             logBox.textContent += '\n' + msg;
             logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function setRunningState(isRunning, mode) {
+            const isC = (mode === 'C');
+            btnRunFlowC.disabled = isRunning;
+            btnRunFlowB.disabled = isRunning;
+            const btnStopFlowC = document.getElementById('btnStopFlowC');
+            const btnStopFlowB = document.getElementById('btnStopFlowB');
+            const btnStopHeader = document.getElementById('btnStopHeader');
+            if (btnStopFlowC) btnStopFlowC.style.display = (isRunning && isC) ? 'flex' : 'none';
+            if (btnStopFlowB) btnStopFlowB.style.display = (isRunning && !isC) ? 'flex' : 'none';
+            if (btnStopHeader) btnStopHeader.style.display = isRunning ? 'inline-flex' : 'none';
+            if (isRunning) {
+                statusBadge.className = 'badge badge-running';
+                statusBadge.textContent = 'Đang chạy Luồng ' + mode + '...';
+            }
+        }
+
+        async function stopCurrentFlow() {
+            if (!confirm('Bạn có chắc chắn muốn dừng tiến trình đang chạy không?')) return;
+            appendLog('🛑 Đang gửi lệnh dừng tiến trình...');
+            try {
+                const res = await fetch('/api/stop', { method: 'POST' });
+                const data = await res.json();
+                appendLog(data.message || 'Đã gửi yêu cầu dừng.');
+            } catch (e) {
+                appendLog('❌ Lỗi gửi lệnh dừng: ' + e.message);
+            }
         }
 
         function clearLog() {
@@ -731,6 +822,40 @@
             localStorage.setItem('theme', next);
         }
 
+        function initDateRanges() {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${yyyy}-${mm}-${dd}`;
+            const firstDayStr = `${yyyy}-${mm}-01`;
+
+            const fromInp = document.getElementById('sync_fromDate');
+            const toInp = document.getElementById('sync_toDate');
+            if (fromInp && !fromInp.value) fromInp.value = firstDayStr;
+            if (toInp && !toInp.value) toInp.value = todayStr;
+        }
+
+        function setDateRange(type) {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${yyyy}-${mm}-${dd}`;
+            const firstDayStr = `${yyyy}-${mm}-01`;
+
+            const fromInp = document.getElementById('sync_fromDate');
+            const toInp = document.getElementById('sync_toDate');
+            if (type === 'today') {
+                fromInp.value = todayStr;
+                toInp.value = todayStr;
+            } else {
+                fromInp.value = firstDayStr;
+                toInp.value = todayStr;
+            }
+        }
+        initDateRanges();
+
         // Tải cấu hình từ backend
         async function loadConfig() {
             try {
@@ -739,12 +864,12 @@
                     const data = await res.json();
                     if (data.server_url) serverUrlInput.value = data.server_url;
                     if (data.ma_cskcb) {
-                        document.getElementById('c_maCSKCB').value = data.ma_cskcb;
-                        document.getElementById('b_maCSKCB').value = data.ma_cskcb;
+                        const el = document.getElementById('common_maCSKCB');
+                        if (el) el.value = data.ma_cskcb;
                     }
                     if (data.username) {
-                        document.getElementById('c_username').value = data.username;
-                        document.getElementById('b_username').value = data.username;
+                        const el = document.getElementById('common_username');
+                        if (el) el.value = data.username;
                     }
                 }
             } catch (e) {}
@@ -881,17 +1006,15 @@
         async function startFlowC() {
             const payload = {
                 server_url: serverUrlInput.value.trim(),
-                maCoSoKCB: document.getElementById('c_maCSKCB').value.trim(),
-                username: document.getElementById('c_username').value.trim(),
-                password: document.getElementById('c_password').value,
+                maCoSoKCB: document.getElementById('common_maCSKCB').value.trim(),
+                username: document.getElementById('common_username').value.trim(),
+                password: document.getElementById('common_password').value,
                 filterCol5: document.getElementById('c_filterCol5').value.trim(),
                 fromSTT: parseInt(document.getElementById('c_fromSTT').value, 10) || 1,
                 toSTT: parseInt(document.getElementById('c_toSTT').value, 10) || 100
             };
 
-            btnRunFlowC.disabled = true;
-            statusBadge.className = 'badge badge-running';
-            statusBadge.textContent = 'Đang chạy Luồng C...';
+            setRunningState(true, 'C');
             resultPanel.classList.remove('active');
             appendLog('\n--- BẮT ĐẦU LUỒNG C MỚI (DIRECT URL DOWNLOAD) ---');
 
@@ -916,7 +1039,7 @@
                     
                     btnDownloadFile.href = '/api/download-file?file_type=error_detail';
                     resultPanel.classList.add('active');
-                    appendLog('\n🎉 LUỒNG C HOÀN TẤT THÀNH CÔNG!');
+                    appendLog('\n🎉 LUỒNG C HOÀN TẤT THÀNH CÔNG! Bạn có thể tải file hoặc bấm "Gửi lên Máy chủ & Kích hoạt đối soát CSDL".');
                 } else {
                     throw new Error(data.detail || data.message || 'Lỗi không xác định');
                 }
@@ -926,7 +1049,7 @@
                 appendLog(`❌ Lỗi thực thi: ${err.message}`);
                 alert(`Lỗi thực thi Luồng C: ${err.message}`);
             } finally {
-                btnRunFlowC.disabled = false;
+                setRunningState(false, 'C');
             }
         }
 
@@ -934,14 +1057,12 @@
         async function startFlowB() {
             const payload = {
                 server_url: serverUrlInput.value.trim(),
-                maCoSoKCB: document.getElementById('b_maCSKCB').value.trim(),
-                username: document.getElementById('b_username').value.trim(),
-                password: document.getElementById('b_password').value
+                maCoSoKCB: document.getElementById('common_maCSKCB').value.trim(),
+                username: document.getElementById('common_username').value.trim(),
+                password: document.getElementById('common_password').value
             };
 
-            btnRunFlowB.disabled = true;
-            statusBadge.className = 'badge badge-running';
-            statusBadge.textContent = 'Đang chạy Luồng B...';
+            setRunningState(true, 'B');
             resultPanel.classList.remove('active');
             appendLog('\n--- BẮT ĐẦU LUỒNG B MỚI (TẢI CẢ THÁNG - HEARTBEAT 10S) ---');
 
@@ -964,7 +1085,7 @@
 
                     btnDownloadFile.href = '/api/download-file?file_type=listbh';
                     resultPanel.classList.add('active');
-                    appendLog('\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG!');
+                    appendLog('\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG! Bạn có thể tải file hoặc bấm "Gửi lên Máy chủ & Kích hoạt đối soát CSDL".');
                 } else {
                     throw new Error(data.detail || data.message || 'Lỗi không xác định');
                 }
@@ -974,7 +1095,7 @@
                 appendLog(`❌ Lỗi thực thi: ${err.message}`);
                 alert(`Lỗi thực thi Luồng B: ${err.message}`);
             } finally {
-                btnRunFlowB.disabled = false;
+                setRunningState(false, 'B');
             }
         }
 
@@ -1005,10 +1126,17 @@
 
         // GỬI FILE VỪA TẢI LÊN MÁY CHỦ CHECKBHYT
         async function pushFileToServer() {
+            const fromDate = document.getElementById('sync_fromDate').value;
+            const toDate = document.getElementById('sync_toDate').value;
+            if (!fromDate || !toDate) {
+                alert('Vui lòng chọn khoảng ngày đối soát CSDL!');
+                return;
+            }
+
             const btn = document.getElementById('btnPushServer');
             btn.disabled = true;
             btn.textContent = 'Đang gửi file lên Máy chủ...';
-            appendLog('\n📤 Đang gửi tệp sang Máy chủ CHECKBHYT để kích hoạt đối soát CSDL tự động...');
+            appendLog(`\n📤 Đang gửi tệp sang Máy chủ CHECKBHYT để kích hoạt đối soát CSDL (${fromDate} đến ${toDate})...`);
 
             try {
                 const res = await fetch('/api/push-to-server', {
@@ -1016,13 +1144,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         server_url: serverUrlInput.value.trim(),
-                        flow: currentMode
+                        flow: currentMode,
+                        fromDate: fromDate,
+                        toDate: toDate
                     })
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
+                    const sResp = data.server_response || {};
+                    const stats = sResp.compare_result || {};
                     appendLog('✅ GỬI FILE VÀ ĐỐI SOÁT THÀNH CÔNG TRÊN MÁY CHỦ!');
-                    alert('Đã gửi file thành công lên Máy chủ! Hệ thống đã nạp và hoàn tất đối soát CSDL.');
+                    if (stats.total !== undefined) {
+                        appendLog(`📊 Kết quả đối soát: Tổng: ${stats.total} ca | Đã gửi: ${stats.sent} | Lỗi Cổng: ${stats.loi} | Chưa gửi FAIL: ${stats.fail}`);
+                    }
+                    alert(`Đã gửi file thành công lên Máy chủ và hoàn tất đối soát CSDL (${fromDate} đến ${toDate})!\n${sResp.message || ''}`);
                 } else {
                     throw new Error(data.detail || 'Lỗi khi gửi lên máy chủ');
                 }

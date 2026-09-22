@@ -28,6 +28,9 @@ def safe_print(msg: str):
         except Exception:
             pass
 
+import base64
+import threading
+
 # Thư mục lưu trữ phiên đăng nhập và các tệp tải lên
 SESSION_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "browser_session")
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploaded_files")
@@ -39,16 +42,28 @@ os.makedirs(TEMP_ERROR_DIR, exist_ok=True)
 
 SESSION_FILE = os.path.join(SESSION_DIR, "portal_storage_state.json")
 
-# Danh sách log thời gian thực để UI có thể hiển thị
-portal_logs: List[str] = []
+# Danh sách log thời gian thực với số thứ tự tăng dần duy nhất (Monotonic sequence)
+_portal_log_lock = threading.Lock()
+_portal_log_seq: int = 0
+portal_logs: List[Dict[str, Any]] = []
 
 def add_portal_log(msg: str):
+    global _portal_log_seq
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     entry = f"[{timestamp}] {msg}"
-    portal_logs.append(entry)
-    if len(portal_logs) > 300:
-        portal_logs.pop(0)
+    with _portal_log_lock:
+        _portal_log_seq += 1
+        seq = _portal_log_seq
+        portal_logs.append({"id": seq, "text": entry})
+        if len(portal_logs) > 600:
+            portal_logs.pop(0)
     safe_print(f"[*] [PortalAutomation] {entry}")
+
+def get_portal_logs_since(last_id: int) -> Tuple[List[str], int]:
+    with _portal_log_lock:
+        new_entries = [item for item in portal_logs if item["id"] > last_id]
+        new_last_id = portal_logs[-1]["id"] if portal_logs else last_id
+        return [item["text"] for item in new_entries], new_last_id
 
 
 def launch_native_browser(playwright_instance, headless: bool = False):
@@ -133,12 +148,32 @@ class PortalAutomationService:
         self.ma_cskcb = ma_cskcb
         self.username = username
         self.password = password
+        self.is_busy: bool = False
+        self.current_flow: str = ""
+        self.current_client_token: str = ""
+        self.stop_requested: bool = False
+        self._current_browser = None
+        self._current_context = None
 
     def update_config(self, base_url: str = "", ma_cskcb: str = "", username: str = "", password: str = ""):
         if base_url: self.base_url = base_url
         if ma_cskcb: self.ma_cskcb = ma_cskcb
         if username: self.username = username
         if password: self.password = password
+
+    def stop_current_flow(self) -> bool:
+        """Yêu cầu dừng ngay lập tức luồng đang chạy"""
+        if not self.is_busy and not self._current_browser:
+            return False
+        self.stop_requested = True
+        captcha_mgr.reset()
+        add_portal_log("🛑 ĐÃ NHẬN LỆNH DỪNG TIẾN TRÌNH! Đang hủy các tác vụ và đóng trình duyệt...")
+        try:
+            if self._current_browser:
+                self._current_browser.close()
+        except Exception:
+            pass
+        return True
 
     def _ensure_login(self, page, log_func: Optional[Callable[[str], None]] = None):
         """
@@ -263,11 +298,17 @@ class PortalAutomationService:
             captcha_mgr.current_captcha_ocr = ocr_text
             captcha_mgr.is_waiting = True
 
+            token_tag = f":{self.current_client_token}" if self.current_client_token else ""
             # Gửi lệnh mở Modal Captcha trên màn hình máy trạm
-            log(f"[CAPTCHA_REQUIRED] data:image/png;base64,{b64}###{ocr_text}")
+            log(f"[CAPTCHA_REQUIRED{token_tag}] data:image/png;base64,{b64}###{ocr_text}")
             log("👉 ĐÃ CHỤP ẢNH CAPTCHA VÀ GỬI VỀ MÀN HÌNH MÁY TRẠM. Vui lòng gõ mã trên Popup hiển thị...")
 
             while time.time() - start_wait < 180:
+                if self.stop_requested:
+                    log("🛑 Đã dừng chờ Captcha theo yêu cầu người dùng.")
+                    captcha_mgr.reset()
+                    break
+
                 # Kiểm tra yêu cầu đổi mã Captcha từ máy trạm
                 if captcha_mgr.refresh_event.is_set():
                     captcha_mgr.refresh_event.clear()
@@ -281,7 +322,7 @@ class PortalAutomationService:
                     ocr_text = ocr.classification(base64.b64decode(b64)).strip() if ocr and b64 else ""
                     captcha_mgr.current_captcha_b64 = b64
                     captcha_mgr.current_captcha_ocr = ocr_text
-                    log(f"[CAPTCHA_REQUIRED] data:image/png;base64,{b64}###{ocr_text}")
+                    log(f"[CAPTCHA_REQUIRED{token_tag}] data:image/png;base64,{b64}###{ocr_text}")
 
                 # Kiểm tra nhận mã Captcha từ máy trạm gửi lên
                 if captcha_mgr.waiting_event.is_set():
@@ -306,7 +347,7 @@ class PortalAutomationService:
 
                         if (has_logout or has_menu) and not has_login_btn and not has_pass_inp:
                             log("🎉 ĐĂNG NHẬP THÀNH CÔNG! ✅")
-                            log("[CAPTCHA_SUCCESS]")
+                            log(f"[CAPTCHA_SUCCESS{token_tag}]")
                             login_success = True
                             captcha_mgr.reset()
                             break
@@ -317,7 +358,7 @@ class PortalAutomationService:
                             ocr_text = ocr.classification(base64.b64decode(b64)).strip() if ocr and b64 else ""
                             captcha_mgr.current_captcha_b64 = b64
                             captcha_mgr.current_captcha_ocr = ocr_text
-                            log(f"[CAPTCHA_REQUIRED] data:image/png;base64,{b64}###{ocr_text}")
+                            log(f"[CAPTCHA_REQUIRED{token_tag}] data:image/png;base64,{b64}###{ocr_text}")
                     except Exception as le:
                         log(f"Lỗi đăng nhập: {le}")
 
@@ -328,7 +369,7 @@ class PortalAutomationService:
                     has_login_btn = page.locator("input[value='Đăng nhập'], #btnLogin, #btnDangNhap").is_visible()
                     if (has_logout or has_menu) and not has_login_btn:
                         log("🎉 ĐĂNG NHẬP THÀNH CÔNG! ✅")
-                        log("[CAPTCHA_SUCCESS]")
+                        log(f"[CAPTCHA_SUCCESS{token_tag}]")
                         login_success = True
                         captcha_mgr.reset()
                         break
@@ -345,6 +386,9 @@ class PortalAutomationService:
                 time.sleep(0.5)
 
         captcha_mgr.reset()
+        if self.stop_requested:
+            raise Exception("Tiến trình đã bị dừng theo yêu cầu người dùng.")
+
         if not login_success:
             raise Exception("Quá thời gian 180 giây chờ nhập Captcha hoặc chưa hoàn tất Đăng nhập.")
 
@@ -354,10 +398,6 @@ class PortalAutomationService:
             log("💾 Đã lưu phiên làm việc (Session) thành công!")
         except Exception as se:
             log(f"Lưu storage state: {se}")
-
-        except Exception as e:
-            log(f"Lỗi đăng nhập: {str(e)}")
-            raise Exception(f"Không thể đăng nhập Cổng BHYT: {str(e)}")
 
     def _wait_for_grid_ready(self, page, timeout_ms: int = 600000, log_func: Optional[Callable[[str], None]] = None):
         """
@@ -369,6 +409,10 @@ class PortalAutomationService:
         last_report = start_time
 
         while (time.time() - start_time) * 1000 < timeout_ms:
+            if self.stop_requested:
+                if log_func: log_func("🛑 Đã dừng chờ dữ liệu theo yêu cầu.")
+                return False
+
             is_busy = False
             try:
                 is_busy = page.evaluate("""() => {
@@ -669,7 +713,8 @@ class PortalAutomationService:
         from_stt: int = 1,
         to_stt: int = 100,
         filter_col5: str = "1",
-        log_func: Optional[Callable[[str], None]] = None
+        log_func: Optional[Callable[[str], None]] = None,
+        client_token: str = ""
     ) -> Dict[str, Any]:
         """
         LUỒNG C MỚI: Tự động tải Danh sách lỗi chi tiết QĐ 3176 siêu tốc.
@@ -678,6 +723,13 @@ class PortalAutomationService:
         - Tải trực tiếp bằng Direct HTTP URL: ExportExcelKPG_New?maGd={maGD} (Không mở Popup).
         - Gộp file và lọc trùng dòng dữ liệu sạch sẽ thành HoSoLoiChiTiet.xlsx.
         """
+        if self.is_busy:
+            raise Exception(f"Hệ thống đang thực thi một tác vụ khác (Luồng {self.current_flow}). Vui lòng chờ hoặc bấm 'Dừng' trước khi chạy mới.")
+        self.is_busy = True
+        self.current_flow = "C"
+        self.current_client_token = client_token
+        self.stop_requested = False
+
         from playwright.sync_api import sync_playwright
 
         def log(msg: str):
@@ -696,6 +748,7 @@ class PortalAutomationService:
         with sync_playwright() as p:
             log("🌐 Đang khởi động trình duyệt (Google Chrome / Microsoft Edge)...")
             browser = launch_native_browser(p, headless=False)
+            self._current_browser = browser
 
             storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
             context = browser.new_context(
@@ -703,6 +756,7 @@ class PortalAutomationService:
                 viewport=None,
                 accept_downloads=True
             )
+            self._current_context = context
             page = context.new_page()
             page.set_default_timeout(600000)
             page.set_default_navigation_timeout(600000)
@@ -714,6 +768,8 @@ class PortalAutomationService:
             try:
                 # 1. Đảm bảo đăng nhập
                 self._ensure_login(page, log_func=log)
+                if self.stop_requested:
+                    return {"status": "stopped", "message": "Tiến trình đã bị dừng theo yêu cầu."}
 
                 # 2. Điều hướng vào màn hình QĐ 3176
                 log("📌 Đang điều hướng đến: Kết quả gửi hồ sơ XML (/DanhSachKetQuaGuiHoSoQD130/Index)...")
@@ -817,8 +873,14 @@ class PortalAutomationService:
                 current_page_num = 1
 
                 while current_stt <= to_stt:
+                    if self.stop_requested:
+                        log("🛑 Tiến trình Luồng C đã bị dừng theo yêu cầu người dùng.")
+                        break
+
                     log(f"\n📑 Đang quét dữ liệu tại Trang {current_page_num}...")
                     self._wait_for_grid_ready(page, timeout_ms=600000, log_func=log)
+                    if self.stop_requested:
+                        break
 
                     records = self._extract_records_from_grid(page)
                     if not records:
@@ -839,6 +901,9 @@ class PortalAutomationService:
                     log(f"⚡ Sẽ tải {len(records_to_dl)} bản ghi trên trang này...")
 
                     for rec in records_to_dl:
+                        if self.stop_requested:
+                            log("🛑 Đã nhận lệnh dừng! Ngừng tải tiếp các bản ghi...")
+                            break
                         fp = self._download_direct_record(
                             page=page,
                             ma_gd=rec['maGD'],
@@ -851,8 +916,9 @@ class PortalAutomationService:
                         current_stt = rec['stt'] + 1
                         time.sleep(0.2)  # Nghỉ 200ms để server không bị nghẽn
 
-                    if current_stt > to_stt:
-                        log(f"🎉 Đã tải hoàn tất đến STT {to_stt}!")
+                    if self.stop_requested or current_stt > to_stt:
+                        if current_stt > to_stt:
+                            log(f"🎉 Đã tải hoàn tất đến STT {to_stt}!")
                         break
 
                     # Chuyển sang trang tiếp theo
@@ -868,6 +934,14 @@ class PortalAutomationService:
                     else:
                         log(f"⚠️ Không tìm thấy nút Trang {current_page_num}. Đã đến trang cuối.")
                         break
+
+                if self.stop_requested:
+                    log(f"🛑 TIẾN TRÌNH LUỒNG C ĐÃ BỊ DỪNG LẠI THEO YÊU CẦU! Đã tải {downloaded_count} gói lỗi.")
+                    return {
+                        "status": "stopped",
+                        "downloaded_count": downloaded_count,
+                        "message": f"Tiến trình đã được dừng theo yêu cầu. Đã tải {downloaded_count} gói lỗi."
+                    }
 
                 log(f"\n📦 ĐÃ TẢI XONG TỔNG CỘNG {downloaded_count} FILE HỒ SƠ LỖI.")
 
@@ -892,22 +966,42 @@ class PortalAutomationService:
                 log(f"❌ Lỗi thực thi Luồng C: {str(e)}")
                 raise e
             finally:
-                context.close()
-                browser.close()
+                self.is_busy = False
+                self.current_flow = ""
+                self.current_client_token = ""
+                self.stop_requested = False
+                self._current_browser = None
+                self._current_context = None
+                try:
+                    context.close()
+                except Exception:
+                    pass
+                try:
+                    browser.close()
+                except Exception:
+                    pass
 
     # =========================================================================
     # LUỒNG B MỚI (NATIVE BROWSER & TIMEOUT 600S)
     # =========================================================================
     def run_flow_b(
         self,
-        log_func: Optional[Callable[[str], None]] = None
+        log_func: Optional[Callable[[str], None]] = None,
+        client_token: str = ""
     ) -> Dict[str, Any]:
         """
         LUỒNG B MỚI: Tự động tải Danh sách đã gửi (listbh.xlsx) từ Cổng BHYT.
         - Chạy Chrome/Edge native trên Windows.
         - Chọn 'Đã đề nghị thanh toán', Tìm kiếm và xuất file listbh.xlsx.
-        - Timeout 600s (10 phút) để xử lý file dung lượng lớn.
+        - Timeout 1200s (20 phút) để xử lý file dung lượng lớn.
         """
+        if self.is_busy:
+            raise Exception(f"Hệ thống đang thực thi một tác vụ khác (Luồng {self.current_flow}). Vui lòng chờ hoặc bấm 'Dừng' trước khi chạy mới.")
+        self.is_busy = True
+        self.current_flow = "B"
+        self.current_client_token = client_token
+        self.stop_requested = False
+
         from playwright.sync_api import sync_playwright
 
         def log(msg: str):
@@ -919,6 +1013,7 @@ class PortalAutomationService:
         with sync_playwright() as p:
             log("🌐 Đang khởi động trình duyệt (Google Chrome / Microsoft Edge)...")
             browser = launch_native_browser(p, headless=False)
+            self._current_browser = browser
 
             storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
             context = browser.new_context(
@@ -926,6 +1021,7 @@ class PortalAutomationService:
                 viewport=None,
                 accept_downloads=True
             )
+            self._current_context = context
             page = context.new_page()
             page.set_default_timeout(1200000)
             page.set_default_navigation_timeout(1200000)
@@ -937,6 +1033,8 @@ class PortalAutomationService:
             try:
                 # 1. Đảm bảo đăng nhập
                 self._ensure_login(page, log_func=log)
+                if self.stop_requested:
+                    return {"status": "stopped", "message": "Tiến trình đã bị dừng theo yêu cầu."}
 
                 # 2. Điều hướng vào Danh sách đề nghị thanh toán
                 log("📌 Đang điều hướng đến: Danh sách đề nghị thanh toán (/DanhSachHSKCB/Index)...")
@@ -948,6 +1046,8 @@ class PortalAutomationService:
 
                 page.wait_for_selector("#gvDanhSachHoSo, #bt_TimKiem, #btnExport, #cb_TrangThaiTT", timeout=60000)
                 self._wait_for_grid_ready(page, timeout_ms=60000, log_func=log)
+                if self.stop_requested:
+                    return {"status": "stopped", "message": "Tiến trình đã bị dừng theo yêu cầu."}
 
                 # 3. Chọn Trạng thái: 'Đã đề nghị thanh toán'
                 log("🏷️ Đang chọn trạng thái: 'Đã đề nghị thanh toán'...")
@@ -986,6 +1086,8 @@ class PortalAutomationService:
 
                 log("✅ Đã chọn trạng thái 'Đã đề nghị thanh toán'!")
                 self._wait_for_grid_ready(page, timeout_ms=30000, log_func=log)
+                if self.stop_requested:
+                    return {"status": "stopped", "message": "Tiến trình đã bị dừng theo yêu cầu."}
 
                 # 4. Bấm Tìm kiếm
                 log("🔍 Bấm nút Tìm kiếm dữ liệu...")
@@ -1007,6 +1109,8 @@ class PortalAutomationService:
 
                 log("⏳ Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách đề nghị thanh toán cả tháng (tối đa 20 phút)...")
                 self._wait_for_grid_ready(page, timeout_ms=1200000, log_func=log)
+                if self.stop_requested:
+                    return {"status": "stopped", "message": "Tiến trình đã bị dừng theo yêu cầu."}
                 log("✅ Dữ liệu danh sách hồ sơ cả tháng đã nạp xong!")
 
                 # 5. Xuất Excel và tải file listbh.xlsx
@@ -1022,6 +1126,9 @@ class PortalAutomationService:
                 }""")
                 time.sleep(1.5)
 
+                if self.stop_requested:
+                    return {"status": "stopped", "message": "Tiến trình đã bị dừng theo yêu cầu."}
+
                 # Bước 5.2: Bấm nút "Xuất excel" trong Popup và nhận luồng Download với Heartbeat
                 log("⚡ Đang bấm nút 'Xuất excel' để tải file listbh.xlsx (Thời gian chờ tối đa 20 phút kèm Heartbeat)...")
                 dest_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
@@ -1031,7 +1138,7 @@ class PortalAutomationService:
 
                 def heartbeat_worker():
                     start_t = time.time()
-                    while not stop_hb.wait(10.0):
+                    while not stop_hb.wait(10.0) and not self.stop_requested:
                         elapsed = int(time.time() - start_t)
                         log(f"⏳ [Heartbeat] Đang chờ Cổng BHYT xử lý xuất file cả tháng... (Đã chờ {elapsed}s / tối đa 1200s - Kết nối bình thường)")
 
@@ -1065,6 +1172,13 @@ class PortalAutomationService:
                     except Exception:
                         pass
 
+                if self.stop_requested:
+                    log("🛑 Tiến trình Luồng B đã bị dừng lại theo yêu cầu người dùng.")
+                    return {
+                        "status": "stopped",
+                        "message": "Tiến trình đã được dừng bởi người dùng."
+                    }
+
                 log(f"✅ Tải tệp danh sách đã gửi thành công: {dest_path}")
 
                 context.storage_state(path=SESSION_FILE)
@@ -1089,8 +1203,20 @@ class PortalAutomationService:
                 log(f"❌ Lỗi thực thi Luồng B: {str(e)}")
                 raise e
             finally:
-                context.close()
-                browser.close()
+                self.is_busy = False
+                self.current_flow = ""
+                self.current_client_token = ""
+                self.stop_requested = False
+                self._current_browser = None
+                self._current_context = None
+                try:
+                    context.close()
+                except Exception:
+                    pass
+                try:
+                    browser.close()
+                except Exception:
+                    pass
 
 
 portal_service = PortalAutomationService()

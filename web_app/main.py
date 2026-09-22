@@ -17,7 +17,7 @@ from auth import (
     hash_password, verify_password, get_current_user, require_admin, SESSION_COOKIE_NAME
 )
 from services import his_service, excel_service, compare_service
-from services.portal_automation import portal_service, portal_logs, add_portal_log, captcha_mgr
+from services.portal_automation import portal_service, portal_logs, add_portal_log, captcha_mgr, get_portal_logs_since
 
 # ==========================================
 # XOR CRYPTOGRAPHY FOR HIS DB PASSWORD
@@ -1071,24 +1071,34 @@ async def upload_loi(
 @app.get("/api/automation/logs")
 def get_automation_logs(user: User = Depends(require_admin)):
     """Lấy danh sách log tiến trình tự động hóa Cổng BHYT thời gian thực (JSON)"""
-    return {"logs": portal_logs[-60:]}
+    return {"logs": [x["text"] if isinstance(x, dict) else str(x) for x in portal_logs[-60:]]}
 
 
 @app.get("/api/automation/v2/logs")
 async def stream_automation_logs(request: Request):
     """Server-Sent Events (SSE) để truyền log tiến trình thời gian thực lên giao diện web"""
     async def event_generator():
-        last_idx = 0
+        last_id = 0
         while True:
             if await request.is_disconnected():
                 break
-            if len(portal_logs) > last_idx:
-                for i in range(last_idx, len(portal_logs)):
-                    yield f"data: {portal_logs[i]}\n\n"
-                last_idx = len(portal_logs)
+            new_lines, last_id = get_portal_logs_since(last_id)
+            for line in new_lines:
+                yield f"data: {line}\n\n"
             await asyncio.sleep(0.5)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/automation/v2/stop")
+async def stop_automation_flow(
+    user: User = Depends(require_admin)
+):
+    """Dừng ngay lập tức tác vụ tự động hóa đang chạy"""
+    success = portal_service.stop_current_flow()
+    if success:
+        return {"status": "success", "message": "Đã gửi lệnh dừng tiến trình thành công"}
+    return {"status": "idle", "message": "Hiện không có tác vụ nào đang chạy"}
 
 
 @app.post("/api/automation/v2/flow-c")
@@ -1106,6 +1116,7 @@ async def run_automation_v2_flow_c(
     filter_col5 = str(data.get("filterCol5", "1")).strip()
     from_stt = int(data.get("fromSTT", 1))
     to_stt = int(data.get("toSTT", 100))
+    client_token = str(data.get("clientToken", "")).strip()
 
     portal_service.update_config(ma_cskcb=ma_cskcb, username=username, password=password)
 
@@ -1116,10 +1127,11 @@ async def run_automation_v2_flow_c(
             from_stt,
             to_stt,
             filter_col5,
-            add_portal_log
+            add_portal_log,
+            client_token
         )
         return {
-            "status": "success",
+            "status": result.get("status", "success"),
             "flow": "C",
             "downloaded_count": result.get("downloaded_count", 0),
             "summary": result.get("summary", {}),
@@ -1137,19 +1149,20 @@ async def run_automation_v2_flow_b(
     db: Session = Depends(get_db)
 ):
     """
-    Kích hoạt Luồng B Mới: Khởi chạy Chrome/Edge native tải trọn vẹn listbh.xlsx với timeout 600s.
+    Kích hoạt Luồng B Mới: Khởi chạy Chrome/Edge native tải trọn vẹn listbh.xlsx với timeout 1200s.
     """
     ma_cskcb = str(data.get("maCoSoKCB", "")).strip() or "66232"
     username = str(data.get("username", "")).strip() or "066091019320"
     password = str(data.get("password", "")).strip()
+    client_token = str(data.get("clientToken", "")).strip()
 
     portal_service.update_config(ma_cskcb=ma_cskcb, username=username, password=password)
 
     try:
         add_portal_log("--- BẮT ĐẦU LUỒNG B MỚI (TẢI listbh.xlsx) ---")
-        result = await asyncio.to_thread(portal_service.run_flow_b, add_portal_log)
+        result = await asyncio.to_thread(portal_service.run_flow_b, add_portal_log, client_token)
         return {
-            "status": "success",
+            "status": result.get("status", "success"),
             "flow": "B",
             "rows": result.get("rows", 0),
             "file_path": result.get("file_path", ""),
@@ -1220,19 +1233,29 @@ async def import_automation_to_system(
 ):
     """
     Tự động nạp file vừa tải (listbh.xlsx hoặc HoSoLoiChiTiet.xlsx) vào CSDL đối soát CHECKBHYT.
+    Khoảng ngày đối soát lấy từ fromDate, toDate hoặc mặc định từ đầu tháng đến hôm nay.
     """
-    flow = data.get("flow", "C")
-    today_str = datetime.date.today().strftime("%Y%m%d")
+    flow = str(data.get("flow", "C")).upper()
+    today = datetime.date.today()
+    first_day_of_month = today.replace(day=1)
+
+    from_date_raw = str(data.get("fromDate", "") or data.get("from_date", "")).strip()
+    to_date_raw = str(data.get("toDate", "") or data.get("to_date", "")).strip()
+
+    clean_from = from_date_raw.replace("-", "").replace("/", "") if from_date_raw else first_day_of_month.strftime("%Y%m%d")
+    clean_to = to_date_raw.replace("-", "").replace("/", "") if to_date_raw else today.strftime("%Y%m%d")
 
     try:
-        add_portal_log(f"Đang kích hoạt đối soát tự động với CSDL HIS cho ngày {today_str}...")
+        add_portal_log(f"Đang kích hoạt đối soát tự động với CSDL HIS cho khoảng ngày {clean_from} - {clean_to}...")
         include_errors = (flow == "C")
-        compare_res = compare_records(today_str, today_str, include_errors=include_errors, user=user, db=db)
-        add_portal_log("Đối soát tự động hoàn tất thành công! ✅")
+        compare_res = compare_records(clean_from, clean_to, include_errors=include_errors, user=user, db=db)
+        add_portal_log(f"Đối soát tự động hoàn tất thành công! ✅ (Tổng: {compare_res.get('total', 0)} ca, Đã gửi: {compare_res.get('sent', 0)}, Lỗi: {compare_res.get('loi', 0)}, Chưa gửi FAIL: {compare_res.get('fail', 0)})")
         return {
             "status": "success",
             "compare_result": compare_res,
-            "message": "Đã nạp file và đối soát thành công vào hệ thống!"
+            "from_date": clean_from,
+            "to_date": clean_to,
+            "message": f"Đã nạp file và đối soát thành công CSDL từ {clean_from} đến {clean_to}!"
         }
     except Exception as e:
         add_portal_log(f"Lỗi khi đối soát tự động: {str(e)}")
@@ -1243,33 +1266,48 @@ async def import_automation_to_system(
 async def upload_and_reconcile_from_tool(
     file: UploadFile = File(...),
     flow: str = Form("C"),
+    fromDate: Optional[str] = Form(None),
+    toDate: Optional[str] = Form(None),
+    from_date: Optional[str] = Form(None),
+    to_date: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """
     Nhận file tải về từ tool local runner (listbh.xlsx hoặc HoSoLoiChiTiet.xlsx),
-    lưu vào thư mục uploaded_files và tự động kích hoạt đối soát với CSDL HIS.
+    lưu vào thư mục uploaded_files và tự động kích hoạt đối soát với CSDL HIS theo khoảng ngày chỉ định.
     """
     from services.portal_automation import UPLOAD_DIR
-    target_filename = "listbh.xlsx" if flow.upper() == "B" else "HoSoLoiChiTiet.xlsx"
+    flow_upper = flow.upper()
+    target_filename = "listbh.xlsx" if flow_upper == "B" else "HoSoLoiChiTiet.xlsx"
     dest_path = os.path.join(UPLOAD_DIR, target_filename)
 
     content = await file.read()
     with open(dest_path, "wb") as f:
         f.write(content)
 
-    today_str = datetime.date.today().strftime("%Y%m%d")
+    today = datetime.date.today()
+    first_day_of_month = today.replace(day=1)
+
+    from_raw = (fromDate or from_date or "").strip()
+    to_raw = (toDate or to_date or "").strip()
+
+    clean_from = from_raw.replace("-", "").replace("/", "") if from_raw else first_day_of_month.strftime("%Y%m%d")
+    clean_to = to_raw.replace("-", "").replace("/", "") if to_raw else today.strftime("%Y%m%d")
+
     admin_user = db.query(User).filter(User.role == "admin").first()
     if not admin_user:
         admin_user = db.query(User).first()
 
-    include_errors = (flow.upper() == "C")
-    compare_res = compare_records(today_str, today_str, include_errors=include_errors, user=admin_user, db=db)
+    include_errors = (flow_upper == "C")
+    compare_res = compare_records(clean_from, clean_to, include_errors=include_errors, user=admin_user, db=db)
     return {
         "status": "success",
         "flow": flow,
         "filename": target_filename,
+        "from_date": clean_from,
+        "to_date": clean_to,
         "compare_result": compare_res,
-        "message": f"Đã nhận file {target_filename} và hoàn tất đối soát CSDL!"
+        "message": f"Đã nhận file {target_filename} và hoàn tất đối soát CSDL từ {clean_from} đến {clean_to}!"
     }
 
 

@@ -39,15 +39,48 @@ os.makedirs(TEMPLATES_DIR, exist_ok=True)
 SESSION_FILE = os.path.join(SESSION_DIR, "portal_storage_state.json")
 CONFIG_FILE = os.path.join(BASE_DIR, "tool_config.json")
 
-logs: List[str] = []
+_log_lock = threading.Lock()
+_log_seq = 0
+logs: List[Dict[str, Any]] = []
+
+stop_requested: bool = False
+active_browser = None
+active_context = None
 
 def add_log(msg: str):
+    global _log_seq
     ts = datetime.datetime.now().strftime("%H:%M:%S")
     entry = f"[{ts}] {msg}"
-    logs.append(entry)
-    if len(logs) > 400:
-        logs.pop(0)
+    with _log_lock:
+        _log_seq += 1
+        logs.append({"id": _log_seq, "text": entry})
+        if len(logs) > 500:
+            logs.pop(0)
     print(f"[*] {entry}")
+
+def get_logs_since(last_id: int = 0) -> List[Dict[str, Any]]:
+    with _log_lock:
+        if last_id <= 0:
+            return list(logs[-200:])
+        return [item for item in logs if item["id"] > last_id]
+
+def stop_current_flow() -> bool:
+    global stop_requested, active_browser, active_context
+    if not is_busy:
+        return False
+    stop_requested = True
+    add_log("🛑 Người dùng đã yêu cầu DỪNG tiến trình đang chạy!")
+    try:
+        if active_context:
+            active_context.close()
+    except Exception:
+        pass
+    try:
+        if active_browser:
+            active_browser.close()
+    except Exception:
+        pass
+    return True
 
 def load_config() -> dict:
     if os.path.exists(CONFIG_FILE):
@@ -261,6 +294,8 @@ def ensure_login(page, base_url: str, ma_cskcb: str, username: str, password: st
             add_log("👉 ĐÃ CHỤP ẢNH CAPTCHA VÀ GỬI VỀ MÀN HÌNH MÁY TRẠM. Vui lòng gõ mã trên Popup hiển thị...")
 
             while time.time() - start_wait < 180:
+                if stop_requested:
+                    raise Exception("Tiến trình đã bị dừng bởi người dùng.")
                 # Kiểm tra yêu cầu đổi mã Captcha từ máy trạm
                 if captcha_mgr.refresh_event.is_set():
                     captcha_mgr.refresh_event.clear()
@@ -356,6 +391,8 @@ def wait_for_grid_ready(page, timeout_ms: int = 600000):
     last_report = start_time
 
     while (time.time() - start_time) * 1000 < timeout_ms:
+        if stop_requested:
+            raise Exception("Tiến trình đã bị dừng bởi người dùng.")
         is_busy = False
         try:
             is_busy = page.evaluate("""() => {
@@ -562,9 +599,13 @@ def run_flow_c(params: dict) -> dict:
         except Exception: pass
 
     with sync_playwright() as p:
+        global active_browser, active_context, stop_requested
+        stop_requested = False
         browser = launch_native_browser(p, headless=False)
+        active_browser = browser
         storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
         context = browser.new_context(storage_state=storage_path, viewport=None, accept_downloads=True)
+        active_context = context
         page = context.new_page()
         page.set_default_timeout(600000)
         page.set_default_navigation_timeout(600000)
@@ -574,6 +615,7 @@ def run_flow_c(params: dict) -> dict:
         try:
             # 1. Đăng nhập
             ensure_login(page, base_url, ma_cskcb, username, password)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             # 2. Vào màn hình QĐ 3176
             add_log("📌 Điều hướng đến: Kết quả gửi hồ sơ XML (/DanhSachKetQuaGuiHoSoQD130/Index)...")
@@ -594,6 +636,7 @@ def run_flow_c(params: dict) -> dict:
 
             page.wait_for_selector("#roundPanel, #gvDSKetQuaGuiHoso", timeout=90000)
             wait_for_grid_ready(page, timeout_ms=90000)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             # 3. Chọn ngày = Today
             add_log("📅 Đặt ngày tìm kiếm: Chọn ngày 'Today'...")
@@ -615,6 +658,7 @@ def run_flow_c(params: dict) -> dict:
                 page.evaluate("if (window.btnTimKiem && typeof window.btnTimKiem.DoClick === 'function') window.btnTimKiem.DoClick();")
 
             wait_for_grid_ready(page, timeout_ms=600000)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
             add_log("✅ Bảng dữ liệu đã nạp xong!")
 
             # 4. Lọc Cột 5 = 1
@@ -628,6 +672,7 @@ def run_flow_c(params: dict) -> dict:
                 else:
                     page.evaluate(f"if (window.gvDSKetQuaGuiHoso) window.gvDSKetQuaGuiHoso.AutoFilterByColumn(5, '{filter_col5}');")
                 wait_for_grid_ready(page, timeout_ms=600000)
+                if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
                 add_log("✅ Lọc Cột 5 hoàn tất!")
 
             # 5. Page size = 100
@@ -642,6 +687,7 @@ def run_flow_c(params: dict) -> dict:
                     add_log("✅ Đã chọn 100 dòng/trang!")
             except Exception:
                 pass
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             # 6. Sắp xếp Thời gian (2 lần click để mới nhất lên đầu)
             add_log("⏱️ Sắp xếp cột 'Thời gian' (2 lần click)...")
@@ -656,6 +702,7 @@ def run_flow_c(params: dict) -> dict:
                     add_log("✅ Sắp xếp thời gian hoàn tất!")
             except Exception as s_err:
                 add_log(f"Lưu ý sắp xếp: {s_err}")
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             # 7. Quét và tải dải STT bằng Direct URL
             add_log(f"🎯 BẮT ĐẦU TẢI CÁC HỒ SƠ TỪ STT {from_stt} ĐẾN {to_stt} (DIRECT URL)...")
@@ -664,6 +711,7 @@ def run_flow_c(params: dict) -> dict:
             current_page_num = 1
 
             while current_stt <= to_stt:
+                if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
                 add_log(f"\n📑 Đang quét Trang {current_page_num}...")
                 wait_for_grid_ready(page, timeout_ms=600000)
 
@@ -683,6 +731,7 @@ def run_flow_c(params: dict) -> dict:
                     ]
 
                 for rec in records_to_dl:
+                    if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
                     fp = download_direct_record(page, rec['maGD'], rec['stt'], DOWNLOADS_DIR)
                     if fp: downloaded_count += 1
                     current_stt = rec['stt'] + 1
@@ -722,8 +771,12 @@ def run_flow_c(params: dict) -> dict:
             }
 
         finally:
-            context.close()
-            browser.close()
+            try: context.close()
+            except Exception: pass
+            try: browser.close()
+            except Exception: pass
+            active_browser = None
+            active_context = None
 
 # =========================================================================
 # LUỒNG B - TẢI DANH SÁCH ĐÃ GỬI (CẢ THÁNG, TIMEOUT 20 PHÚT, HEARTBEAT 10S)
@@ -739,9 +792,13 @@ def run_flow_b(params: dict) -> dict:
     add_log("🚀 KHỞI ĐỘNG LUỒNG B (TẢI TOÀN BỘ DANH SÁCH ĐÃ GỬI CẢ THÁNG)...")
 
     with sync_playwright() as p:
+        global active_browser, active_context, stop_requested
+        stop_requested = False
         browser = launch_native_browser(p, headless=False)
+        active_browser = browser
         storage_path = SESSION_FILE if os.path.exists(SESSION_FILE) else None
         context = browser.new_context(storage_state=storage_path, viewport=None, accept_downloads=True)
+        active_context = context
         page = context.new_page()
         page.set_default_timeout(1200000)
         page.set_default_navigation_timeout(1200000)
@@ -751,6 +808,7 @@ def run_flow_b(params: dict) -> dict:
         try:
             # 1. Đăng nhập
             ensure_login(page, base_url, ma_cskcb, username, password)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             # 2. Vào Danh sách hồ sơ KCB
             add_log("📌 Điều hướng đến: Danh sách đề nghị thanh toán (/DanhSachHSKCB/Index)...")
@@ -759,6 +817,7 @@ def run_flow_b(params: dict) -> dict:
 
             page.wait_for_selector("#gvDanhSachHoSo, #bt_TimKiem, #btnExport, #cb_TrangThaiTT", timeout=60000)
             wait_for_grid_ready(page, timeout_ms=60000)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             # 3. Chọn Trạng thái: 'Đã đề nghị thanh toán'
             add_log("🏷️ Đang chọn trạng thái: 'Đã đề nghị thanh toán'...")
@@ -797,6 +856,7 @@ def run_flow_b(params: dict) -> dict:
 
             add_log("✅ Đã chọn trạng thái 'Đã đề nghị thanh toán'!")
             wait_for_grid_ready(page, timeout_ms=30000)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             # 4. Bấm Tìm kiếm (Không lọc ngày -> Tải toàn bộ cả tháng)
             add_log("🔍 Bấm nút Tìm kiếm (Tải toàn bộ hồ sơ cả tháng)...")
@@ -817,6 +877,7 @@ def run_flow_b(params: dict) -> dict:
 
             add_log("⏳ Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách cả tháng (tối đa 20 phút)...")
             wait_for_grid_ready(page, timeout_ms=1200000)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
             add_log("✅ Danh sách hồ sơ cả tháng đã nạp xong!")
 
             # 5. Xuất Excel
@@ -829,6 +890,7 @@ def run_flow_b(params: dict) -> dict:
                 } catch(e) {}
             }""")
             time.sleep(1.5)
+            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
             add_log("⚡ Đang bấm nút 'Xuất excel' để tải file listbh.xlsx (Thời gian chờ tối đa 20 phút kèm Heartbeat)...")
             dest_path = os.path.join(OUTPUT_DIR, "listbh.xlsx")
@@ -837,6 +899,8 @@ def run_flow_b(params: dict) -> dict:
             def heartbeat_worker():
                 start_t = time.time()
                 while not stop_hb.wait(10.0):
+                    if stop_requested:
+                        break
                     elapsed = int(time.time() - start_t)
                     add_log(f"⏳ [Heartbeat] Đang chờ Cổng BHYT xuất file cả tháng... (Đã chờ {elapsed}s / tối đa 1200s - Kết nối mạng ổn định)")
 
@@ -886,8 +950,12 @@ def run_flow_b(params: dict) -> dict:
             }
 
         finally:
-            context.close()
-            browser.close()
+            try: context.close()
+            except Exception: pass
+            try: browser.close()
+            except Exception: pass
+            active_browser = None
+            active_context = None
 
 # =========================================================================
 # FASTAPI LOCAL SERVER
@@ -924,18 +992,25 @@ def save_current_config(cfg: dict):
 @app.get("/api/logs")
 async def get_logs_stream(request: Request):
     async def event_generator():
-        last_idx = 0
+        last_id = 0
         while True:
             if await request.is_disconnected():
                 break
-            if len(logs) > last_idx:
-                for i in range(last_idx, len(logs)):
-                    yield f"data: {logs[i]}\n\n"
-                last_idx = len(logs)
+            new_items = get_logs_since(last_id)
+            if new_items:
+                for it in new_items:
+                    yield f"data: {it['text']}\n\n"
+                    last_id = max(last_id, it["id"])
             import asyncio
             await asyncio.sleep(0.5)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.post("/api/stop")
+async def handle_stop():
+    stopped = stop_current_flow()
+    return {"status": "success", "stopped": stopped, "message": "Đã gửi lệnh dừng tiến trình."}
+
 
 @app.post("/api/flow-c")
 async def handle_flow_c(data: dict):
@@ -1016,6 +1091,8 @@ async def handle_push_to_server(data: dict):
     """Gửi tệp đã tải lên máy chủ CHECKBHYT và kích hoạt đối soát tự động"""
     server_url = str(data.get("server_url", "")).strip().rstrip("/")
     flow = str(data.get("flow", "C")).upper()
+    from_date = str(data.get("fromDate", "") or data.get("from_date", "")).strip()
+    to_date = str(data.get("toDate", "") or data.get("to_date", "")).strip()
 
     if not server_url:
         server_url = "http://127.0.0.1:8000"
@@ -1026,14 +1103,20 @@ async def handle_push_to_server(data: dict):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail=f"Không tìm thấy tệp {target_filename} để gửi. Hãy chạy tải trước.")
 
-    add_log(f"📤 Đang gửi tệp {target_filename} lên máy chủ CHECKBHYT ({server_url})...")
+    date_hint = f" (Đối soát CSDL: {from_date} đến {to_date})" if from_date and to_date else ""
+    add_log(f"📤 Đang gửi tệp {target_filename} lên máy chủ CHECKBHYT ({server_url}){date_hint}...")
 
     upload_endpoint = f"{server_url}/api/automation/v2/upload-and-reconcile"
 
     def do_upload():
         with open(file_path, "rb") as f:
             files = {"file": (target_filename, f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-            resp = requests.post(upload_endpoint, files=files, data={"flow": flow}, timeout=120)
+            form_payload = {
+                "flow": flow,
+                "fromDate": from_date,
+                "toDate": to_date
+            }
+            resp = requests.post(upload_endpoint, files=files, data=form_payload, timeout=120)
             return resp
 
     try:

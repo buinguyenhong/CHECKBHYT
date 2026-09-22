@@ -56,6 +56,79 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-22 10:45 - Antigravity (Đồng Bộ Khoảng Ngày Đối Soát CSDL SQL HIS & Tái Cấu Trúc Cấu Hình Dùng Chung Cho Luồng B & C)
+
+### Mục tiêu
+- Thống nhất các thông tin đăng nhập Cổng BHYT (Mã cơ sở, CCCD/Tài khoản, Mật khẩu) thành một cụm cấu hình dùng chung đặt trước 2 tab Luồng B và C, tránh nhập lặp lại.
+- Bổ sung ô chọn Khoảng ngày đối soát (Từ ngày - Đến ngày) dùng chung cho cả 2 luồng, mặc định từ ngày đầu tháng đến ngày hôm nay (kèm nút nhanh Hôm nay / Tháng này).
+- Thay thế triệt để logic ghim cứng ngày `Today -> Today` cũ trong các API đối soát sau khi tải, đảm bảo dữ liệu file tải về (`listbh.xlsx` cả tháng hoặc `HoSoLoiChiTiet.xlsx`) được so khớp chính xác với Stored Procedure SQL Server HIS theo đúng khoảng ngày người dùng chọn, đồng nhất 100% với logic đối soát truyền thống trên trang IT Admin.
+- Tách bạch rõ ràng 2 bước: Bước 1 (Tải dữ liệu từ Cổng BHYT) và Bước 2 (Nạp & Đối soát với CSDL SQL HIS).
+
+### Thay đổi
+- **`web_app/main.py`:**
+  - `POST /api/automation/v2/import-to-system`: Tiếp nhận `fromDate` và `toDate` từ request payload. Xử lý chuẩn hóa định dạng và gọi `compare_records(clean_from, clean_to, include_errors=include_errors, user=user, db=db)`.
+  - `POST /api/automation/v2/upload-and-reconcile`: Tiếp nhận `fromDate` và `toDate` từ form payload của tool máy trạm và kích hoạt đối soát đúng khoảng ngày.
+- **`web_app/templates/portal_automation.html`:**
+  - Bổ sung Card "Cấu hình Dùng Chung (Tài khoản Cổng BHYT & Khoảng ngày Đối soát CSDL)" đặt phía trên các tab luồng.
+  - Tinh gọn Tab Luồng C và Luồng B, chỉ giữ lại các tham số riêng biệt (Luồng C: Cột 5 = 1, Dải STT 1-100; Luồng B: Tải cả tháng).
+  - Thêm các hàm JS `initDateRanges()` và `setDateRange(type)` thiết lập ngày mặc định (Đầu tháng -> Hôm nay).
+  - Cập nhật `startFlowC()` và `startFlowB()` đọc tài khoản BHYT dùng chung; cập nhật `importToReconciliation()` truyền chính xác `fromDate` và `toDate` vào API đối soát CSDL.
+- **`portal_downloader/downloader_server.py`:**
+  - Endpoint `POST /api/push-to-server`: Tiếp nhận `fromDate` và `toDate`, đóng gói vào form payload gửi lên máy chủ CHECKBHYT.
+- **`portal_downloader/templates/index.html`:**
+  - Đồng bộ thiết kế cụm cấu hình chung (Tài khoản BHYT + Khoảng ngày đối soát SQL HIS) tương tự như trên web server.
+  - Cập nhật `pushFileToServer()` gửi kèm `fromDate` và `toDate` lên máy chủ khi người dùng kích hoạt đối soát.
+
+### Nghiệp vụ ảnh hưởng
+- Giữ nguyên 100% logic tự động hóa tải Cổng BHYT (Direct URL Luồng C, Tải cả tháng Luồng B).
+- Đối soát tự động sau khi tải giờ đây hoàn toàn tuân thủ theo đúng khoảng ngày được chọn, giúp Luồng B đối soát đầy đủ dữ liệu cả tháng với SQL HIS và Luồng C đối soát chính xác theo dải ngày ra viện của bệnh nhân.
+
+### Kiểm tra
+- Chạy kiểm tra cú pháp: `python -m py_compile web_app/main.py web_app/services/portal_automation.py portal_downloader/downloader_server.py` -> Kết quả biên dịch 100% thành công không lỗi (exit code 0).
+
+## 2026-09-22 10:20 - Antigravity (Khắc Phục Sự Cố Đa Phiên Luồng B/C: Phân Luồng Captcha Trạm, Monotonic Sequence SSE Log, Chống Vỡ Giao Diện & Bổ Sung Nút Dừng Khẩn Cấp)
+
+### Mục tiêu
+- Xử lý triệt để 4 vấn đề trên Luồng B (Tải danh sách đã gửi cả tháng) và Luồng C (Tải hồ sơ lỗi QĐ 3176 Direct URL):
+  1. Khi nhiều máy trạm trong mạng LAN cùng kết nối hoặc mở tab, bấm chạy Luồng B/C ở một máy thì popup Modal Captcha lại nhảy lên ở các máy khác.
+  2. Log SSE thời gian thực bị ngắt/cụt sau khi đạt giới hạn bộ đệm (do cơ chế `pop(0)` làm lệch index `len(logs)` với `last_idx` của client).
+  3. Chuỗi Base64 ảnh Captcha dài không có khoảng trắng làm phình to ngang khung log (flex-item) gây vỡ bố cục giao diện.
+  4. Người dùng không thể can thiệp hủy/dừng tiến trình Playwright khi đang chạy hoặc khi bị treo/chờ quá lâu.
+
+### Thay đổi
+- **`web_app/services/portal_automation.py`:**
+  - Chuyển `portal_logs` sang mảng đối tượng `{"id": seq, "text": entry}` được cấp `_portal_log_seq` tăng dần duy nhất (monotonic) bảo vệ bởi `threading.Lock()`. Thêm hàm `get_portal_logs_since(last_id)`.
+  - Bổ sung trường quản lý phiên: `is_busy`, `current_flow`, `current_client_token`, `stop_requested`, `_current_browser`, `_current_context` và hàm `stop_current_flow()`.
+  - Đính kèm `client_token` vào sự kiện phát Captcha SSE: `[CAPTCHA_REQUIRED:client_token]` và `[CAPTCHA_SUCCESS:client_token]`.
+  - Đặt các chốt kiểm tra `if self.stop_requested:` xuyên suốt `_ensure_login`, `_wait_for_grid_ready`, vòng lặp phân trang / tải từng hồ sơ của Luồng C và vòng lặp chờ xuất / Heartbeat của Luồng B; dọn dẹp an toàn context/browser trong `finally:`.
+- **`web_app/main.py`:**
+  - Cập nhật endpoint SSE `/api/automation/v2/logs` dùng `get_portal_logs_since(last_id)`.
+  - Tiếp nhận `clientToken` trong payload của `POST /api/automation/v2/flow-c` và `POST /api/automation/v2/flow-b`.
+  - Thêm endpoint `POST /api/automation/v2/stop` để dừng luồng khẩn cấp.
+- **`web_app/templates/portal_automation.html`:**
+  - CSS: Thêm `min-width: 0;` cho `.card`, `.main-layout`, `.log-container`, `.log-box`. Thêm `word-break: break-all; overflow-wrap: anywhere; overflow-x: hidden;` cho `.log-box`. Thêm class `.btn-danger`.
+  - HTML: Bổ sung các nút dừng `btnStopFlowC`, `btnStopFlowB`, và `btnStopFlowHeader`.
+  - JS: Tự động sinh `myClientToken` duy nhất cho mỗi tab client. Chỉ mở Modal Captcha khi `targetToken === myClientToken`. Lọc bỏ chuỗi Base64 dài trong hàm `appendLog` bằng placeholder ngắn gọn. Thêm hàm `setRunningState(isRunning)` và `stopCurrentFlow()`.
+- **`portal_downloader/downloader_server.py`:**
+  - Nâng cấp mảng `logs` có bộ đếm monotonic id `_log_seq` có khóa luồng và hàm `get_logs_since(last_id)`.
+  - Thêm cờ `stop_requested`, `active_browser`, `active_context` và hàm `stop_current_flow()`.
+  - Bổ sung chốt kiểm tra dừng trong `ensure_login`, `wait_for_grid_ready`, `run_flow_c`, `run_flow_b` và dọn dẹp browser trong `finally:`.
+  - Cập nhật endpoint `/api/logs` theo ID log và thêm endpoint `POST /api/stop`.
+- **`portal_downloader/templates/index.html`:**
+  - CSS: Chống vỡ layout với `min-width: 0;`, `word-break: break-all;`, `overflow-wrap: anywhere;`, bổ sung `.btn-danger`.
+  - HTML: Thêm các nút dừng `btnStopFlowC`, `btnStopFlowB`, và `btnStopHeader`.
+  - JS: Thêm hàm `setRunningState(isRunning, mode)` và `stopCurrentFlow()`, lọc chuỗi Base64 trong `appendLog`.
+
+### Nghiệp vụ ảnh hưởng
+- Không làm thay đổi logic đối soát CSDL, các quy tắc tìm kiếm (ngày Today, cột Lỗi = 1, dải STT Direct URL, tải danh sách cả tháng).
+- Đảm bảo tính độc lập và chính xác của giao diện tương tác giữa các máy trạm trong mạng nội bộ.
+
+### Kiểm tra
+- Chạy kiểm tra cú pháp: `python -m py_compile web_app/main.py web_app/services/portal_automation.py portal_downloader/downloader_server.py` -> Kết quả biên dịch 100% thành công không lỗi (exit code 0).
+
+### Lưu ý cho phiên sau
+- Khi triển khai môi trường nhiều máy trạm chạy đồng thời, khuyến nghị các máy trạm nên dùng công cụ trực tiếp `portal_downloader` chạy trên máy của mình để tải cục bộ, sau đó bấm nút đẩy lên máy chủ đối soát để tránh tranh chấp Playwright browser trên server trung tâm.
+
 ## 2026-09-21 10:00 - Antigravity (Tối Ưu Hiệu Năng Toàn Diện: Phân Trang Frontend, Index CSDL và Tra Cứu Danh Mục O(1))
 
 ### Mục tiêu

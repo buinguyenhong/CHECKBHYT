@@ -83,7 +83,7 @@ File quan trọng:
 - `web_app/services/his_service.py`: kết nối SQL HIS, cache, chuẩn hóa SQL, sinh reset SQL.
 - `web_app/services/excel_service.py`: đọc `listbh.xlsx`, `HoSoLoiChiTiet.xlsx`.
 - `web_app/services/compare_service.py`: logic đối soát và lưu trạng thái.
-- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT thế hệ mới (Native Chrome/Edge, tích hợp Auto-OCR ddddocr tự động giải Captcha + Cầu nối chụp ảnh Captcha gửi SSE về giao diện Web máy trạm để nhập từ xa, Direct URL Download `ExportExcelKPG_New?maGd=...` cho Luồng C, Luồng B tải cả tháng với timeout 1200s kèm Heartbeat định kỳ 10s, khử trùng dữ liệu tự động).
+- `web_app/services/portal_automation.py`: module Playwright RPA tự động hóa Cổng BHYT thế hệ mới (Native Chrome/Edge, Auto-OCR + Cầu nối Captcha phân luồng token về máy trạm, Monotonic Log SSE, nút Dừng luồng khẩn cấp, Luồng C Direct URL, Luồng B cả tháng timeout 1200s kèm Heartbeat).
 - `portal_downloader/`: bộ công cụ tải & gộp hồ sơ BHYT chạy trực tiếp tại chỗ trên máy đang thao tác (`downloader_server.py`, `Chay_Tool_Tai_BHYT.bat`, `templates/index.html`), hỗ trợ Auto-OCR và Popup xác thực Captcha trực tiếp, bật trình duyệt trước mặt người dùng và 1-click gửi file lên Máy chủ CHECKBHYT để đối soát CSDL.
 - `Chay_Tool_Tai_BHYT.bat`: tệp thực thi 1-click tại thư mục gốc khởi động nhanh công cụ tải dữ liệu BHYT cục bộ.
 - `client_runner/`: bộ công cụ RPA Runner chạy trên máy trạm (`client_agent.py`, `Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
@@ -92,7 +92,7 @@ File quan trọng:
   - `rule_engine.py`: Chứa 26 quy tắc nghiệp vụ BHYT kiểm tra lỗi.
   - `report_generator.py`: Sinh báo cáo tổng hợp lỗi Excel và JSON kết quả.
 - `web_app/templates/admin.html`: giao diện phòng IT (Đối soát HIS/BHYT, Quản lý tài khoản khoa, Tab kiểm tra XML BHYT, card liên kết tới Trung tâm Tự động hóa Cổng BHYT).
-- `web_app/templates/portal_automation.html`: màn hình chuyên biệt độc lập (`/portal-automation`) phục vụ vận hành Luồng B & Luồng C thế hệ mới với Live-Streaming Log SSE, tải file và nạp CSDL đối soát 1-click.
+- `web_app/templates/portal_automation.html`: màn hình chuyên biệt độc lập (`/portal-automation`) phục vụ vận hành Luồng B & Luồng C thế hệ mới với Live-Streaming Log SSE, phân luồng Captcha theo client token, nút Dừng khẩn cấp, cụm cấu hình dùng chung tài khoản BHYT và ô chọn Khoảng ngày (Từ ngày - Đến ngày) để đối soát CSDL SQL HIS linh hoạt 1-click.
 - `web_app/templates/department.html`: giao diện khoa lâm sàng.
 - `web_app/templates/login.html`: đăng nhập.
 
