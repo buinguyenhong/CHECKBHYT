@@ -1799,7 +1799,7 @@
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px;">
             <button class="btn" onclick="closeHisUnlockModal()">Đóng</button>
-            <button class="btn btn-success" style="font-weight:bold;" onclick="copyHisUnlockSql()">Copy câu lệnh SQL</button>
+            <button id="btnCopyHisUnlock" class="btn btn-success" style="font-weight:bold;" onclick="copyHisUnlockSql()">Copy câu lệnh SQL</button>
         </div>
     </div>
 </div>
@@ -2148,15 +2148,29 @@
         logToConsole("Đang xóa toàn bộ Cache SQL Server...");
         try {
             const res = await fetch('/api/config/clear-cache', { method: 'POST' });
-            if (res.ok) {
-                logToConsole("Đã xóa sạch Cache SQL Server thành công! ✅");
-                alert("Đã xóa sạch Cache SQL Server thành công!");
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                const msg = data.message || "Đã xóa sạch Cache SQL Server thành công!";
+                logToConsole(`${msg} ✅`);
+                
+                // Làm sạch bảng dữ liệu SQL ở Tab 2
+                const tbody = document.getElementById('sqlDataBody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">' +
+                        'Đã xóa sạch toàn bộ Cache SQL Server. Vui lòng bấm <b>Tải lại dữ liệu</b> để truy vấn trực tiếp từ CSDL HIS.' +
+                        '</td></tr>';
+                }
+                const totalCountEl = document.getElementById('sql_total_count');
+                if (totalCountEl) totalCountEl.innerText = '0';
+                
+                showAdminToast(msg, "success", 2500);
             } else {
-                logToConsole("Lỗi khi xóa Cache SQL Server.");
-                alert("Xóa cache thất bại.");
+                logToConsole("Lỗi khi xóa Cache SQL Server: " + (data.detail || ""));
+                showAdminToast("Xóa cache thất bại: " + (data.detail || ""), "error", 2500);
             }
-        } catch {
-            logToConsole("Lỗi kết nối máy chủ để xóa cache.");
+        } catch (err) {
+            logToConsole("Lỗi kết nối máy chủ để xóa cache: " + err);
+            showAdminToast("Lỗi kết nối máy chủ để xóa cache.", "error", 2500);
         }
     }
 
@@ -3455,8 +3469,7 @@
 
     // Bulk Reset from Fail List
     async function resetSelectedFail(loai) {
-        if (!confirm(`Sinh SQL reset cho TOÀN BỘ ca FAIL đang chờ reset (${loai})? Sau bước này ca bệnh sẽ ở trạng thái chờ hệ thống gửi XML lại, chưa được đánh dấu hoàn tất.`)) return;
-
+        // Mở trực tiếp khung chứa script SQL, không hỏi confirm phiền toái
         try {
             const fromDate = document.getElementById('sync_from')?.value || '';
             const toDate = document.getElementById('sync_to')?.value || '';
@@ -3475,15 +3488,15 @@
                 if (data.rowcount > 0) {
                     openHisUnlockModal(data.sql_command, `Reset cờ xuất hàng loạt ca FAIL (${loai})`);
                 } else {
-                    alert("Không có ca FAIL nào đang chờ reset.");
+                    showAdminToast("Không có ca FAIL nào đang chờ reset.", "warning", 2000);
                 }
                 fetchFailRecords();
                 updateGlobalKPIs();
             } else {
-                alert(`Thất bại: ${data.detail || 'Lỗi chạy SQL reset'}`);
+                showAdminToast(`Thất bại: ${data.detail || 'Lỗi chạy SQL reset'}`, "error", 2500);
             }
         } catch {
-            alert("Lỗi kết nối.");
+            showAdminToast("Lỗi kết nối máy chủ.", "error", 2000);
         }
     }
 
@@ -3523,6 +3536,56 @@
         });
     }
 
+    // Toast Notification System (Tự động tắt sau thời gian chỉ định, mặc định 2s)
+    function showAdminToast(msg, type = 'success', duration = 2000) {
+        let toast = document.getElementById('globalAdminToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'globalAdminToast';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '30px';
+            toast.style.right = '30px';
+            toast.style.zIndex = '99999';
+            toast.style.padding = '12px 20px';
+            toast.style.borderRadius = '8px';
+            toast.style.fontSize = '14px';
+            toast.style.fontWeight = '600';
+            toast.style.boxShadow = '0 8px 24px rgba(0,0,0,0.35)';
+            toast.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+            toast.style.display = 'flex';
+            toast.style.alignItems = 'center';
+            toast.style.gap = '10px';
+            toast.style.pointerEvents = 'none';
+            document.body.appendChild(toast);
+        }
+        
+        if (type === 'success') {
+            toast.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            toast.style.color = '#ffffff';
+            toast.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            toast.innerHTML = `<span style="font-size:18px;">✓</span> <span>${msg}</span>`;
+        } else if (type === 'warning') {
+            toast.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+            toast.style.color = '#ffffff';
+            toast.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+            toast.innerHTML = `<span style="font-size:18px;">⚠️</span> <span>${msg}</span>`;
+        } else {
+            toast.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            toast.style.color = '#ffffff';
+            toast.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            toast.innerHTML = `<span style="font-size:18px;">✕</span> <span>${msg}</span>`;
+        }
+        
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0) scale(1)';
+        
+        if (window._toastTimer) clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(15px) scale(0.95)';
+        }, duration);
+    }
+
     // Helper functions for hisUnlockModal
     function openHisUnlockModal(sql, title) {
         document.getElementById('hisUnlockModalTitle').innerText = title || "Mở khóa bệnh án / Reset HIS";
@@ -3544,9 +3607,19 @@
     function copyHisUnlockSql() {
         const sql = document.getElementById('hisUnlockSqlText').value;
         copyTextToClipboard(sql).then(() => {
-            alert("Đã copy câu lệnh SQL thành công!");
+            showAdminToast("Đã copy câu lệnh SQL thành công! ✓", "success", 2000);
+            const btn = document.getElementById('btnCopyHisUnlock');
+            if (btn) {
+                const oldText = btn.innerHTML;
+                btn.innerHTML = "Đã copy! ✓";
+                btn.style.background = "#059669";
+                setTimeout(() => {
+                    btn.innerHTML = oldText;
+                    btn.style.background = "";
+                }, 2000);
+            }
         }).catch(err => {
-            alert("Lỗi copy: " + err);
+            showAdminToast("Lỗi copy: " + err, "error", 2000);
         });
     }
 

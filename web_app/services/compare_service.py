@@ -123,8 +123,11 @@ def deduplicate_database_records(db: Session):
                 
                 keep_rec = rec_list[0]
                 for dup_rec in rec_list[1:]:
-                    if dup_rec.note and not keep_rec.note:
-                        keep_rec.note = dup_rec.note
+                    if dup_rec.note:
+                        if not keep_rec.note:
+                            keep_rec.note = dup_rec.note
+                        elif dup_rec.note not in keep_rec.note:
+                            keep_rec.note = f"{keep_rec.note} | {dup_rec.note}".strip(" | ")
                     db.delete(dup_rec)
                     deleted_count += 1
             else:
@@ -359,7 +362,10 @@ def process_comparison(
                     existing_record.tien_bhyt = tien_bhyt
                     existing_record.ngay_doi_soat = ngay_doi_soat
                     if note_val:
-                        existing_record.note = note_val
+                        if existing_record.note and note_val not in existing_record.note:
+                            existing_record.note = f"{existing_record.note} | {note_val}".strip(" | ")
+                        elif not existing_record.note:
+                            existing_record.note = note_val
                     
                     # Nếu ca FAIL này trước đó đã gửi thành công nay bị mở lại
                     if existing_record.status == "RESOLVED":

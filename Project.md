@@ -413,7 +413,7 @@ Nếu `MA_LK` không có trong `listbh` và không có trong file lỗi:
 
 - Tạo/cập nhật record nhóm `FAIL`.
 - Trạng thái mặc định `PENDING`.
-- Nhóm này dành cho IT xử lý/reset.
+- Nhóm này dành cho IT xử lý/reset. Toàn bộ ghi chú cũ của người dùng (kèm thông tin sửa lỗi từ đợt trước nếu có) được nối chuỗi bảo toàn tuyệt đối, không bao giờ bị ghi đè.
 
 Nếu `MA_LK` không có trong `listbh` nhưng có trong file lỗi:
 
@@ -453,7 +453,7 @@ Danh sách FAIL:
 
 - `GET /api/records/admin/fail`
 - IT xem các ca `FAIL` chưa `RESOLVED`.
-- Có thể sinh SQL reset hàng loạt theo loại ca qua `POST /api/records/admin/fail/reset?loai=...`.
+- Có thể sinh SQL reset hàng loạt theo loại ca qua `POST /api/records/admin/fail/reset?loai=...` (mở trực tiếp khung modal chứa script SQL không cần popup confirm, bấm nút copy có popup toast tự tắt sau 2s).
 - Code chuyển các record FAIL đó sang `WAITING_RESEND` sau khi sinh SQL.
 - Câu SQL trả về để IT copy chạy ngoài SSMS.
 - Chỉ khi lần đối soát sau thấy `MA_LK` xuất hiện trong `listbh`, hệ thống mới tự chuyển sang `RESOLVED`.
@@ -656,6 +656,7 @@ Logic hiện tại:
 - Nếu `TuNgay` và `DenNgay` khớp cache, dùng lại.
 - Nếu `DenNgay` lớn hơn cache cũ, chỉ gọi SQL phần ngày còn thiếu rồi ghép.
 - Nếu cache không dùng được, gọi full range.
+- Nút "Xóa Cache SQL" (`POST /api/config/clear-cache`) quét và dọn sạch toàn bộ tệp `.pkl` và `index.json` ở cả `web_app/cache_sql/` và `cache_sql/` cấp gốc, gỡ bỏ thuộc tính read-only và tự động làm trắng bảng tra cứu SQL ở Tab 2.
 
 Timeout SQL hiện tại:
 
@@ -1131,6 +1132,7 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
    - **Bước 1 (Chọn Trạng thái):** Gọi `cb_TrangThaiTT.SetSelectedIndex(...)` chọn "Đã đề nghị thanh toán" và kích hoạt `ProcessItemClick()`.
    - **Bước 2 (Tìm kiếm & Chờ dữ liệu):** Kích hoạt `bt_TimKiem.DoClick()` -> Chờ các hàng dữ liệu của bảng nạp xong hoàn toàn (`wait_portal_idle`).
    - **Bước 3 (Xuất Excel):** Mở menu `#bt_XuatExcel` -> Chờ popup menu xuất hiện -> Dùng Playwright click chính xác mục con "Xuất excel" (`table.dxm-item:has-text('Xuất excel')`) trong khối `expect_download` để lưu tệp thành `listbh.xlsx`.
+   - **Bước 4 (Thông báo hoàn tất & UI Khung log):** Tự động bật Modal Popup thông báo tải xong file (số lượng hồ sơ, nút tải về và nút nạp đối soát CSDL). Khung log thời gian thực được cố định chiều cao tối đa (max-height 420px) với thanh cuộn scrollbar nội bộ, không làm kéo dài trang web.
 
 ### 19.4. Quy trình chuẩn hóa Luồng C (Tải danh sách lỗi chi tiết & Đối soát C)
 1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Hệ thống mở popup lịch bằng icon `#deTuNgay_B-1` -> Click nút **`Today`** (`#deTuNgay_DDD_C_BT` / `.dxeCalendarTodayButton_EIS`) đảm bảo máy chủ nhận đủ các trường ẩn của DevExpress.
@@ -1141,7 +1143,7 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
    - Sau khi click dòng: Đợi popup `#PopupNhanChiTietLoiHS_PW-0` và loading indicator bên trong nạp xong.
    - Tìm và click nút "Xuất Excel" bên trong popup với `expect_download`.
    - Đóng popup an toàn (`PopupNhanChiTietLoiHS.Hide()`) và đợi mask ẩn hẳn trước khi sang dòng tiếp theo.
-5. **Gom file & Đối soát C:** Gom tất cả file Excel con thành `HoSoLoiChiTiet.xlsx` và tự động kích hoạt tiến trình Đối soát C với CSDL HIS.
+5. **Gom file, Thông báo hoàn tất & Đối soát C:** Gom tất cả file Excel con thành `HoSoLoiChiTiet.xlsx`, tự động bật Modal Popup thông báo kết quả gom file kèm nút tải nhanh và kích hoạt đối soát CSDL HIS.
 
 ### 19.5. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
 - Khi chạy Đối soát C: nếu một ca bệnh (`MA_LK`) vừa có trong danh sách đã gửi (`listbh`) nhưng lại xuất hiện trong file lỗi chi tiết (`HoSoLoiChiTiet.xlsx`):

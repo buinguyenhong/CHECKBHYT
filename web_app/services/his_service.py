@@ -106,11 +106,52 @@ def cache_put(tu: str, den: str, df: pd.DataFrame):
     }
     save_cache_index(index)
 
-def clear_sql_cache():
-    """Xóa toàn bộ thư mục cache SQL"""
-    if os.path.exists(CACHE_DIR):
-        shutil.rmtree(CACHE_DIR, ignore_errors=True)
+def clear_sql_cache() -> dict:
+    """Xóa toàn bộ các tệp cache SQL ở cả web_app/cache_sql và root/cache_sql"""
+    deleted_count = 0
+    freed_bytes = 0
+    import stat
+
+    dirs_to_clean = [
+        CACHE_DIR,
+        os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache_sql")),
+        os.path.abspath(os.path.join(os.getcwd(), "cache_sql"))
+    ]
+    seen_dirs = set()
+    for d in dirs_to_clean:
+        d = os.path.normpath(d)
+        if d in seen_dirs:
+            continue
+        seen_dirs.add(d)
+        if not os.path.exists(d):
+            continue
+        try:
+            for root, dirs, files in os.walk(d, topdown=False):
+                for f in files:
+                    file_path = os.path.join(root, f)
+                    try:
+                        sz = os.path.getsize(file_path)
+                        os.chmod(file_path, stat.S_IWRITE)
+                        os.remove(file_path)
+                        deleted_count += 1
+                        freed_bytes += sz
+                    except Exception as fe:
+                        safe_print(f"[!] Không thể xóa cache file {file_path}: {fe}")
+                for sub_d in dirs:
+                    try:
+                        shutil.rmtree(os.path.join(root, sub_d), ignore_errors=True)
+                    except Exception:
+                        pass
+        except Exception as e:
+            safe_print(f"[!] Lỗi dọn dẹp cache dir {d}: {e}")
+
     ensure_cache_dir()
+    save_cache_index({})
+    return {
+        "deleted_count": deleted_count,
+        "freed_bytes": freed_bytes,
+        "freed_kb": round(freed_bytes / 1024, 2)
+    }
 
 
 # Business logic normalization functions (taken from original main.py)

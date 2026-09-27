@@ -56,6 +56,54 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-27 16:00 - Antigravity (Tối Ưu Bảo Toàn Tuyệt Đối Ghi Chú Hồ Sơ Qua Các Đợt Đối Soát & Gộp Trùng)
+
+### Mục tiêu
+- Đảm bảo 100% các ghi chú do IT hoặc khoa phòng nhập vào cho từng ca bệnh không bao giờ bị ghi đè, làm mất hay rơi rụng trong mọi tình huống đối soát lại.
+
+### Thay đổi
+- **`web_app/services/compare_service.py`:**
+  - Cải tiến logic chuyển nhóm LỖI -> FAIL: Khi ca bệnh trước đó có lỗi nay chuyển sang FAIL, thay vì ghi đè chuỗi `note_val = "đã sửa lỗi cũ (đợt ...)"`, hệ thống kiểm tra và nối chuỗi bảo toàn ghi chú cũ của người dùng (`existing_record.note = f"{existing_record.note} | {note_val}"`).
+  - Cải tiến logic gộp bản ghi trùng lặp (`cleanup_duplicate_records`): Nếu cả bản ghi giữ lại và bản ghi trùng lặp đều có ghi chú khác nhau, tự động gộp cả hai ghi chú lại (`keep_rec.note = f"{keep_rec.note} | {dup_rec.note}"`).
+
+### Nghiệp vụ ảnh hưởng
+- Giữ nguyên toàn bộ logic đối soát và quy tắc nghiệp vụ.
+- Bảo toàn tuyệt đối lịch sử giải trình và ý kiến xử lý của người dùng qua các đợt đối soát.
+
+### Kiểm tra
+- Chạy kiểm tra cú pháp: `python -m py_compile web_app/services/compare_service.py` -> Thành công 100% (exit code 0).
+
+## 2026-09-27 15:45 - Antigravity (Tối Ưu Xóa Cache SQL Triệt Để, Trực Tiếp Mở Script Reset Không Confirm & Popup Hoàn Tất Luồng B/C Kèm Scrollbar Khung Log)
+
+### Mục tiêu
+- Xử lý triệt để lỗi xóa cache SQL: xóa sạch các tệp .pkl và index.json ở cả web_app/cache_sql và root/cache_sql, gỡ bỏ thuộc tính read-only và xóa trắng bảng dữ liệu SQL Tab 2 trên giao diện để đồng bộ trực quan.
+- Tinh gọn trải nghiệm thao tác Reset ca FAIL: loại bỏ popup confirm gây phiền toái, mở trực tiếp modal chứa script SQL; thay thế alert chặn màn hình khi bấm Copy bằng Toast Badge tự động tắt sau 2 giây.
+- Bổ sung Popup Modal thông báo hoàn thành file tải về cho Luồng B (`listbh.xlsx`) và Luồng C (`HoSoLoiChiTiet.xlsx`), tích hợp nút tải nhanh và nút nạp vào CSDL đối soát.
+- Khóa chiều cao tối đa và cấu hình thanh cuộn mượt mà nội bộ cho khung log (`.log-box`) trên cả WebApp (`/portal-automation`) và công cụ máy trạm (`portal_downloader`), triệt tiêu hiện tượng kéo dài toàn trang web.
+
+### Thay đổi
+- **`web_app/services/his_service.py`:**
+  - Nâng cấp `clear_sql_cache()`: Quét và dọn dẹp triệt để cả `web_app/cache_sql` và thư mục gốc `cache_sql`, duyệt `os.walk` xóa từng file với `os.chmod(..., stat.S_IWRITE)` và `os.remove()`, ghi đè `index.json = {}`, trả về `deleted_count` và `freed_kb`.
+- **`web_app/main.py`:**
+  - Endpoint `POST /api/config/clear-cache`: Tiếp nhận kết quả từ `clear_sql_cache()` và trả về JSON thống kê số tệp cùng dung lượng đã giải phóng.
+- **`web_app/templates/admin.html`:**
+  - `clearSqlCache()`: Nhận thông điệp phản hồi từ máy chủ, làm trống bảng `#sqlDataBody` ở Tab 2, đặt `#sql_total_count = 0` và hiển thị Toast thông báo.
+  - `resetSelectedFail()`: Bỏ hàm `confirm()`, lập tức mở modal `#hisUnlockModal`.
+  - `copyHisUnlockSql()`: Bỏ hàm `alert()`, sao chép script vào clipboard và gọi `showAdminToast("Đã copy câu lệnh SQL thành công! ✓", "success", 2000)` kèm hiệu ứng nút xanh tự trả lại trạng thái sau 2s.
+  - Bổ sung hàm tiện ích `showAdminToast(msg, type, duration)`.
+- **`web_app/templates/portal_automation.html` & `portal_downloader/templates/index.html`:**
+  - CSS: Thêm `max-height: 420px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;` cho `.log-box` và cấu hình webkit-scrollbar.
+  - HTML: Thêm modal popup hoàn tất `#completionModal` hiển thị tên tệp, số bản ghi, nút tải file về máy và nút nạp/gửi đối soát.
+  - JS: Thêm các hàm `showCompletionModal()` và `closeCompletionModal()`, tự động kích hoạt khi Luồng B / Luồng C tải thành công.
+
+### Nghiệp vụ ảnh hưởng
+- Giữ nguyên 100% logic đối soát CSDL, logic Stored Procedures và các quy tắc tự động hóa Cổng BHYT.
+- Cải thiện đáng kể trải nghiệm người dùng, thao tác nhanh chóng và phản hồi trực quan rõ ràng.
+
+### Kiểm tra
+- Chạy kiểm tra cú pháp: `python -m py_compile web_app/services/his_service.py web_app/main.py` -> Thành công 100% (exit code 0).
+- Chạy thử nghiệm xóa cache thực tế trên Python -> Xóa sạch các file cache .pkl và làm trống `index.json`.
+
 ## 2026-09-22 10:45 - Antigravity (Đồng Bộ Khoảng Ngày Đối Soát CSDL SQL HIS & Tái Cấu Trúc Cấu Hình Dùng Chung Cho Luồng B & C)
 
 ### Mục tiêu

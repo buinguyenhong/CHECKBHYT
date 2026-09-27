@@ -656,8 +656,15 @@ def get_available_drivers(user: User = Depends(require_admin)):
 def clear_his_cache(user: User = Depends(require_admin)):
     """Xóa toàn bộ các tệp cache truy vấn SQL Server HIS để giải phóng dung lượng và tải mới dữ liệu"""
     try:
-        his_service.clear_sql_cache()
-        return {"status": "success"}
+        res = his_service.clear_sql_cache()
+        del_count = res.get("deleted_count", 0)
+        freed_kb = res.get("freed_kb", 0)
+        return {
+            "status": "success",
+            "deleted_count": del_count,
+            "freed_kb": freed_kb,
+            "message": f"Đã dọn dẹp thành công {del_count} tệp cache ({freed_kb} KB)." if del_count > 0 else "Đã xóa sạch bộ đệm Cache SQL (Hiện không có tệp rác tồn đọng)."
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
