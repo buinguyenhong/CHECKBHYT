@@ -56,6 +56,35 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-09-27 16:30 - Antigravity (Tự Động Ẩn / Đóng Hồ Sơ LOI Mồ Côi & Cảnh Báo Hồ Sơ Rác Trên Cổng BHYT)
+
+### Mục tiêu
+- Xử lý triệt để tình trạng ca bệnh cũ nhóm `LOI` đã được xử lý (hủy hồ sơ trên HIS, chuyển viện phí, hoặc không gửi BHYT nữa), khi xóa cache SQL chạy lại vẫn bị hiện lên ở "Danh sách lỗi" do không thuộc `df_sql` nên bị bỏ qua trong vòng lặp đối soát.
+- Đảm bảo an toàn nghiệp vụ: Phân biệt rõ giữa ca đã sạch hoàn toàn (ẩn khỏi danh sách tác nghiệp, lưu vào kho vĩnh viễn) và ca "hồ sơ rác" vẫn còn treo lỗi trên cổng BHYT (cảnh báo IT/Khoa lên cổng hủy hồ sơ).
+
+### Thay đổi
+- `web_app/services/compare_service.py`:
+  - Bổ sung bước 2.1 ngay sau khi nạp `current_sql_keys`, `sent_keys`, `error_map`, và xác định khoảng ngày ra viện `[min_d, max_d]`.
+  - Chuẩn hóa việc trích xuất ngày ra viện `sql_dates` hỗ trợ cả `datetime`, `date`, và `string` (`pd.to_datetime`).
+  - Xử lý các bản ghi `Record` nhóm `LOI` chưa giải quyết (`status != 'RESOLVED'`) thuộc khoảng ngày đối soát mà không còn trong `current_sql_keys`:
+    - **TH1 (Gửi thành công):** Nếu `ma_lk` có trong `sent_keys` -> Chuyển `RESOLVED`, ghi log và đồng bộ vào `error_history_archive`.
+    - **TH2 (Ca mồ côi sạch - Đủ 3 điều kiện):** Không có trong SQL HIS, không có trong file thành công, và **không còn trong tệp lỗi chi tiết mới nhất** (`rec_lk not in error_map`) -> Chuyển `RESOLVED`, ghi log tự động đóng và đồng bộ đầy đủ sang `error_history_archive`. Giúp ca bệnh lập tức biến mất khỏi Tab 3 (Danh sách Lỗi) và màn hình Khoa phòng, nhưng vẫn tra cứu được 100% tại Tab 10 (Lịch sử Lỗi Vĩnh viễn).
+    - **TH3 (Hồ sơ rác treo trên cổng):** Không có trong SQL HIS nhưng cổng BHYT **vẫn báo lỗi** (`rec_lk in error_map`) -> Giữ nguyên trạng thái `PENDING` và cập nhật ghi chú cảnh báo: `"Cảnh báo: Hồ sơ không còn trong SQL HIS nhưng cổng BHYT vẫn báo lỗi. Cần kiểm tra và hủy hồ sơ trên cổng BHYT."`.
+- `scratch/test_reconciliation.py`:
+  - Thêm Test Case 3 kiểm chứng cả 2 tình huống mồ côi sạch (auto `RESOLVED` + lưu `ErrorHistoryArchive`) và hồ sơ treo lỗi trên cổng (cảnh báo).
+
+### Nghiệp vụ ảnh hưởng
+- **Danh sách Lỗi (Tab 3 & Khoa phòng):** Sạch sẽ, không còn bị rác bởi các ca bệnh đã rút khỏi HIS và không còn lỗi cổng.
+- **Lưu trữ Lỗi Vĩnh viễn (Tab 10):** Vẫn lưu trữ đầy đủ mọi ca lỗi lịch sử với ghi chú minh bạch phục vụ thanh tra/kiểm toán.
+- **Phát hiện hồ sơ rác trên cổng BHYT:** IT/Khoa phòng được cảnh báo chính xác các ca đã hủy trên HIS nhưng còn sót lỗi trên cổng BHYT để lên cổng hủy.
+
+### Kiểm tra
+- Đã chạy `python scratch/test_reconciliation.py`: Tất cả 3 Test Case (Test Case 1, 2, 3) đều vượt qua thành công (`Exit code 0`).
+- Đã kiểm tra cú pháp toàn diện bằng `python -m py_compile web_app/services/compare_service.py`.
+
+### Lưu ý cho phiên sau
+- Khi người dùng chạy đối soát đợt mới có chọn kèm tệp lỗi chi tiết `HoSoLoiChiTiet.xlsx`, cơ chế dọn dẹp và cảnh báo này sẽ tự động phát huy hiệu lực.
+
 ## 2026-09-27 16:00 - Antigravity (Tối Ưu Bảo Toàn Tuyệt Đối Ghi Chú Hồ Sơ Qua Các Đợt Đối Soát & Gộp Trùng)
 
 ### Mục tiêu

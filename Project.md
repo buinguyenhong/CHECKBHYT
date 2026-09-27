@@ -422,6 +422,20 @@ Nếu `MA_LK` không có trong `listbh` nhưng có trong file lỗi:
 - Trạng thái mặc định `PENDING`.
 - Hệ thống tự học danh mục lỗi mới nếu gặp `MALOI`/keyword chưa có.
 
+### 8.6.1. Xử lý Hồ sơ Mồ côi & Cảnh báo Hồ sơ Rác Treo Cổng BHYT
+Khi đối soát đợt mới (có phạm vi ngày ra viện `[min_d, max_d]` từ SQL HIS):
+1. **Dọn dẹp nhóm FAIL mồ côi:** Các ca `FAIL` thuộc khoảng ngày đối soát nhưng không còn xuất hiện trong SQL HIS hiện tại sẽ tự động được xóa khỏi bảng `Record`.
+2. **Xử lý nhóm LOI mồ côi (không còn trong SQL HIS):**
+   - **TH1 (Đã gửi thành công):** Nếu `ma_lk` có trong `listbh` -> Tự động chuyển `RESOLVED`, ghi log hệ thống và đồng bộ trạng thái `RESOLVED` sang bảng lưu trữ vĩnh viễn `ErrorHistoryArchive`.
+   - **TH2 (Hồ sơ sạch - Đủ đồng thời 3 điều kiện):**
+     * Không còn trong SQL HIS (không cần gửi BHYT nữa, đã hủy hoặc chuyển viện phí).
+     * Không có trong danh sách gửi thành công `listbh`.
+     * **Không còn xuất hiện trong tệp lỗi chi tiết mới nhất của BHYT** (`HoSoLoiChiTiet.xlsx`).
+     $\rightarrow$ Hệ thống tự động chuyển `status = RESOLVED`, ghi log và đồng bộ vào kho lưu trữ vĩnh viễn `ErrorHistoryArchive`. Ca bệnh lập tức được ẩn khỏi Danh sách Lỗi tác nghiệp (Tab 3 & Màn hình Khoa phòng) để tránh gây nhiễu, nhưng vẫn tra cứu được 100% tại Tab 10 (Lịch sử Lỗi Vĩnh viễn).
+   - **TH3 (Hồ sơ rác treo trên Cổng BHYT):**
+     * Không còn trong SQL HIS nhưng **vẫn còn nằm trong tệp lỗi chi tiết BHYT**.
+     $\rightarrow$ Hệ thống giữ nguyên trạng thái `PENDING` và cập nhật ghi chú cảnh báo: *"Cảnh báo: Hồ sơ không còn trong SQL HIS nhưng cổng BHYT vẫn báo lỗi. Cần kiểm tra và hủy hồ sơ trên cổng BHYT."* để IT/Khoa phòng kịp thời lên cổng rút/hủy hồ sơ rác.
+
 ### 8.7. Quy trình xử lý của khoa
 
 Khoa đăng nhập `/department`.

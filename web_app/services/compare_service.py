@@ -181,14 +181,22 @@ def process_comparison(
 
     # Dọn dẹp các ca FAIL cũ/mã lỗi từ lượt chạy trước thuộc cùng khoảng ngày nhưng không thuộc SQL HIS hiện tại
     current_sql_keys = set(df_sql["MA_LK"].dropna().astype(str).map(lambda x: chuan_hoa_ma_lk(x).upper()))
-    sql_dates = [d for d in df_sql["Ngày ra viện"].dropna() if hasattr(d, "year") or isinstance(d, datetime.date)]
+    sql_dates = []
+    if "Ngày ra viện" in df_sql.columns:
+        for d in df_sql["Ngày ra viện"].dropna():
+            if isinstance(d, datetime.datetime):
+                sql_dates.append(d.date())
+            elif isinstance(d, datetime.date):
+                sql_dates.append(d)
+            elif isinstance(d, str):
+                try:
+                    sql_dates.append(pd.to_datetime(d).date())
+                except Exception:
+                    pass
+    min_d, max_d = None, None
     if sql_dates:
         min_d = min(sql_dates)
         max_d = max(sql_dates)
-        if isinstance(min_d, datetime.datetime):
-            min_d = min_d.date()
-        if isinstance(max_d, datetime.datetime):
-            max_d = max_d.date()
             
         obsolete_fails = db.query(Record).filter(
             Record.type_group == "FAIL",
@@ -227,6 +235,58 @@ def process_comparison(
                         "motaloi": motaloi,
                         "ngay_ra": ngay_ra
                     })
+
+    # 2.1. Tự động xử lý & dọn dẹp các ca LOI không còn trong SQL HIS thuộc cùng khoảng ngày đối soát
+    if (include_errors or not df_hsloi.empty) and sql_dates and min_d and max_d:
+        obsolete_loi = db.query(Record).filter(
+            Record.type_group == "LOI",
+            Record.status != "RESOLVED",
+            Record.ngay_ra_vien >= min_d,
+            Record.ngay_ra_vien <= max_d
+        ).all()
+        
+        for rec in obsolete_loi:
+            rec_lk = chuan_hoa_ma_lk(rec.ma_lk).upper()
+            if rec_lk not in current_sql_keys:
+                d_moi_str = ngay_doi_soat.strftime('%d/%m/%Y')
+                d_cu_str = rec.ngay_doi_soat.strftime('%d/%m/%Y') if rec.ngay_doi_soat else "trước đó"
+                
+                # TH1: Ca đã được gửi thành công lên cổng BHYT
+                if rec_lk in sent_keys:
+                    rec.status = "RESOLVED"
+                    note_text = f"Hệ thống tự động duyệt: Ca bệnh đã gửi thành công lên cổng BHYT (đối soát ngày {d_moi_str})."
+                    log = RecordLog(
+                        record_id=rec.id,
+                        username="system",
+                        action="CHANGE_STATUS",
+                        note=note_text
+                    )
+                    db.add(log)
+                    sync_archive_error(db, rec, resolved=True, resolved_by="system", note=note_text)
+                
+                # TH2: Thỏa mãn đồng thời cả 3 điều kiện:
+                # - Không có trong SQL HIS (không cần gửi BHYT nữa)
+                # - Không có trong danh sách gửi thành công
+                # - Không còn trong tệp lỗi chi tiết BHYT (đã rút/hủy hoặc cổng không còn ghi nhận lỗi)
+                # => Tự động ẩn khỏi danh sách lỗi tác nghiệp và chuyển lưu trữ vĩnh viễn (RESOLVED).
+                elif rec_lk not in error_map:
+                    rec.status = "RESOLVED"
+                    note_text = f"Tự động ẩn/đóng: Hồ sơ (đợt {d_cu_str}) không còn trong SQL HIS, không có trong DS gửi thành công và không còn lỗi trên cổng BHYT (đối soát {d_moi_str})."
+                    log = RecordLog(
+                        record_id=rec.id,
+                        username="system",
+                        action="CHANGE_STATUS",
+                        note=note_text
+                    )
+                    db.add(log)
+                    sync_archive_error(db, rec, resolved=True, resolved_by="system", note=note_text)
+                
+                # TH3: Không có trong SQL HIS nhưng CỔNG BHYT VẪN BÁO LỖI (hồ sơ rác trên cổng)
+                else:
+                    warn_text = "Cảnh báo: Hồ sơ không còn trong SQL HIS nhưng cổng BHYT vẫn báo lỗi. Cần kiểm tra và hủy hồ sơ trên cổng BHYT."
+                    if warn_text not in (rec.note or ""):
+                        rec.note = f"{rec.note} | {warn_text}".strip(" | ") if rec.note else warn_text
+        db.commit()
 
     stats = {"total": len(df_sql), "loi": 0, "fail": 0, "sent": 0}
 

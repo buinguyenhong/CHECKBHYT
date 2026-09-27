@@ -171,6 +171,103 @@ def test_reconciliation_logic():
         
         print("[+] Test Case 2: Partial error resolution (resolved XML5, kept XML8) passed! [OK]")
         
+        # Test Case 3: Orphan LOI records
+        # Case 3A: Clean orphan LOI (not in df_sql, not in df_listbh, not in df_hsloi) -> auto RESOLVED
+        # Case 3B: Lingering orphan LOI (not in df_sql, not in df_listbh, but STILL in df_hsloi) -> keeps PENDING & warning note
+        from models import ErrorHistoryArchive
+        orphan_clean = Record(
+            ma_lk="99991",
+            ho_ten="Orphan Patient Clean",
+            ma_the="DN403030303",
+            ten_khoa="Khoa Cap Cuu",
+            ma_y_te="YT991",
+            ngay_ra_vien=datetime.date(2026, 6, 12),
+            loai_ca="Ngoại trú",
+            ngay_doi_soat=datetime.date(2026, 6, 12),
+            status="PENDING",
+            type_group="LOI",
+            maloi="XML1",
+            motaloi="Loi thieu thong tin han the",
+            note=""
+        )
+        orphan_lingering = Record(
+            ma_lk="99992",
+            ho_ten="Orphan Patient Lingering",
+            ma_the="DN404040404",
+            ten_khoa="Khoa Kham Benh",
+            ma_y_te="YT992",
+            ngay_ra_vien=datetime.date(2026, 6, 12),
+            loai_ca="Ngoại trú",
+            ngay_doi_soat=datetime.date(2026, 6, 12),
+            status="PENDING",
+            type_group="LOI",
+            maloi="XML2",
+            motaloi="Loi ngay thanh toan",
+            note=""
+        )
+        db.add(orphan_clean)
+        db.add(orphan_lingering)
+        db.commit()
+
+        # Run reconciliation for date range 2026-06-10 to 2026-06-15:
+        # SQL HIS only has 67890 (neither 99991 nor 99992)
+        # df_hsloi has XML8 for 67890 AND XML2 for 99992 (lingering on portal)
+        df_hsloi_3 = pd.DataFrame([
+            {
+                "MA_LK": "67890",
+                "MALOI": "XML8",
+                "MOTALOI": "Loi tom tat kq",
+                "Ngày ra": datetime.date(2026, 6, 10)
+            },
+            {
+                "MA_LK": "99992",
+                "MALOI": "XML2",
+                "MOTALOI": "Loi ngay thanh toan",
+                "Ngày ra": datetime.date(2026, 6, 12)
+            }
+        ])
+        
+        df_sql_3 = pd.DataFrame([
+            {
+                "MA_LK": "67890",
+                "Loại ca": "Nội trú",
+                "Họ tên": "Tran Van B",
+                "Mã thẻ": "DN402020202",
+                "Tên khoa": "Khoa Noi",
+                "Mã y tế": "YT456",
+                "Ngày ra viện": datetime.date(2026, 6, 10)
+            },
+            {
+                "MA_LK": "77777",
+                "Loại ca": "Nội trú",
+                "Họ tên": "Le Van C",
+                "Mã thẻ": "DN405050505",
+                "Tên khoa": "Khoa Noi",
+                "Mã y tế": "YT777",
+                "Ngày ra viện": datetime.date(2026, 6, 15)
+            }
+        ])
+        
+        stats_3 = compare_service.process_comparison(
+            db=db,
+            df_sql=df_sql_3,
+            df_listbh=pd.DataFrame(),
+            df_hsloi=df_hsloi_3,
+            ngay_doi_soat=datetime.date(2026, 6, 15),
+            include_errors=True
+        )
+
+        res_clean = db.query(Record).filter(Record.ma_lk == "99991").first()
+        res_lingering = db.query(Record).filter(Record.ma_lk == "99992").first()
+        arch_clean = db.query(ErrorHistoryArchive).filter(ErrorHistoryArchive.ma_lk == "99991").first()
+
+        assert res_clean.status == "RESOLVED", f"Expected orphan_clean to be RESOLVED, got {res_clean.status}"
+        assert arch_clean is not None and arch_clean.status == "RESOLVED", "Expected arch_clean to be archived as RESOLVED"
+        assert res_lingering.status == "PENDING", f"Expected orphan_lingering to remain PENDING, got {res_lingering.status}"
+        assert "Cảnh báo" in (res_lingering.note or ""), f"Expected warning note in orphan_lingering, got {res_lingering.note}"
+
+        print("[+] Test Case 3: Orphan LOI auto-resolution and lingering portal warning passed! [OK]")
+        
         print("[*] All tests completed successfully!")
         
     finally:
