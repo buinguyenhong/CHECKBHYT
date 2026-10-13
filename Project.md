@@ -1223,3 +1223,15 @@ Nhằm đảm bảo hệ thống phản hồi tức thì và không bị treo đ
   - Tùy chọn 30, 50, 100, 200 dòng/trang. Trình duyệt chỉ render 30-50 dòng DOM của trang hiện tại (thời gian render < 5ms), triệt tiêu hoàn toàn hiện tượng "Trang không phản hồi".
 - **Chống dội phím (Debounce 250ms):**
   - Các ô tìm kiếm nhanh (`#loi_search`, `#fail_search`, `#deptSearch`) áp dụng kỹ thuật debounce 250ms, chỉ lọc dữ liệu khi người dùng ngừng gõ, loại bỏ tình trạng đơ layout khi tìm kiếm.
+
+## 21. Bảng điều khiển Khởi chạy Máy chủ GUI một chạm (LaunchWebBHYT)
+
+Để đơn giản hóa vận hành cho quản trị viên và phòng CNTT, tập lệnh `LaunchWebBHYT.py` cung cấp giao diện Tkinter trực quan để cài đặt, khởi chạy và giám sát hệ thống:
+- **Tự động nhận diện môi trường ảo `.venv`:**
+  - Tự động ưu tiên sử dụng `python.exe` và `pythonw.exe` nằm trong thư mục `.venv/Scripts/` của dự án nếu tồn tại, loại bỏ hoàn toàn nguy cơ chạy nhầm vào Python hệ thống thiếu thư viện.
+- **Xác thực trạng thái cổng thực tế (Health check):**
+  - Khi bấm "Khởi chạy WebApp Chạy Ngầm", hệ thống lắng nghe trạng thái cổng trong 4 giây. Chỉ thông báo thành công khi cổng đã thực sự mở.
+  - Nếu xảy ra crash (thiếu thư viện, lỗi cấu hình, xung đột mạng), hệ thống đọc ngay 15 dòng log gần nhất từ `web_app_server.log` và cảnh báo trực tiếp hộp thoại lỗi.
+- **Tự khởi động cùng hệ điều hành (Auto-start Service):**
+  - Đăng ký máy chủ chạy ngầm qua Windows Task Scheduler (`schtasks`) với tùy chọn khởi động cùng Windows (Boot) hoặc khi người dùng đăng nhập (Logon), sử dụng `pythonw.exe` để không hiện cửa sổ console.
+

@@ -56,6 +56,38 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-13 10:05 - Antigravity (Khắc phục LaunchWebBHYT Báo Khởi Chạy Thành Công Nhưng Server Tắt & Tự Động Ưu Tiên Môi Trường Ảo .venv)
+
+### Mục tiêu
+- Khắc phục sự cố người dùng sử dụng `LaunchWebBHYT.py` dừng server, cập nhật code và bấm khởi chạy báo "Khởi chạy thành công" nhưng đèn trạng thái vẫn OFF / STOPPED ❌, không truy cập được web đối soát (`http://localhost:8000`).
+- Đảm bảo launcher luôn tự động phát hiện và ưu tiên sử dụng Python interpreter của môi trường ảo `.venv` (nơi đã cài đặt đầy đủ dependencies).
+- Bổ sung cơ chế xác thực lắng nghe cổng (Health check) thực tế trước khi thông báo khởi chạy thành công; nếu lỗi sẽ trích xuất log chi tiết cảnh báo trực quan cho người dùng.
+
+### Nguyên nhân gốc rễ
+1. Thư mục môi trường ảo `.venv` (`d:\Project\newcheckBHYT\CHECKBHYT\CHECKBHYT\.venv`) trước đó bị thiếu toàn bộ dependencies của webapp (`fastapi`, `uvicorn`, `sqlalchemy`, `jinja2`, `python-multipart`, `httpx`, `pyodbc`, `ddddocr`, `lxml`, `watchdog`, `pyperclip`). Khi `web_app/run.py` được gọi bằng Python trong `.venv`, chương trình bị crash ngay lập tức tại dòng `import fastapi` với mã lỗi `ModuleNotFoundError`.
+2. File `LaunchWebBHYT.py` trước đây dùng cứng `sys.executable` (trỏ đến Python hệ thống bên ngoài hoặc Python gọi script Launcher) thay vì tự động nhận diện `.venv` nội bộ của dự án.
+3. Hàm `start_server_background()` trong `LaunchWebBHYT.py` kích hoạt `subprocess.Popen` không đồng bộ và hiển thị ngay hộp thoại `messagebox.showinfo("Khởi chạy thành công")` mà không đợi kiểm tra xem tiến trình có sống sót hay cổng đã thực sự mở chưa. Khi tiến trình crash sau 0.05s, người dùng vẫn nhận được thông báo thành công gây hiểu lầm.
+
+### Thay đổi
+- **Môi trường ảo `.venv`:**
+  - Cài đặt đầy đủ 100% dependencies từ `requirements.txt` vào `.venv`.
+  - Đã kiểm tra import toàn bộ các module `fastapi`, `uvicorn`, `sqlalchemy`, `jinja2`, `pyodbc`,... chạy mượt mà.
+- **`LaunchWebBHYT.py`:**
+  - Thêm phương thức `get_python_exe(self, folder: str) -> str`: Kiểm tra `folder/.venv/Scripts/python.exe`, nếu có thì ưu tiên dùng, nếu không mới dùng `sys.executable`.
+  - Thêm phương thức `get_pythonw_exe(self, folder: str) -> str`: Kiểm tra `folder/.venv/Scripts/pythonw.exe` để phục vụ chạy ngầm không hiện console hoặc đăng ký Task Scheduler.
+  - Cập nhật các hàm `run_setup` (bước pip install & playwright install), `run_install_chromium` và `register_autostart` chuyển sang dùng `get_python_exe` / `get_pythonw_exe`.
+  - Cải tiến `start_server_background()`:
+    - Sử dụng `python_bin` từ `get_python_exe(folder)`.
+    - Ghi rõ đường dẫn interpreter vào đầu phiên log trong `web_app_server.log`.
+    - Đóng file log handle ngay sau `Popen`.
+    - Thêm vòng lặp kiểm tra trạng thái mở cổng `self.is_port_active(int(port))` tối đa ~4 giây (polling mỗi 0.5s) và kiểm tra `proc.poll()`.
+    - Nếu cổng thực sự lắng nghe -> Hiện popup "Khởi chạy thành công".
+    - Nếu cổng không mở hoặc process kết thúc sớm -> Đọc 15 dòng log cuối cùng từ `web_app_server.log` và hiển thị chi tiết nguyên nhân lỗi qua `messagebox.showerror`.
+
+### Kiểm tra
+- Biên dịch cú pháp `python -m py_compile LaunchWebBHYT.py` thành công không có lỗi.
+- Đã kiểm tra thực thi `run.py` thông qua `.venv\Scripts\python.exe` khởi động trơn tru trên cổng 8000.
+
 ## 2026-10-13 09:35 - Antigravity (Báo Cáo Hiệu Suất Khoa Đa Sheet, Khắc Phục Sai Lệch Ca FAIL & Báo Cáo Lỗi Theo Ngày Cầu Nối Webhook Zalo n8n)
 
 ### Mục tiêu

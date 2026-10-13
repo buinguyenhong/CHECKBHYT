@@ -114,3 +114,16 @@ Khoi dong may chu uvicorn...
     *   *Startup directory*: `d:\Project\newcheckBHYT\CHECKBHYT\CHECKBHYT`
     *   *Arguments*: `web_app/run.py`
 4.  Bấm **Install service**. Mở Trình quản lý Services của Windows (`services.msc`), tìm `CheckBHYTService` và bấm **Start**.
+
+---
+
+## 5. Hướng dẫn Vận hành bằng Giao diện Đồ họa (LaunchWebBHYT.py)
+
+Ngoài cách dòng lệnh ở trên, hệ thống tích hợp sẵn công cụ GUI `LaunchWebBHYT.py` giúp quản trị viên thao tác nhanh:
+```powershell
+python LaunchWebBHYT.py
+```
+* **Tab 1: Thiết lập & Cài đặt môi trường:** Nhấn "Kích hoạt cài đặt thư viện & Chromium RPA" để tự động cài `requirements.txt` và Playwright Chromium vào môi trường ảo `.venv`.
+* **Tab 2: Vận hành Hệ thống:** Khởi chạy máy chủ LAN WebApp chạy ngầm trong Windows, giám sát trạng thái máy chủ (ONLINE / STOPPED), kiểm tra IP LAN và mở trực tiếp trang quản trị.
+* **Tab 3: Tự động khởi động (Auto-start):** Đăng ký tự động chạy cùng Windows Task Scheduler chỉ với 1 click chuột mà không cần cấu hình file batch thủ công.
+

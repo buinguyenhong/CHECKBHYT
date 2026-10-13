@@ -4,6 +4,7 @@ import json
 import socket
 import threading
 import datetime
+import time
 import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -415,6 +416,24 @@ class BHYTLauncher:
     # ========================================================
     # LOGIC XỬ LÝ (LOGIC OPERATIONS)
     # ========================================================
+    def get_python_exe(self, folder: str) -> str:
+        """Ưu tiên sử dụng python.exe trong môi trường ảo .venv nếu tồn tại"""
+        venv_py = os.path.join(folder, ".venv", "Scripts", "python.exe")
+        if os.path.exists(venv_py):
+            return venv_py
+        return sys.executable
+
+    def get_pythonw_exe(self, folder: str) -> str:
+        """Ưu tiên sử dụng pythonw.exe trong môi trường ảo .venv nếu tồn tại"""
+        venv_pyw = os.path.join(folder, ".venv", "Scripts", "pythonw.exe")
+        if os.path.exists(venv_pyw):
+            return venv_pyw
+        python_dir = os.path.dirname(sys.executable)
+        pyw = os.path.join(python_dir, "pythonw.exe")
+        if os.path.exists(pyw):
+            return pyw
+        return self.get_python_exe(folder)
+
     def browse_folder(self):
         folder = filedialog.askdirectory(title="Chọn Thư mục chứa WebApp")
         if folder:
@@ -470,7 +489,8 @@ class BHYTLauncher:
             self.root.after(0, lambda: self.txt_log.configure(state=tk.DISABLED))
 
             # Bước 1: pip install -r requirements.txt
-            cmd_pip = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
+            python_bin = self.get_python_exe(folder)
+            cmd_pip = [python_bin, "-m", "pip", "install", "-r", "requirements.txt"]
             process_pip = subprocess.Popen(
                 cmd_pip,
                 cwd=folder,
@@ -495,7 +515,7 @@ class BHYTLauncher:
 
             # Bước 2: playwright install chromium
             self.root.after(0, lambda: self.append_log("\n>>> [2/2] Đang cài đặt trình duyệt tự động hóa Chromium (Playwright RPA)...\n"))
-            cmd_pw = [sys.executable, "-m", "playwright", "install", "chromium"]
+            cmd_pw = [python_bin, "-m", "playwright", "install", "chromium"]
             process_pw = subprocess.Popen(
                 cmd_pw,
                 cwd=folder,
@@ -538,7 +558,8 @@ class BHYTLauncher:
             self.root.after(0, lambda: self.txt_log.insert(tk.END, ">>> Đang tải và cài đặt trình duyệt Chromium cho Playwright RPA...\n"))
             self.root.after(0, lambda: self.txt_log.configure(state=tk.DISABLED))
 
-            cmd_pw = [sys.executable, "-m", "playwright", "install", "chromium"]
+            python_bin = self.get_python_exe(folder)
+            cmd_pw = [python_bin, "-m", "playwright", "install", "chromium"]
             process_pw = subprocess.Popen(
                 cmd_pw,
                 cwd=folder,
@@ -600,16 +621,16 @@ class BHYTLauncher:
             env["PYTHONIOENCODING"] = "utf-8"
             env["PYTHONUTF8"] = "1"
             
-            cmd = [sys.executable, run_script_path, "--port", str(port)]
-
+            python_bin = self.get_python_exe(folder)
+            cmd = [python_bin, run_script_path, "--port", str(port)]
             
             log_file_path = os.path.join(folder, "web_app_server.log")
             log_file = open(log_file_path, "a", encoding="utf-8")
-            log_file.write(f"\n--- KHỞI ĐỘNG HỆ THỐNG: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+            log_file.write(f"\n--- KHỞI ĐỘNG HỆ THỐNG ({python_bin}): {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
             log_file.flush()
 
             # DETACHED_PROCESS = 0x00000008, CREATE_NO_WINDOW = 0x08000000
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 cmd,
                 cwd=folder,
                 env=env,
@@ -618,13 +639,39 @@ class BHYTLauncher:
                 close_fds=False,  # Cần thiết khi redirect stdout/stderr trên Windows
                 creationflags=0x00000008 | 0x08000000
             )
-            
-            messagebox.showinfo(
-                "Khởi chạy thành công",
-                f"CheckBHYT WebApp đã được khởi chạy thành công trong nền hệ thống Windows!\n"
-                f"Dịch vụ chạy ngầm trên cổng: {port}\n\n"
-                f"Bạn có thể đóng bảng điều khiển này, máy chủ LAN vẫn hoạt động ổn định."
-            )
+            log_file.close()
+
+            # Chờ kiểm tra trạng thái port thực tế
+            server_started = False
+            for _ in range(8):  # Đợi tối đa ~4 giây
+                time.sleep(0.5)
+                if self.is_port_active(int(port)):
+                    server_started = True
+                    break
+                if proc.poll() is not None:
+                    break
+
+            if server_started:
+                messagebox.showinfo(
+                    "Khởi chạy thành công",
+                    f"CheckBHYT WebApp đã được khởi chạy thành công trong nền hệ thống Windows!\n"
+                    f"Dịch vụ chạy ngầm trên cổng: {port}\n\n"
+                    f"Bạn có thể đóng bảng điều khiển này, máy chủ LAN vẫn hoạt động ổn định."
+                )
+            else:
+                error_detail = "Máy chủ không phản hồi hoặc đã dừng ngay sau khi bật."
+                if os.path.exists(log_file_path):
+                    try:
+                        with open(log_file_path, "r", encoding="utf-8", errors="ignore") as f:
+                            lines = f.readlines()
+                            if lines:
+                                error_detail = "".join(lines[-15:])
+                    except Exception:
+                        pass
+                messagebox.showerror(
+                    "Lỗi khởi chạy",
+                    f"Không thể khởi chạy máy chủ hoặc tiến trình đã dừng!\n\nChi tiết log:\n{error_detail}"
+                )
             
         except Exception as e:
             messagebox.showerror("Lỗi khởi chạy", f"Không thể khởi chạy dịch vụ ngầm: {e}")
@@ -849,11 +896,8 @@ class BHYTLauncher:
         folder = self.folder_path.get().strip()
         port = self.port_val.get().strip()
         
-        # Locate pythonw.exe in the same folder as current python interpreter
-        python_dir = os.path.dirname(sys.executable)
-        pythonw_path = os.path.join(python_dir, "pythonw.exe")
-        if not os.path.exists(pythonw_path):
-            pythonw_path = sys.executable
+        # Locate pythonw.exe in venv or system python
+        pythonw_path = self.get_pythonw_exe(folder)
             
         run_script_path = os.path.join(folder, "web_app", "run.py")
         mode = self.autostart_mode.get()
