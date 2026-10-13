@@ -16,7 +16,7 @@ from models import User, AppConfig, Record, RecordLog, ErrorHistoryArchive
 from auth import (
     hash_password, verify_password, get_current_user, require_admin, SESSION_COOKIE_NAME
 )
-from services import his_service, excel_service, compare_service
+from services import his_service, excel_service, compare_service, report_service
 from services.portal_automation import portal_service, portal_logs, add_portal_log, captcha_mgr, get_portal_logs_since
 
 # ==========================================
@@ -2651,13 +2651,14 @@ def export_monthly_summary(
                 total_errors_val = len(df_loi_m)
                 errors_resolved_val = len(df_loi_m[df_loi_m["status"] == "RESOLVED"])
 
-                df_fail_m = df_rec_m[df_rec_m["type_group"] == "FAIL"]
+                # Chỉ tính các ca FAIL thực sự (loại trừ các ca thực chất là LOI)
+                df_fail_m = df_rec_m[(df_rec_m["type_group"] == "FAIL") & (~df_rec_m["ma_lk"].isin(loi_lks))]
                 fail_lks = set(df_fail_m["ma_lk"].unique())
                 fail_cases_val = len(fail_lks)
                 fail_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in fail_lks)
                 fail_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in fail_lks)
 
-                fail_res_lks = set(df_fail_m[df_fail_m["status"] == "RESOLVED"]["ma_lk"].unique())
+                fail_res_lks = set(df_fail_m[df_fail_m["status"] == "RESOLVED"]["ma_lk"].unique()) | (fail_lks & sent_lks)
                 fail_resolved_val = len(fail_res_lks)
                 fail_resolved_amount_val = sum(lk_money_map.get(lk, {}).get("tong_tien", 0.0) for lk in fail_res_lks)
                 fail_resolved_bhyt_val = sum(lk_money_map.get(lk, {}).get("tien_bhyt", 0.0) for lk in fail_res_lks)
@@ -2752,106 +2753,68 @@ def export_department_performance(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Xuất file Excel báo cáo phân tích thực hiện sửa lỗi theo khoa phòng ban và tháng (Tối ưu hóa tốc độ tải)"""
-    # Chỉ select các trường cần thiết để bypass ORM instantiation overhead
-    records = db.query(
-        Record.type_group,
-        Record.status,
-        Record.ten_khoa,
-        Record.ngay_ra_vien,
-        Record.ngay_doi_soat,
-        Record.ngay_ra
-    ).all()
-
-    if not records:
-        df = pd.DataFrame(columns=[
-            "Khoa/Phòng", "Tháng", 
-            "Tổng số lỗi phát sinh", "Số lỗi đã xử lý", "Số lỗi chưa xử lý", "Tỷ lệ sửa lỗi (%)",
-            "Tổng số ca FAIL phát sinh", "Số ca FAIL đã xử lý", "Số ca FAIL chưa xử lý", "Tỷ lệ giải quyết FAIL (%)"
-        ])
-    else:
-        data = []
-        for r in records:
-            date_val = r[3] or r[4] or r[5] # ngay_ra_vien, ngay_doi_soat, ngay_ra
-            month_str = date_val.strftime("%Y-%m") if date_val else "Không rõ"
-            data.append({
-                "type_group": r[0],
-                "status": r[1],
-                "ten_khoa": r[2] or "Chưa phân khoa",
-                "month": month_str
-            })
-        df_rec = pd.DataFrame(data)
-        
-        # Group by department and month
-        grouped = df_rec.groupby(["ten_khoa", "month"])
-        
-        report_data = []
-        for (dept, month), group in grouped:
-            # Errors (LOI)
-            df_err = group[group["type_group"] == "LOI"]
-            tot_err = len(df_err)
-            res_err = len(df_err[df_err["status"] == "RESOLVED"])
-            unres_err = tot_err - res_err
-            err_rate = f"{(res_err / tot_err * 100):.1f}%" if tot_err > 0 else "0.0%"
-            
-            # Fail (FAIL)
-            df_fail = group[group["type_group"] == "FAIL"]
-            tot_fail = len(df_fail)
-            res_fail = len(df_fail[df_fail["status"] == "RESOLVED"])
-            unres_fail = tot_fail - res_fail
-            fail_rate = f"{(res_fail / tot_fail * 100):.1f}%" if tot_fail > 0 else "0.0%"
-            
-            report_data.append({
-                "Khoa/Phòng": dept,
-                "Tháng": month,
-                "Tổng số lỗi phát sinh": tot_err,
-                "Số lỗi đã xử lý": res_err,
-                "Số lỗi chưa xử lý": unres_err,
-                "Tỷ lệ sửa lỗi (%)": err_rate,
-                "Tổng số ca FAIL phát sinh": tot_fail,
-                "Số ca FAIL đã xử lý": res_fail,
-                "Số ca FAIL chưa xử lý": unres_fail,
-                "Tỷ lệ giải quyết FAIL (%)": fail_rate
-            })
-            
-        df = pd.DataFrame(report_data)
-        # Sort by Department and Month
-        df = df.sort_values(by=["Khoa/Phòng", "Tháng"])
-        
-        # Add total row
-        total_err = df["Tổng số lỗi phát sinh"].sum()
-        total_res_err = df["Số lỗi đã xử lý"].sum()
-        total_unres_err = df["Số lỗi chưa xử lý"].sum()
-        total_err_rate = f"{(total_res_err / total_err * 100):.1f}%" if total_err > 0 else "0.0%"
-        
-        total_fail = df["Tổng số ca FAIL phát sinh"].sum()
-        total_res_fail = df["Số ca FAIL đã xử lý"].sum()
-        total_unres_fail = df["Số ca FAIL chưa xử lý"].sum()
-        total_fail_rate = f"{(total_res_fail / total_fail * 100):.1f}%" if total_fail > 0 else "0.0%"
-        
-        total_row = {
-            "Khoa/Phòng": "Tổng cộng",
-            "Tháng": "-",
-            "Tổng số lỗi phát sinh": total_err,
-            "Số lỗi đã xử lý": total_res_err,
-            "Số lỗi chưa xử lý": total_unres_err,
-            "Tỷ lệ sửa lỗi (%)": total_err_rate,
-            "Tổng số ca FAIL phát sinh": total_fail,
-            "Số ca FAIL đã xử lý": total_res_fail,
-            "Số ca FAIL chưa xử lý": total_unres_fail,
-            "Tỷ lệ giải quyết FAIL (%)": total_fail_rate
-        }
-        df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
-        
+    """Xuất file Excel báo cáo phân tích thực hiện sửa lỗi theo khoa phòng ban và tháng (Tách sheet theo từng tháng)"""
+    out_path = report_service.export_department_performance_multi_sheet(db, UPLOAD_DIR)
     filename = "BAO_CAO_KHOA_PHONG_THEO_THANG.xlsx"
-    out_path = os.path.join(UPLOAD_DIR, filename)
-    df.to_excel(out_path, index=False)
-    
     return FileResponse(
         out_path, 
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
         filename=filename
     )
+
+
+# ----------------------------------------------------
+# API: BÁO CÁO LỖI THEO NGÀY (PHƯƠNG ÁN A & WEBHOOK N8N)
+# ----------------------------------------------------
+
+@app.get("/api/reports/daily-errors")
+def get_daily_errors_summary(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Lấy dữ liệu JSON tổng hợp tình hình lỗi tồn đọng sau đối soát theo khoa phòng và ca quá hạn > 7 ngày"""
+    summary_data = report_service.get_daily_error_summary_data(db)
+    return summary_data
+
+
+@app.get("/api/export/daily-errors")
+def export_daily_errors_excel(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Xuất file Excel báo cáo lỗi theo ngày: Khoa - Số ca lỗi - Số lỗi - Số ca lỗi quá hạn (> 7 ngày)"""
+    out_path = report_service.generate_daily_error_excel(db, UPLOAD_DIR)
+    filename = os.path.basename(out_path)
+    return FileResponse(
+        out_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=filename
+    )
+
+
+@app.get("/api/reports/daily-errors/preview-html")
+def preview_daily_error_html(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Trả về nội dung HTML thiết kế chuẩn iPhone 14 (390x844px) để xem trước trực tiếp trên giao diện"""
+    summary_data = report_service.get_daily_error_summary_data(db)
+    html_content = report_service.generate_daily_error_html(summary_data)
+    return HTMLResponse(content=html_content, status_code=200)
+
+
+@app.post("/api/reports/daily-errors/webhook")
+def trigger_daily_error_webhook(
+    webhook_url: Optional[str] = None,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Gửi webhook POST chứa mã HTML hoàn chỉnh tới n8n (mặc định https://tool.thienhanhhospital.com/webhook/bvth-bhyt-baocao)"""
+    target_url = webhook_url or report_service.DEFAULT_WEBHOOK_URL
+    summary_data = report_service.get_daily_error_summary_data(db)
+    html_content = report_service.generate_daily_error_html(summary_data)
+    result = report_service.send_daily_error_webhook(html_content, summary_data, target_url)
+    return result
 
 
 # ==========================================

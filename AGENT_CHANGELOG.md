@@ -56,6 +56,42 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-13 09:35 - Antigravity (Báo Cáo Hiệu Suất Khoa Đa Sheet, Khắc Phục Sai Lệch Ca FAIL & Báo Cáo Lỗi Theo Ngày Cầu Nối Webhook Zalo n8n)
+
+### Mục tiêu
+- **Báo cáo Hiệu suất Khoa đa sheet:** Tách từng sheet theo tháng (`Tháng MM-YYYY`) giống Báo cáo tổng hợp tháng, có bảng số liệu và dòng tổng cộng cho từng tháng.
+- **Khắc phục sai lệch số ca FAIL:** Loại trừ các ca bệnh thực chất là `LOI` khỏi nhóm `FAIL` trong Báo cáo tổng hợp tháng và Báo cáo hiệu suất khoa; tính đúng số ca FAIL thực sự và số ca FAIL đã giải quyết.
+- **Báo cáo Lỗi theo Ngày (Phương án A):** Tổng hợp toàn bộ lỗi tồn đọng sau đối soát theo từng khoa phòng: `Khoa/Phòng`, `Số ca lỗi` (distinct `MA_LK`), `Số lỗi` (dòng lỗi), `Số ca quá hạn > 7 ngày` (so sánh ngày ra viện với ngày hiện tại).
+- **Cầu nối Webhook n8n (Zalo Mobile):**
+  - Sinh mã HTML hoàn chỉnh chuẩn iPhone 14 (390 × 844px), CSS inline, không JS, không font/ảnh ngoài, không tràn, không bị cắt.
+  - Endpoint gửi Webhook POST tới `https://tool.thienhanhhospital.com/webhook/bvth-bhyt-baocao` với payload `{"output": html_content, ...}` phục vụ n8n chụp ảnh qua snap-render gửi Zalo Bot.
+  - Giao diện WebApp Tab 5 trang bị nút Tải Excel, nút Xem trước Zalo mô phỏng khung iPhone 14 và nút Gửi Webhook 1-click kèm Toast thông báo.
+
+### Thay đổi
+- `web_app/services/report_service.py` (Mới):
+  - `get_daily_error_summary_data(db)`: Tính toán số ca lỗi, số lỗi, số ca quá hạn > 7 ngày và tỷ lệ quá hạn theo từng khoa phòng và toàn viện.
+  - `generate_daily_error_html(summary_data)`: Sinh mã HTML chuẩn khung iPhone 14 (390 × 844px), header Phòng CNTT - Bệnh viện Đa khoa Thiện Hạnh, 3 card KPI, bảng khoa kèm CSS progress bar thuần, footer cảnh báo.
+  - `generate_daily_error_excel(db, upload_dir)`: Xuất file Excel `BAO_CAO_LOI_THEO_NGAY_{YYYYMMDD}.xlsx` định dạng openpyxl đẹp mắt.
+  - `send_daily_error_webhook(...)`: Gửi HTTP POST JSON payload tới webhook n8n qua `httpx`.
+  - `export_department_performance_multi_sheet(db, upload_dir)`: Phân tách sheet theo từng tháng `Tháng MM-YYYY`, loại trừ ca có lỗi khỏi FAIL, sắp xếp theo số lỗi giảm dần và thêm dòng tổng cộng toàn viện cho từng sheet.
+- `web_app/main.py`:
+  - `export_monthly_summary`: Sửa logic tính `df_fail_m` bằng cách loại trừ `df_rec_m['ma_lk'].isin(loi_lks)`.
+  - `export_department_performance`: Chuyển sang gọi `report_service.export_department_performance_multi_sheet()`.
+  - Bổ sung 4 endpoints mới: `GET /api/reports/daily-errors`, `GET /api/export/daily-errors`, `GET /api/reports/daily-errors/preview-html`, `POST /api/reports/daily-errors/webhook`.
+- `web_app/templates/admin.html`:
+  - Thêm thẻ Card "Báo cáo Lỗi theo Ngày (Zalo)" trên Tab 5: Reports & Export.
+  - Thêm Modal Popup `#dailyErrorPreviewModal` giả lập màn hình iPhone 14 để xem trước báo cáo HTML.
+  - Thêm các hàm JS `exportDailyErrorsExcel()`, `previewDailyErrorHtml()`, `closeDailyErrorPreviewModal()`, `sendDailyErrorWebhook()`.
+
+### Nghiệp vụ ảnh hưởng
+- Không ảnh hưởng đến dữ liệu lưu trữ trong CSDL và luồng đối soát lõi.
+- Dữ liệu báo cáo tài chính và hiệu suất phản ánh chính xác số lượng ca FAIL thực tế, không còn bị đội số liệu do ca lỗi gây ra.
+- Phòng CNTT có thể gửi ngay ảnh báo cáo lỗi về Zalo các khoa phòng chỉ với 1-click sau khi hoàn tất đối soát.
+
+### Kiểm tra
+- Đã chạy kiểm thử toàn diện `python scratch/test_reports.py`: Đạt 100% tất cả các mục (JSON dữ liệu, HTML 390x844px, Excel theo ngày, Excel theo khoa đa sheet).
+- Đã kiểm tra cú pháp biên dịch `python -m py_compile web_app/main.py web_app/services/report_service.py` thành công không có lỗi.
+
 ## 2026-09-27 16:30 - Antigravity (Tự Động Ẩn / Đóng Hồ Sơ LOI Mồ Côi & Cảnh Báo Hồ Sơ Rác Trên Cổng BHYT)
 
 ### Mục tiêu

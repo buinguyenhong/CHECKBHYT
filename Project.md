@@ -505,12 +505,16 @@ Khi app startup, scheduler chạy nền:
 
 ### 8.10. Xuất báo cáo
 
-Hệ thống hỗ trợ các loại export Excel:
+Hệ thống hỗ trợ các loại export Excel và Webhook tự động:
 
 - `GET /api/export/sql_list`: Xuất toàn bộ danh sách nạp từ HIS SQL ở ngày đối soát gần nhất.
 - `GET /api/export/fail`: Xuất danh sách ca FAIL chưa giải quyết (hỗ trợ các tham số `from_date`, `to_date` để lọc theo ngày ra viện và cờ `include_resolved` để quyết định có xuất ca đã duyệt hay không).
 - `GET /api/export/loi`: Xuất danh sách tất cả các ca lỗi (`LOI`) chưa giải quyết trong hệ thống.
 - `GET /api/export/dept/loi`: Khoa lâm sàng xuất danh sách lỗi chưa giải quyết của riêng khoa mình theo tháng.
+- `GET /api/export/monthly_summary`: Xuất báo cáo tổng hợp số ca XML và top 10 lỗi thường gặp theo từng tháng (đã chuẩn hóa loại trừ ca lỗi khỏi nhóm FAIL).
+- `GET /api/export/department_performance`: Xuất báo cáo phân tích hiệu suất sửa lỗi theo khoa phòng và phân tách từng sheet theo tháng (`Tháng MM-YYYY`), kèm dòng tổng cộng toàn viện.
+- `GET /api/export/daily-errors`: Xuất báo cáo tổng hợp lỗi theo ngày (Khoa - Số ca lỗi - Số lỗi - Số ca lỗi quá hạn > 7 ngày).
+- `POST /api/reports/daily-errors/webhook`: Gửi chuỗi HTML hoàn chỉnh chuẩn iPhone 14 (390 × 844px) tới Webhook n8n (`https://tool.thienhanhhospital.com/webhook/bvth-bhyt-baocao`) để chụp ảnh qua snap-render gửi Zalo Bot.
 
 ## 9. Quy trình nghiệp vụ chuẩn đề xuất khi vận hành hằng ngày
 
@@ -1044,6 +1048,12 @@ Báo cáo & Xuất file:
 - `GET /api/export/sql_list`
 - `GET /api/export/fail`
 - `GET /api/export/loi`
+- `GET /api/export/monthly_summary`
+- `GET /api/export/department_performance`
+- `GET /api/reports/daily-errors`
+- `GET /api/export/daily-errors`
+- `GET /api/reports/daily-errors/preview-html`
+- `POST /api/reports/daily-errors/webhook`
 
 Lưu trữ Lịch sử Lỗi Vĩnh viễn:
 

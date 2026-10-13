@@ -1441,8 +1441,20 @@
                 </div>
                 <div class="upload-card">
                     <h3>Hiệu suất theo Khoa</h3>
-                    <p>Phân tích tỷ lệ sửa lỗi theo từng khoa và tháng</p>
+                    <p>Phân tích tỷ lệ sửa lỗi theo từng khoa và tháng (tách sheet)</p>
                     <button class="btn" style="background-color: var(--username-color); color: #fff;" onclick="exportDeptPerformance()">Tải báo cáo hiệu suất khoa</button>
+                </div>
+                <div class="upload-card" style="border: 2px solid #0284c7; background: rgba(2, 132, 199, 0.04);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <h3 style="color:#0369a1; margin:0;">Báo cáo Lỗi theo Ngày (Zalo)</h3>
+                        <span style="background:#0284c7; color:#fff; font-size:10.5px; font-weight:bold; padding:2px 7px; border-radius:10px;">n8n / Webhook</span>
+                    </div>
+                    <p style="margin:4px 0 10px 0;">Tổng hợp lỗi sau đối soát: Khoa - Ca lỗi - Số lỗi - Quá hạn &gt; 7 ngày</p>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button class="btn btn-primary" style="flex:1; padding:6px 10px; font-size:12px;" onclick="exportDailyErrorsExcel()">Tải Excel</button>
+                        <button class="btn btn-warning" style="flex:1; padding:6px 10px; font-size:12px;" onclick="previewDailyErrorHtml()">Xem trước Zalo</button>
+                        <button class="btn btn-success" style="flex:100%; padding:8px 12px; font-size:13px; font-weight:bold;" onclick="sendDailyErrorWebhook()">🚀 Gửi Webhook Zalo (n8n)</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1800,6 +1812,31 @@
         <div style="display:flex; justify-content:flex-end; gap:10px;">
             <button class="btn" onclick="closeHisUnlockModal()">Đóng</button>
             <button id="btnCopyHisUnlock" class="btn btn-success" style="font-weight:bold;" onclick="copyHisUnlockSql()">Copy câu lệnh SQL</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem trước Báo cáo Zalo (Khung giả lập iPhone 14 390x844px) -->
+<div class="modal" id="dailyErrorPreviewModal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.75); z-index:9999;">
+    <div class="modal-content" style="max-width: 440px; padding: 16px; background: var(--bg-card); border-radius: 16px; display:flex; flex-direction:column; align-items:center;">
+        <div class="modal-header" style="width:100%; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:18px;">📱</span>
+                <h3 style="margin:0; font-size:15px; font-weight:700;">Xem trước Báo cáo Zalo (390 × 844px)</h3>
+            </div>
+            <button class="btn-close" onclick="closeDailyErrorPreviewModal()">&times;</button>
+        </div>
+        <p style="font-size:11.5px; color:var(--text-secondary); margin-bottom:10px; text-align:center;">
+            Mô phỏng hình ảnh iPhone 14 gửi qua n8n. Khung thiết kế cố định 390×844px, không tràn, không bị cắt.
+        </p>
+        <!-- Mockup iPhone Screen Frame -->
+        <div style="width: 390px; height: 580px; border: 3px solid #334155; border-radius: 20px; overflow: hidden; background: #0f172a; box-shadow: 0 10px 25px rgba(0,0,0,0.3); position: relative;">
+            <iframe id="dailyErrorPreviewIframe" style="width: 390px; height: 844px; border: none; transform: scale(0.687); transform-origin: top left;" src="/api/reports/daily-errors/preview-html"></iframe>
+        </div>
+        <div style="display:flex; gap:8px; width:100%; margin-top:12px; justify-content:flex-end;">
+            <button class="btn" onclick="closeDailyErrorPreviewModal()">Đóng</button>
+            <button class="btn btn-primary" onclick="exportDailyErrorsExcel()">Tải Excel</button>
+            <button id="btnSendWebhookInModal" class="btn btn-success" style="font-weight:bold;" onclick="sendDailyErrorWebhook()">🚀 Gửi Webhook Zalo (n8n)</button>
         </div>
     </div>
 </div>
@@ -3801,6 +3838,54 @@
 
     function exportDeptPerformance() {
         window.open('/api/export/department_performance', '_blank');
+    }
+
+    function exportDailyErrorsExcel() {
+        window.open('/api/export/daily-errors', '_blank');
+    }
+
+    function previewDailyErrorHtml() {
+        const modal = document.getElementById('dailyErrorPreviewModal');
+        const iframe = document.getElementById('dailyErrorPreviewIframe');
+        if (modal && iframe) {
+            iframe.src = '/api/reports/daily-errors/preview-html?t=' + Date.now();
+            modal.style.display = 'flex';
+        }
+    }
+
+    function closeDailyErrorPreviewModal() {
+        const modal = document.getElementById('dailyErrorPreviewModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function sendDailyErrorWebhook() {
+        const btnInModal = document.getElementById('btnSendWebhookInModal');
+        if (btnInModal) {
+            btnInModal.disabled = true;
+            btnInModal.textContent = 'Đang gửi tới n8n...';
+        }
+        try {
+            showAdminToast("Đang gửi báo cáo HTML tới n8n...", "info", 2000);
+            const res = await fetch('/api/reports/daily-errors/webhook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showAdminToast("Đã gửi báo cáo Zalo qua n8n thành công! ✓", "success", 4000);
+            } else {
+                const errDetail = data.error || data.response_text || `HTTP ${data.status_code}`;
+                showAdminToast("Gửi n8n thất bại: " + errDetail, "error", 6000);
+            }
+        } catch (e) {
+            console.error("Lỗi gửi webhook:", e);
+            showAdminToast("Lỗi kết nối webhook: " + e.message, "error", 5000);
+        } finally {
+            if (btnInModal) {
+                btnInModal.disabled = false;
+                btnInModal.textContent = '🚀 Gửi Webhook Zalo (n8n)';
+            }
+        }
     }
 
     // Load unique department names datalist for autocomplete
