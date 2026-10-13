@@ -2794,12 +2794,13 @@ def export_daily_errors_excel(
 
 @app.get("/api/reports/daily-errors/preview-html")
 def preview_daily_error_html(
+    page: int = 1,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Trả về nội dung HTML thiết kế chuẩn iPhone 14 (390x844px) để xem trước trực tiếp trên giao diện"""
+    """Trả về nội dung HTML thiết kế chuẩn iPhone 14 (390x844px) theo số trang để xem trước trực tiếp trên giao diện"""
     summary_data = report_service.get_daily_error_summary_data(db)
-    html_content = report_service.generate_daily_error_html(summary_data)
+    html_content = report_service.generate_daily_error_html(summary_data, page=page)
     return HTMLResponse(content=html_content, status_code=200)
 
 
@@ -2812,8 +2813,7 @@ def trigger_daily_error_webhook(
     """Gửi webhook POST chứa mã HTML hoàn chỉnh tới n8n (mặc định https://tool.thienhanhhospital.com/webhook/bvth-bhyt-baocao)"""
     target_url = webhook_url or report_service.DEFAULT_WEBHOOK_URL
     summary_data = report_service.get_daily_error_summary_data(db)
-    html_content = report_service.generate_daily_error_html(summary_data)
-    result = report_service.send_daily_error_webhook(html_content, summary_data, target_url)
+    result = report_service.send_daily_error_webhook(summary_data=summary_data, webhook_url=target_url)
     return result
 
 

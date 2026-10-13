@@ -56,6 +56,32 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-13 10:40 - Antigravity (Sắp Xếp Ưu Tiên Ca Quá Hạn & Tự Động Phân Trang Cắt Thành Hình Ảnh Thứ 2 Cho Báo Cáo Zalo)
+
+### Mục tiêu
+- Điều chỉnh thứ tự sắp xếp danh sách khoa trong Báo cáo Lỗi theo Ngày gửi n8n/Zalo: **Ưu tiên số ca quá hạn (> 7 ngày) từ nhiều đến ít** lên hàng đầu để cảnh báo tức thì các khoa có nguy cơ chậm trễ nghiêm trọng nhất.
+- Đảm bảo hiển thị đầy đủ 100% tất cả các khoa phòng có lỗi (không gom hay bỏ sót vào nhóm "Khác").
+- Nếu danh sách khoa dài vượt quá chiều cao chuẩn iPhone 14 (390 × 844px), hệ thống tự động phân chia và cắt thành **Hình ảnh thứ 1 (Trang 1)** và **Hình ảnh thứ 2 (Trang 2)**.
+
+### Thay đổi
+- `web_app/services/report_service.py`:
+  - `get_daily_error_summary_data()`: Sắp xếp theo thứ tự ưu tiên `(so_ca_qua_han, so_ca_loi, so_loi)` giảm dần; tính toán động `total_pages` dựa trên số lượng khoa.
+  - `generate_daily_error_html(summary_data, page)`: Hỗ trợ phân trang:
+    - **Trang 1 (8 khoa đầu tiên):** Giữ nguyên Header bệnh viện, 3 KPI Cards tổng thể, Bảng 8 khoa có nhiều ca quá hạn nhất và Footer chỉ báo `Trang 1/{total_pages}`.
+    - **Trang 2 (từ khoa thứ 9 trở đi, tối đa 14 khoa/trang):** Header rút gọn (Tiếp theo), mở rộng toàn bộ bảng hiển thị các khoa còn lại mà không lặp lại 3 KPI Cards to, đảm bảo chiều cao luôn $\le$ 844px.
+  - `send_daily_error_webhook()`: Bổ sung các trường `output_page_1`, `output_page_2`, `total_pages`, `pages` vào JSON payload gửi n8n giúp workflow n8n có thể chụp thành 2 ảnh gửi 2 tin nhắn Zalo độc lập.
+- `web_app/main.py`:
+  - Endpoint `GET /api/reports/daily-errors/preview-html`: Nhận thêm query param `page` (mặc định 1) để trả về mã HTML của trang tương ứng.
+  - Endpoint `POST /api/reports/daily-errors/webhook`: Chuyển sang gọi `send_daily_error_webhook` với payload đa trang tự động.
+- `web_app/templates/admin.html`:
+  - Cập nhật popup xem trước: Thêm 2 nút tab **[📄 Ảnh 1 (Trang 1)]** và **[📄 Ảnh 2 (Trang 2)]** (tự động ẩn tab 2 nếu chỉ có 1 trang).
+  - Bổ sung hàm JS `switchPreviewPage(page)` để quản trị viên có thể xem trước chính xác từng ảnh trước khi gửi n8n.
+
+### Kiểm tra
+- Đã chạy unit test kiểm tra sắp xếp `so_ca_qua_han` giảm dần: chính xác 100%.
+- Đã chạy kiểm tra sinh HTML trang 1 và trang 2 với 14 khoa phòng: Trang 1 có KPI cards và 8 khoa, Trang 2 không có KPI cards và chứa 6 khoa còn lại, cả 2 trang đều có kích thước cố định 390x844px.
+- Đã test gửi Webhook đa trang giả lập (HTTP 200).
+
 ## 2026-10-13 10:20 - Antigravity (Khắc phục Crash Khởi Động: Loại Bỏ Hard Dependency httpx & Fallback urllib Chuẩn Cho Webhook)
 
 ### Mục tiêu

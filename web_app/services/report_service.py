@@ -1,6 +1,7 @@
 import os
+import math
 import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -80,12 +81,18 @@ def get_daily_error_summary_data(db: Session) -> Dict[str, Any]:
             "bar_pct": bar_pct
         })
         
-    # Sắp xếp các khoa: số ca lỗi giảm dần, số ca quá hạn giảm dần
-    dept_list.sort(key=lambda x: (x["so_ca_loi"], x["so_ca_qua_han"], x["so_loi"]), reverse=True)
+    # Sắp xếp các khoa: Ưu tiên số ca quá hạn giảm dần (từ nhiều đến ít), tiếp theo là số ca lỗi, rồi số lỗi
+    dept_list.sort(key=lambda x: (x["so_ca_qua_han"], x["so_ca_loi"], x["so_loi"]), reverse=True)
     
     total_cases = len(all_lks)
     total_overdue = len(all_overdue_lks)
     overdue_rate = round((total_overdue / total_cases * 100), 1) if total_cases > 0 else 0.0
+    
+    total_depts = len(dept_list)
+    if total_depts <= 8:
+        total_pages = 1
+    else:
+        total_pages = 1 + math.ceil((total_depts - 8) / 14)
     
     return {
         "report_date": today.strftime("%d/%m/%Y"),
@@ -94,13 +101,17 @@ def get_daily_error_summary_data(db: Session) -> Dict[str, Any]:
         "total_errors": total_errors,
         "total_overdue": total_overdue,
         "overdue_rate": overdue_rate,
+        "total_pages": total_pages,
         "departments": dept_list
     }
 
-def generate_daily_error_html(summary_data: Dict[str, Any]) -> str:
+def generate_daily_error_html(summary_data: Dict[str, Any], page: int = 1) -> str:
     """
     Sinh 1 file HTML hoàn chỉnh thiết kế cố định chuẩn iPhone 14 (rộng 390px, cao tối đa 844px).
     Không dùng JS, không file/font ngoài, CSS inline, không tràn, không bị cắt.
+    Hỗ trợ phân trang:
+    - Trang 1: 8 khoa đầu tiên (có nhiều ca quá hạn nhất) + 3 KPI Cards.
+    - Trang 2 trở đi: tối đa 14 khoa/trang, mở rộng bảng hiển thị, không lặp lại 3 KPI Cards.
     """
     report_date = summary_data.get("report_date", "")
     report_time = summary_data.get("report_time", "")
@@ -109,25 +120,31 @@ def generate_daily_error_html(summary_data: Dict[str, Any]) -> str:
     total_overdue = summary_data.get("total_overdue", 0)
     overdue_rate = summary_data.get("overdue_rate", 0.0)
     departments = summary_data.get("departments", [])
+    total_depts = len(departments)
     
-    # Để đảm bảo chiều cao toàn trang không vượt quá 844px:
-    # Nếu danh sách khoa > 9, hiển thị top 8 khoa và gom số còn lại vào "Các khoa khác"
-    max_dept_rows = 9
-    has_more = len(departments) > max_dept_rows
-    display_depts = departments[:8] if has_more else departments
+    if total_depts <= 8:
+        total_pages = 1
+    else:
+        total_pages = 1 + math.ceil((total_depts - 8) / 14)
+        
+    page = max(1, min(page, total_pages))
     
-    other_cases = 0
-    other_errors = 0
-    other_overdue = 0
-    if has_more:
-        for d in departments[8:]:
-            other_cases += d["so_ca_loi"]
-            other_errors += d["so_loi"]
-            other_overdue += d["so_ca_qua_han"]
-            
-    # Xây dựng các hàng HTML cho bảng khoa
+    if page == 1:
+        page_depts = departments[:8]
+        start_idx = 1 if page_depts else 0
+        end_idx = len(page_depts)
+        is_first_page = True
+    else:
+        start_offset = 8 + (page - 2) * 14
+        end_offset = start_offset + 14
+        page_depts = departments[start_offset:end_offset]
+        start_idx = start_offset + 1
+        end_idx = start_offset + len(page_depts)
+        is_first_page = False
+
+    # Xây dựng các hàng HTML cho bảng khoa của trang này
     dept_rows_html = []
-    for idx, d in enumerate(display_depts, 1):
+    for d in page_depts:
         dept_name = d["ten_khoa"]
         # Cắt ngắn tên khoa nếu quá dài để không bị rớt dòng
         short_name = dept_name if len(dept_name) <= 18 else dept_name[:17] + "…"
@@ -148,31 +165,71 @@ def generate_daily_error_html(summary_data: Dict[str, Any]) -> str:
         """
         dept_rows_html.append(row)
         
-    if has_more:
-        rem_count = len(departments) - 8
-        od_badge_other = f'<span class="badge-od">{other_overdue}</span>' if other_overdue > 0 else '<span class="text-muted">0</span>'
-        dept_rows_html.append(f"""
-        <tr class="row-other">
-            <td class="col-dept">
-                <div class="dept-title">Khác ({rem_count} khoa)</div>
-                <div class="progress-track"><div class="progress-fill" style="width:30%; background:#94a3b8;"></div></div>
-            </td>
-            <td class="col-num text-bold">{other_cases}</td>
-            <td class="col-num">{other_errors}</td>
-            <td class="col-num">{od_badge_other}</td>
-        </tr>
-        """)
-        
     rows_joined = "".join(dept_rows_html) if dept_rows_html else """
         <tr><td colspan="4" style="text-align:center; padding:16px; color:#64748b; font-style:italic;">Không có hồ sơ lỗi tồn đọng. Xuất sắc! ✓</td></tr>
     """
+
+    if is_first_page:
+        top_section = f"""
+        <div>
+            <div class="header">
+                <div class="org-name">Bệnh viện Đa khoa Thiện Hạnh</div>
+                <div class="report-title">Phòng Công nghệ Thông tin</div>
+                <div class="header-meta">
+                    <span>Báo Cáo Giám Sát Hồ Sơ Lỗi BHYT</span>
+                    <span class="date-pill">{report_date}</span>
+                </div>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-val">{total_cases}</div>
+                    <div class="kpi-label">Ca Lỗi</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-val">{total_errors}</div>
+                    <div class="kpi-label">Tổng Lỗi</div>
+                </div>
+                <div class="kpi-card alert">
+                    <div class="kpi-val">{total_overdue}</div>
+                    <div class="kpi-label">Quá Hạn &gt;7d</div>
+                    <div class="kpi-sub">{overdue_rate}% ca</div>
+                </div>
+            </div>
+        </div>
+        """
+        table_title_html = f"""
+            <span>Chi tiết Lỗi theo Khoa (Top ca quá hạn)</span>
+            <span style="font-size:10.5px; color:#64748b; font-weight:normal;">({end_idx}/{total_depts} khoa)</span>
+        """
+        table_card_class = "table-card"
+    else:
+        top_section = f"""
+        <div>
+            <div class="header" style="padding: 10px 14px; margin-bottom: 8px;">
+                <div class="org-name">Bệnh viện Đa khoa Thiện Hạnh • Phòng CNTT</div>
+                <div class="report-title" style="font-size: 14px;">Báo Cáo Giám Sát Lỗi BHYT (Tiếp theo)</div>
+                <div class="header-meta" style="margin-top: 4px;">
+                    <span>Danh sách khoa phòng lâm sàng</span>
+                    <span class="date-pill">{report_date}</span>
+                </div>
+            </div>
+        </div>
+        """
+        table_title_html = f"""
+            <span>Chi tiết Lỗi theo Khoa (Khoa {start_idx} - {end_idx})</span>
+            <span style="font-size:10.5px; color:#64748b; font-weight:normal;">({end_idx}/{total_depts} khoa)</span>
+        """
+        table_card_class = "table-card table-card-expanded"
+
+    footer_page_info = f"Trang {page}/{total_pages}"
 
     html = f"""<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=390, height=844, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Báo cáo BHYT - {report_date}</title>
+<title>Báo cáo BHYT - {report_date} - Trang {page}/{total_pages}</title>
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 html, body {{
@@ -287,6 +344,9 @@ html, body {{
     min-height: 0;
     margin-bottom: 9px;
 }}
+.table-card-expanded {{
+    margin-bottom: 9px;
+}}
 .table-title {{
     display: flex;
     justify-content: space-between;
@@ -361,10 +421,6 @@ html, body {{
     padding: 1px 6px;
     border-radius: 8px;
 }}
-.row-other td {{
-    background: #f8fafc;
-    font-style: italic;
-}}
 .footer {{
     background: #ffffff;
     border-radius: 10px;
@@ -380,41 +436,23 @@ html, body {{
     font-weight: 600;
     color: #b91c1c;
 }}
+.page-badge {{
+    background: #e2e8f0;
+    color: #334155;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 9.5px;
+}}
 </style>
 </head>
 <body>
 <div class="phone-container">
-    <div>
-        <div class="header">
-            <div class="org-name">Bệnh viện Đa khoa Thiện Hạnh</div>
-            <div class="report-title">Phòng Công nghệ Thông tin</div>
-            <div class="header-meta">
-                <span>Báo Cáo Giám Sát Hồ Sơ Lỗi BHYT</span>
-                <span class="date-pill">{report_date}</span>
-            </div>
-        </div>
+    {top_section}
 
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-val">{total_cases}</div>
-                <div class="kpi-label">Ca Lỗi</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-val">{total_errors}</div>
-                <div class="kpi-label">Tổng Lỗi</div>
-            </div>
-            <div class="kpi-card alert">
-                <div class="kpi-val">{total_overdue}</div>
-                <div class="kpi-label">Quá Hạn &gt;7d</div>
-                <div class="kpi-sub">{overdue_rate}% ca</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="table-card">
+    <div class="{table_card_class}">
         <div class="table-title">
-            <span>Chi tiết Lỗi theo Khoa lâm sàng</span>
-            <span style="font-size:10.5px; color:#64748b; font-weight:normal;">({len(departments)} khoa)</span>
+            {table_title_html}
         </div>
         <table class="dept-table">
             <thead>
@@ -433,7 +471,7 @@ html, body {{
 
     <div class="footer">
         <span class="footer-note">⚠️ Đề nghị các khoa xử lý dứt điểm ca quá hạn</span>
-        <span>{report_time}</span>
+        <span class="page-badge">{footer_page_info}</span>
     </div>
 </div>
 </body>
@@ -562,17 +600,35 @@ def generate_daily_error_excel(db: Session, upload_dir: str) -> str:
     return out_path
 
 def send_daily_error_webhook(
-    html_content: str,
-    summary_data: Dict[str, Any],
+    html_content: Optional[str] = None,
+    summary_data: Optional[Dict[str, Any]] = None,
     webhook_url: str = DEFAULT_WEBHOOK_URL
 ) -> Dict[str, Any]:
     """
-    Gửi Webhook POST tới n8n với body JSON có trường 'output' chứa chuỗi HTML.
+    Gửi Webhook POST tới n8n với body JSON chứa:
+    - 'output': HTML trang 1
+    - 'output_page_1': HTML trang 1 (top các khoa có ca quá hạn nhiều nhất)
+    - 'output_page_2': HTML trang 2 (các khoa tiếp theo, nếu có)
+    - 'total_pages': Tổng số trang (1 hoặc 2)
+    - 'pages': Danh sách HTML từng trang
     Tự động ưu tiên httpx nếu có, hoặc fallback về urllib.request (thư viện chuẩn của Python)
     để đảm bảo không bao giờ bị lỗi ModuleNotFoundError khi khởi động hệ thống.
     """
+    if summary_data is None:
+        summary_data = {}
+        
+    total_pages = summary_data.get("total_pages", 1)
+    
+    page1_html = html_content or generate_daily_error_html(summary_data, page=1)
+    page2_html = generate_daily_error_html(summary_data, page=2) if total_pages >= 2 else ""
+    pages = [generate_daily_error_html(summary_data, page=p) for p in range(1, total_pages + 1)]
+
     payload = {
-        "output": html_content,
+        "output": page1_html,
+        "output_page_1": page1_html,
+        "output_page_2": page2_html,
+        "total_pages": total_pages,
+        "pages": pages,
         "report_date": summary_data.get("report_date", ""),
         "total_cases": summary_data.get("total_cases", 0),
         "total_errors": summary_data.get("total_errors", 0),
