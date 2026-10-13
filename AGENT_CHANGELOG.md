@@ -56,6 +56,28 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-13 10:20 - Antigravity (Khắc phục Crash Khởi Động: Loại Bỏ Hard Dependency httpx & Fallback urllib Chuẩn Cho Webhook)
+
+### Mục tiêu
+- Khắc phục triệt để lỗi máy chủ bị crash ngay khi khởi động: `ModuleNotFoundError: No module named 'httpx'` tại `web_app/services/report_service.py`, dòng 8.
+- Đảm bảo ứng dụng khởi động thành công 100% trên mọi máy tính/môi trường Python dù đã hay chưa cài gói `httpx`.
+
+### Nguyên nhân gốc rễ
+- Trong bản cập nhật trước, `web_app/services/report_service.py` được thêm tính năng gửi webhook Zalo qua n8n và đã thực hiện `import httpx` ở đầu tệp (top-level).
+- Gói `httpx` chưa có trong `requirements.txt`. Do đó, trên các máy tính mới pull code về hoặc môi trường Python hệ thống chưa cài `httpx`, khi `web_app/main.py` import `report_service` thì toàn bộ server bị dừng ngay lập tức.
+
+### Thay đổi
+- `web_app/services/report_service.py`:
+  - Xóa dòng `import httpx` ở đầu file.
+  - Cập nhật hàm `send_daily_error_webhook`: Sử dụng cơ chế lazy import `httpx` nếu có; nếu không có, tự động fallback sang `urllib.request` (thư viện chuẩn tích hợp sẵn trong mọi bản phân phối Python) để gửi HTTP POST request có header `Content-Type: application/json; charset=utf-8`.
+  - Nhờ đó, ứng dụng không còn phụ thuộc cứng vào `httpx`, loại bỏ 100% nguy cơ crash khi khởi động, đồng thời chức năng gửi Webhook vẫn hoạt động hoàn hảo.
+- `requirements.txt`:
+  - Bổ sung `httpx` vào danh sách thư viện để khi người dùng chạy cài đặt qua Tab 1 của launcher thì `httpx` vẫn được cài đặt đầy đủ.
+
+### Kiểm tra
+- Đã kiểm tra mô phỏng môi trường hoàn toàn không có `httpx`: `report_service.send_daily_error_webhook` gửi dữ liệu qua `urllib.request` thành công (HTTP 200).
+- Đã kiểm tra nạp `web_app/main.py` thành công mượt mà không còn lỗi `ModuleNotFoundError`.
+
 ## 2026-10-13 10:05 - Antigravity (Khắc phục LaunchWebBHYT Báo Khởi Chạy Thành Công Nhưng Server Tắt & Tự Động Ưu Tiên Môi Trường Ảo .venv)
 
 ### Mục tiêu

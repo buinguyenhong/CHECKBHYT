@@ -5,7 +5,6 @@ import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-import httpx
 from sqlalchemy.orm import Session
 from models import Record
 
@@ -569,6 +568,8 @@ def send_daily_error_webhook(
 ) -> Dict[str, Any]:
     """
     Gửi Webhook POST tới n8n với body JSON có trường 'output' chứa chuỗi HTML.
+    Tự động ưu tiên httpx nếu có, hoặc fallback về urllib.request (thư viện chuẩn của Python)
+    để đảm bảo không bao giờ bị lỗi ModuleNotFoundError khi khởi động hệ thống.
     """
     payload = {
         "output": html_content,
@@ -580,7 +581,9 @@ def send_daily_error_webhook(
         "departments_count": len(summary_data.get("departments", []))
     }
     
+    # Cách 1: Thử sử dụng httpx nếu môi trường đã cài
     try:
+        import httpx
         with httpx.Client(timeout=15.0) as client:
             resp = client.post(webhook_url, json=payload)
             return {
@@ -588,6 +591,49 @@ def send_daily_error_webhook(
                 "status_code": resp.status_code,
                 "response_text": resp.text[:500]
             }
+    except ImportError:
+        pass
+    except Exception as e:
+        return {
+            "success": False,
+            "status_code": 500,
+            "error": str(e)
+        }
+
+    # Cách 2: Fallback urllib.request chuẩn tích hợp sẵn trong Python (không cần pip install)
+    try:
+        import urllib.request
+        import urllib.error
+        import json
+        req_data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            webhook_url,
+            data=req_data,
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "User-Agent": "CheckBHYT-Reporter/1.0"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=15.0) as response:
+            status_code = response.getcode()
+            resp_body = response.read().decode("utf-8", errors="ignore")
+            return {
+                "success": status_code in [200, 201, 202, 204],
+                "status_code": status_code,
+                "response_text": resp_body[:500]
+            }
+    except urllib.error.HTTPError as he:
+        err_body = ""
+        try:
+            err_body = he.read().decode("utf-8", errors="ignore")[:500]
+        except Exception:
+            pass
+        return {
+            "success": False,
+            "status_code": he.code,
+            "error": f"HTTP {he.code}: {he.reason} - {err_body}"
+        }
     except Exception as e:
         return {
             "success": False,
