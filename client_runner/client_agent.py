@@ -157,9 +157,11 @@ class ClientAgentHTTPHandler(BaseHTTPRequestHandler):
             from_d = body.get("from_date", "").strip()
             to_d = body.get("to_date", "").strip()
             srv = body.get("server_url", "").strip()
+            thang = body.get("thang", None)
+            tai_chua_de_nghi = bool(body.get("taiChuaDeNghi", False) or body.get("tai_chua_de_nghi", False))
 
             if path == '/api/run-flow-b':
-                ACTIVE_CLIENT_GUI.trigger_flow_from_web('B', from_d, to_d, srv)
+                ACTIVE_CLIENT_GUI.trigger_flow_from_web('B', from_d, to_d, srv, thang=thang, tai_chua_de_nghi=tai_chua_de_nghi)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
@@ -211,6 +213,8 @@ class ClientRPAGui:
         self.portal_user = tk.StringVar(value="066091019320")
         self.portal_pass = tk.StringVar(value="Nguyenhong123@")
         self.portal_url = tk.StringVar(value="https://gdbhyt.baohiemxahoi.gov.vn/")
+        self.b_thang = tk.StringVar(value=str(datetime.date.today().month))
+        self.b_tai_chua_de_nghi = tk.BooleanVar(value=False)
 
         self.load_config()
         self.create_widgets()
@@ -231,7 +235,7 @@ class ClientRPAGui:
         t = threading.Thread(target=run_server, daemon=True)
         t.start()
 
-    def trigger_flow_from_web(self, flow_type: str, from_d: str, to_d: str, server_url: str):
+    def trigger_flow_from_web(self, flow_type: str, from_d: str, to_d: str, server_url: str, thang=None, tai_chua_de_nghi=False):
         """WebApp kích hoạt chạy Luồng B hoặc C từ xa trên máy trạm này"""
         if from_d:
             self.root.after(0, lambda: self.from_date.set(from_d))
@@ -253,7 +257,7 @@ class ClientRPAGui:
         }
 
         if flow_type == 'B':
-            threading.Thread(target=self._run_flow_b_worker, kwargs={"is_from_web": True}, daemon=True).start()
+            threading.Thread(target=self._run_flow_b_worker, kwargs={"is_from_web": True, "thang": thang, "tai_chua_de_nghi": tai_chua_de_nghi}, daemon=True).start()
         else:
             threading.Thread(target=self._run_flow_c_worker, kwargs={"is_from_web": True}, daemon=True).start()
 
@@ -324,16 +328,23 @@ class ClientRPAGui:
         card2 = tk.Frame(self.root, bg=self.card_bg, padx=15, pady=12)
         card2.pack(fill=tk.X, padx=25, pady=(0, 10))
 
-        tk.Label(card2, text="2. KHOẢNG NGÀY ĐỐI SOÁT (YYYY-MM-DD)", font=("Segoe UI", 9, "bold"), bg=self.card_bg, fg=self.text_sec).pack(anchor=tk.W)
+        tk.Label(card2, text="2. KHOẢNG NGÀY ĐỐI SOÁT & CẤU HÌNH LUỒNG B", font=("Segoe UI", 9, "bold"), bg=self.card_bg, fg=self.text_sec).pack(anchor=tk.W)
 
         date_frame = tk.Frame(card2, bg=self.card_bg)
         date_frame.pack(fill=tk.X, pady=(4, 0))
 
         tk.Label(date_frame, text="Từ ngày:", font=("Segoe UI", 9), bg=self.card_bg, fg=self.text_main).pack(side=tk.LEFT)
-        tk.Entry(date_frame, textvariable=self.from_date, font=("Segoe UI", 10), bg="#0f172a", fg=self.text_main, insertbackground=self.text_main, bd=1, relief=tk.SOLID, width=14).pack(side=tk.LEFT, padx=(5, 15), ipady=3)
+        tk.Entry(date_frame, textvariable=self.from_date, font=("Segoe UI", 10), bg="#0f172a", fg=self.text_main, insertbackground=self.text_main, bd=1, relief=tk.SOLID, width=12).pack(side=tk.LEFT, padx=(5, 10), ipady=3)
 
         tk.Label(date_frame, text="Đến ngày:", font=("Segoe UI", 9), bg=self.card_bg, fg=self.text_main).pack(side=tk.LEFT)
-        tk.Entry(date_frame, textvariable=self.to_date, font=("Segoe UI", 10), bg="#0f172a", fg=self.text_main, insertbackground=self.text_main, bd=1, relief=tk.SOLID, width=14).pack(side=tk.LEFT, padx=(5, 0), ipady=3)
+        tk.Entry(date_frame, textvariable=self.to_date, font=("Segoe UI", 10), bg="#0f172a", fg=self.text_main, insertbackground=self.text_main, bd=1, relief=tk.SOLID, width=12).pack(side=tk.LEFT, padx=(5, 15), ipady=3)
+
+        # Cấu hình riêng cho Luồng B
+        tk.Label(date_frame, text="Tháng (B):", font=("Segoe UI", 9, "bold"), bg=self.card_bg, fg="#38bdf8").pack(side=tk.LEFT)
+        tk.Entry(date_frame, textvariable=self.b_thang, font=("Segoe UI", 10, "bold"), bg="#0f172a", fg="#38bdf8", insertbackground=self.text_main, bd=1, relief=tk.SOLID, width=4, justify="center").pack(side=tk.LEFT, padx=(5, 12), ipady=3)
+
+        chk_chua = tk.Checkbutton(date_frame, text="Tải gộp Chưa đề nghị", variable=self.b_tai_chua_de_nghi, font=("Segoe UI", 8, "bold"), bg=self.card_bg, fg="#cbd5e1", selectcolor="#0f172a", activebackground=self.card_bg, activeforeground="#ffffff")
+        chk_chua.pack(side=tk.LEFT)
 
         # Card 3: Action Buttons
         card3 = tk.Frame(self.root, bg=self.card_bg, padx=15, pady=12)
@@ -636,17 +647,47 @@ class ClientRPAGui:
         self.btn_flow_c.configure(state=tk.DISABLED)
         self.is_running = True
         self.last_status = {"status": "running", "flow": "B", "message": "Đang khởi chạy Luồng B...", "error": None}
-        threading.Thread(target=self._run_flow_b_worker, kwargs={"is_from_web": False}, daemon=True).start()
+        threading.Thread(
+            target=self._run_flow_b_worker,
+            kwargs={
+                "is_from_web": False,
+                "thang": self.b_thang.get().strip(),
+                "tai_chua_de_nghi": bool(self.b_tai_chua_de_nghi.get())
+            },
+            daemon=True
+        ).start()
 
-    def _run_flow_b_worker(self, is_from_web: bool = False):
+    def _run_flow_b_worker(self, is_from_web: bool = False, thang=None, tai_chua_de_nghi: bool = False):
         from playwright.sync_api import sync_playwright
         from_d = self.from_date.get().strip()
         to_d = self.to_date.get().strip()
         srv = self.server_url.get().strip().rstrip("/")
 
+        # Xác định tháng quyết toán hợp lệ (mặc định tháng hiện tại)
+        target_month = str(datetime.date.today().month)
+        if thang is not None and str(thang).strip():
+            try:
+                m_int = int(str(thang).strip())
+                if 1 <= m_int <= 12:
+                    target_month = str(m_int)
+            except Exception:
+                pass
+        else:
+            try:
+                m_gui = int(self.b_thang.get().strip())
+                if 1 <= m_gui <= 12:
+                    target_month = str(m_gui)
+            except Exception:
+                pass
+
         self.is_running = True
-        self.last_status = {"status": "running", "flow": "B", "message": "Đang chạy Luồng B (Tải danh sách đã gửi listbh.xlsx)...", "error": None}
-        self.log("=== BẮT ĐẦU LUỒNG B (TẢI DANH SÁCH ĐÃ GỬI LISTBH.XLSX) ===")
+        self.last_status = {
+            "status": "running",
+            "flow": "B",
+            "message": f"Đang chạy Luồng B (Tháng {target_month}, Tải gộp Chưa ĐN: {tai_chua_de_nghi})...",
+            "error": None
+        }
+        self.log(f"=== BẮT ĐẦU LUỒNG B (THÁNG {target_month} - TẢI GỘP CHƯA ĐN: {tai_chua_de_nghi}) ===")
 
         try:
             with sync_playwright() as p:
@@ -659,7 +700,7 @@ class ClientRPAGui:
                     self._ensure_login(page)
                     self._wait_portal_idle(page)
 
-                    # Điều hướng trực tiếp vào Danh sách hồ sơ KCB
+                    # 1. Điều hướng trực tiếp vào Danh sách hồ sơ KCB
                     self.log("Đang điều hướng đến: Danh sách đề nghị thanh toán (/DanhSachHSKCB/Index)...")
                     target_url_b = f"{self.portal_url.get().strip().rstrip('/')}/DanhSachHSKCB/Index" if hasattr(self, 'portal_url') else "https://gdbhyt.baohiemxahoi.gov.vn/DanhSachHSKCB/Index"
                     try:
@@ -684,149 +725,232 @@ class ClientRPAGui:
 
                     self._wait_portal_idle(page)
 
-                    # 3. Chọn Trạng thái: "Đã đề nghị thanh toán" qua DevExpress Client API
-                    self.log("Đang chọn trạng thái: 'Đã đề nghị thanh toán'...")
-                    status_selected = False
+                    # 2. Chọn Kỳ quyết toán là 'Tháng' và chọn đúng Tháng target_month
+                    self.log(f"Đang chọn Kỳ quyết toán 'Tháng' và Tháng {target_month}...")
+                    month_set = False
                     try:
-                        status_selected = page.evaluate("""() => {
+                        month_set = page.evaluate("""(mStr) => {
                             try {
                                 const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
-                                if (cb) {
-                                    const count = typeof cb.GetItemCount === 'function' ? cb.GetItemCount() : 0;
-                                    for (let i = 0; i < count; i++) {
-                                        const it = cb.GetItem(i);
-                                        if (it && it.text && it.text.trim().toLowerCase().includes('đã đề nghị thanh toán')) {
-                                            cb.SetSelectedIndex(i);
-                                            if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
-                                            if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
-                                            return true;
+                                // 1. Kỳ quyết toán -> Tháng
+                                const cbTime = window.cbx_thoigian || (cc ? cc.GetByName('cbx_thoigian') : null);
+                                if (cbTime) {
+                                    const cnt = typeof cbTime.GetItemCount === 'function' ? cbTime.GetItemCount() : 0;
+                                    for (let i = 0; i < cnt; i++) {
+                                        const it = cbTime.GetItem(i);
+                                        if (it && it.text && it.text.trim().toLowerCase().includes('tháng')) {
+                                            cbTime.SetSelectedIndex(i);
+                                            if (typeof cbTime.ProcessItemClick === 'function') cbTime.ProcessItemClick(i);
+                                            break;
                                         }
                                     }
-                                    cb.SetText('Đã đề nghị thanh toán');
-                                    if (typeof cb.SetValue === 'function') cb.SetValue('2');
-                                    if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                                }
+                                // 2. Chọn Tháng -> mStr
+                                const cbM = window.cbx_thang || (cc ? cc.GetByName('cbx_thang') : null);
+                                if (cbM) {
+                                    const cnt = typeof cbM.GetItemCount === 'function' ? cbM.GetItemCount() : 0;
+                                    let matched = false;
+                                    for (let i = 0; i < cnt; i++) {
+                                        const it = cbM.GetItem(i);
+                                        if (it && (String(it.text).trim() === mStr || String(it.value).trim() === mStr)) {
+                                            cbM.SetSelectedIndex(i);
+                                            if (typeof cbM.ProcessItemClick === 'function') cbM.ProcessItemClick(i);
+                                            if (typeof cbM.HideDropDown === 'function') cbM.HideDropDown();
+                                            matched = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!matched) {
+                                        cbM.SetText(mStr);
+                                        if (typeof cbM.SetValue === 'function') cbM.SetValue(mStr);
+                                        if (typeof cbM.HideDropDown === 'function') cbM.HideDropDown();
+                                    }
                                     return true;
                                 }
-                            } catch(err) {}
+                            } catch(e) {}
                             return false;
-                        }""")
-                        if status_selected:
-                            self.log("Đã chọn trạng thái: 'Đã đề nghị thanh toán' qua DevExpress API ✅")
-                    except Exception as js_err:
-                        self.log(f"Lưu ý JS API trạng thái: {js_err}")
+                        }""", target_month)
+                    except Exception as me_err:
+                        self.log(f"Lỗi script chọn tháng: {me_err}")
 
-                    # Fallback nếu cần
-                    if not status_selected:
+                    if not month_set:
                         try:
-                            btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, td[id*='cb_TrangThaiTT_B-1']").first
-                            if btn_cb.is_visible(timeout=2000):
-                                btn_cb.click(force=True)
+                            btn_m = page.locator("#cbx_thang_B-1, #cbx_thang_B-1Img").first
+                            if btn_m.is_visible(timeout=2000):
+                                btn_m.click(force=True)
                                 time.sleep(0.4)
-                                item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
-                                if item.is_visible(timeout=2000):
-                                    item.click(force=True)
-                                    self.log("Đã chọn trạng thái qua giao diện DOM fallback ✅")
+                                item_m = page.locator("#cbx_thang_DDD_L_LBT td, .dxeListBoxItem").filter(has_text=re.compile(rf"^{target_month}$")).first
+                                if item_m.is_visible(timeout=2000):
+                                    item_m.click(force=True)
                         except Exception: pass
 
+                    self.log(f"Đã chọn kỳ quyết toán Tháng {target_month} ✅")
                     self._wait_portal_idle(page)
 
-                    # 4. Bấm Tìm kiếm & Chờ nạp dữ liệu xong
-                    self.log("Bấm Tìm kiếm dữ liệu...")
-                    searched = False
-                    try:
-                        searched = page.evaluate("""() => {
-                            try {
-                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
-                                if (btn && typeof btn.DoClick === 'function') {
-                                    btn.DoClick();
-                                    return true;
-                                }
-                            } catch(e) {}
-                            return false;
-                        }""")
-                        if searched:
-                            self.log("Đã kích hoạt nút Tìm kiếm qua DevExpress DoClick API ✅")
-                    except Exception:
-                        pass
+                    # Helper chọn trạng thái và tải Excel
+                    def select_status_and_download(status_text: str, save_dest: str) -> int:
+                        self.log(f"Đang chọn trạng thái: '{status_text}'...")
+                        status_selected = False
+                        try:
+                            status_selected = page.evaluate("""(st) => {
+                                try {
+                                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                    const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
+                                    if (cb) {
+                                        const count = typeof cb.GetItemCount === 'function' ? cb.GetItemCount() : 0;
+                                        for (let i = 0; i < count; i++) {
+                                            const it = cb.GetItem(i);
+                                            if (it && it.text && it.text.trim().toLowerCase().includes(st.toLowerCase())) {
+                                                cb.SetSelectedIndex(i);
+                                                if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
+                                                if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                                                return true;
+                                            }
+                                        }
+                                        cb.SetText(st);
+                                        if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                                        return true;
+                                    }
+                                } catch(err) {}
+                                return false;
+                            }""", status_text)
+                        except Exception: pass
 
-                    if not searched:
-                        for s_sel in ["#bt_TimKiem_CD", "#bt_TimKiem_B", "#bt_TimKiem", "#btnTimKiem_CD", "#btnTimKiem", ".dxbButton:has-text('Tìm kiếm')", "span:has-text('Tìm kiếm')"]:
+                        if not status_selected:
                             try:
-                                s_el = page.locator(s_sel).first
-                                if s_el.is_visible(timeout=1500):
-                                    s_el.click(force=True)
-                                    searched = True
-                                    break
+                                btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img, td[id*='cb_TrangThaiTT_B-1']").first
+                                if btn_cb.is_visible(timeout=2000):
+                                    btn_cb.click(force=True)
+                                    time.sleep(0.4)
+                                    item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, tr.dxeListBoxItemRow_EIS td, .dxeListBoxItem").filter(has_text=re.compile(re.escape(status_text), re.IGNORECASE)).first
+                                    if item.is_visible(timeout=2000):
+                                        item.click(force=True)
                             except Exception: pass
 
-                    # 5. Xuất Excel và tải file listbh.xlsx
-                    self.log("Đang kích hoạt Xuất Excel danh sách đã gửi...")
-                    
-                    # Bước 5.1: Click nút "Xuất Excel" (btnExport) để mở Popup Export
-                    self.log("Click nút 'Xuất Excel' (btnExport)...")
-                    opened_popup = page.evaluate("""() => {
-                        try {
-                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
-                            if (btn && typeof btn.DoClick === 'function') {
-                                btn.DoClick();
-                                return true;
-                            }
-                        } catch(e) {}
-                        return false;
-                    }""")
+                        self._wait_portal_idle(page)
 
-                    if not opened_popup:
-                        btn_exp = page.locator("#btnExport_CD, #btnExport, #bt_XuatExcel_CD, #bt_XuatExcel, .dxbButton:has-text('Xuất Excel')").first
-                        if btn_exp.is_visible(timeout=3000):
-                            btn_exp.click(force=True)
+                        # Bấm Tìm kiếm & Chờ nạp dữ liệu xong
+                        self.log(f"Bấm Tìm kiếm dữ liệu ('{status_text}')...")
+                        searched = False
+                        try:
+                            searched = page.evaluate("""() => {
+                                try {
+                                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                    const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
+                                    if (btn && typeof btn.DoClick === 'function') {
+                                        btn.DoClick();
+                                        return true;
+                                    }
+                                } catch(e) {}
+                                return false;
+                            }""")
+                        except Exception: pass
 
-                    time.sleep(1.2)
+                        if not searched:
+                            for s_sel in ["#bt_TimKiem_CD", "#bt_TimKiem_B", "#bt_TimKiem", "#btnTimKiem_CD", "#btnTimKiem", ".dxbButton:has-text('Tìm kiếm')"]:
+                                try:
+                                    s_el = page.locator(s_sel).first
+                                    if s_el.is_visible(timeout=1500):
+                                        s_el.click(force=True)
+                                        searched = True
+                                        break
+                                except Exception: pass
 
-                    # Bước 5.2: Bấm nút "Xuất excel" (btnExportExcel) trong Popup kèm theo expect_download
-                    self.log("Đang bấm nút 'Xuất excel' (btnExportExcel) để tải file listbh.xlsx...")
-                    with page.expect_download(timeout=300000) as dl_info:
-                        clicked_excel = page.evaluate("""() => {
+                        self.log(f"Chờ máy chủ nạp dữ liệu '{status_text}'...")
+                        self._wait_portal_idle(page)
+
+                        # Xuất Excel
+                        self.log(f"Kích hoạt Xuất Excel ('{status_text}')...")
+                        page.evaluate("""() => {
                             try {
                                 const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                                const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
-                                if (btn && typeof btn.DoClick === 'function') {
-                                    btn.DoClick();
-                                    return true;
-                                }
+                                const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
+                                if (btn && typeof btn.DoClick === 'function') btn.DoClick();
                             } catch(e) {}
-                            return false;
                         }""")
+                        time.sleep(1.2)
 
-                        if not clicked_excel:
-                            btn_down = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel'), [id*='btnExportExcel']").first
-                            if btn_down.is_visible(timeout=5000):
-                                btn_down.click(force=True)
-                            else:
-                                page.evaluate("""() => {
-                                    const btns = Array.from(document.querySelectorAll('.dxbButton, button, a, tr, td, span'));
-                                    const target = btns.find(b => b.textContent && b.textContent.trim().toLowerCase() === 'xuất excel');
-                                    if (target) target.click();
+                        self.log(f"Đang chờ xuất file '{status_text}'...")
+                        stop_hb = threading.Event()
+                        def hb_func():
+                            st_time = time.time()
+                            while not stop_hb.wait(10.0):
+                                el = int(time.time() - st_time)
+                                self.log(f"⏳ [Heartbeat] Đang tạo file '{status_text}'... ({el}s)")
+
+                        hb_t = threading.Thread(target=hb_func, daemon=True)
+                        hb_t.start()
+
+                        try:
+                            with page.expect_download(timeout=600000) as dl_info:
+                                clicked_excel = page.evaluate("""() => {
+                                    try {
+                                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                        const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
+                                        if (btn && typeof btn.DoClick === 'function') {
+                                            btn.DoClick();
+                                            return true;
+                                        }
+                                    } catch(e) {}
+                                    return false;
                                 }""")
+                                if not clicked_excel:
+                                    btn_down = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel'), [id*='btnExportExcel']").first
+                                    if btn_down.is_visible(timeout=5000):
+                                        btn_down.click(force=True)
 
-                    self.log("Cổng BHYT đã tạo tệp Excel xong! Đang tải về máy...")
-                    download = dl_info.value
-                    dest_path = os.path.join(TEMP_DIR, "listbh.xlsx")
-                    download.save_as(dest_path)
-                    self.log(f"Tải tệp danh sách đã gửi thành công: {dest_path} ✅")
+                            dl_obj = dl_info.value
+                            dl_obj.save_as(save_dest)
+                        finally:
+                            stop_hb.set()
+                            try: hb_t.join(timeout=1.0)
+                            except Exception: pass
+
+                        c_count = 0
+                        try:
+                            df_c = pd.read_excel(save_dest)
+                            c_count = len(df_c)
+                        except Exception: pass
+                        self.log(f"Tải thành công '{status_text}': {c_count} bản ghi ✅")
+                        return c_count
+
+                    dest_final = os.path.join(TEMP_DIR, "listbh.xlsx")
+
+                    if not tai_chua_de_nghi:
+                        # Chạy đơn: chỉ tải 'Đã đề nghị thanh toán'
+                        row_count = select_status_and_download("Đã đề nghị thanh toán", dest_final)
+                    else:
+                        # Chạy kép: tải cả 2 rồi gộp
+                        tmp_da = os.path.join(TEMP_DIR, "temp_listbh_da.xlsx")
+                        tmp_chua = os.path.join(TEMP_DIR, "temp_listbh_chua.xlsx")
+
+                        self.log("🔄 [1/2] Đang tải danh sách 'Đã đề nghị thanh toán'...")
+                        rows_da = select_status_and_download("Đã đề nghị thanh toán", tmp_da)
+
+                        self.log("🔄 [2/2] Đang tải danh sách 'Chưa đề nghị thanh toán'...")
+                        rows_chua = select_status_and_download("Chưa đề nghị thanh toán", tmp_chua)
+
+                        self.log(f"📂 Đang gộp 2 danh sách Excel ({rows_da} dòng đã đề nghị + {rows_chua} dòng chưa đề nghị)...")
+                        try:
+                            df_da = pd.read_excel(tmp_da)
+                        except Exception:
+                            df_da = pd.DataFrame()
+                        try:
+                            df_chua = pd.read_excel(tmp_chua)
+                        except Exception:
+                            df_chua = pd.DataFrame()
+
+                        df_merged = pd.concat([df_da, df_chua], ignore_index=True)
+                        row_count = len(df_merged)
+                        df_merged.to_excel(dest_final, index=False)
+                        self.log(f"Gộp file hoàn tất -> {dest_final} ({row_count} dòng dữ liệu) ✅")
 
                     context.storage_state(path=SESSION_FILE)
-
-                    df = pd.read_excel(dest_path)
-                    row_count = len(df)
-                    self.log(f"Đã nạp file listbh.xlsx với {row_count} dòng dữ liệu.")
 
                     if is_from_web:
                         self.log("Đang gửi kết quả về WebApp Server...")
                         try:
-                            with open(dest_path, "rb") as f:
+                            with open(dest_final, "rb") as f:
                                 resp = requests.post(
                                     f"{srv}/api/reconcile/upload_listbh",
                                     files={"file": ("listbh.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
@@ -839,10 +963,10 @@ class ClientRPAGui:
                     self.last_status = {
                         "status": "success",
                         "flow": "B",
-                        "message": f"Tải thành công {row_count} bản ghi danh sách đã gửi.",
+                        "message": f"Tải thành công {row_count} bản ghi danh sách đề nghị thanh toán Tháng {target_month}.",
                         "error": None
                     }
-                    self.log(f"=== HOÀN THÀNH LUỒNG B: {row_count} BẢN GHI ===")
+                    self.log(f"=== HOÀN THÀNH LUỒNG B: {row_count} BẢN GHI (THÁNG {target_month}) ===")
 
                 except Exception as e:
                     self.last_status = {"status": "error", "flow": "B", "message": str(e), "error": str(e)}

@@ -666,20 +666,33 @@
                 <div id="panelFlowB" style="display:none;">
                     <div class="card-header">
                         <div class="card-title">
-                            <span>📦</span> Tùy chọn Luồng B (Tải Danh Sách Đã Gửi listbh.xlsx)
+                            <span>📦</span> Tùy chọn Luồng B (Tải Danh Sách Đề Nghị Thanh Toán)
                         </div>
-                        <span class="badge badge-success">Cả Tháng Hiện Tại</span>
+                        <span class="badge badge-success">Cả Tháng</span>
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-group full">
+                        <div class="form-group">
+                            <label for="b_thang">Tháng quyết toán (1 - 12):</label>
+                            <input type="number" id="b_thang" class="form-control" min="1" max="12" placeholder="Ví dụ: 10" style="font-weight:700; font-size:15px; color:var(--primary);">
+                        </div>
+                        <div class="form-group">
                             <label>Phạm vi tải trên Cổng BHYT:</label>
-                            <input type="text" class="form-control" value="Toàn bộ hồ sơ của cả tháng (Timeout 20 phút kèm Heartbeat 10s)" disabled style="color:var(--success); font-weight:600;">
+                            <input type="text" class="form-control" value="Toàn bộ hồ sơ của tháng đã chọn (Timeout 20 phút)" disabled style="color:var(--success); font-weight:600; font-size:12px;">
+                        </div>
+                        <div class="form-group full" style="margin-top: 4px;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--text-primary); text-transform:none;">
+                                <input type="checkbox" id="b_taiChuaDeNghi" style="width:18px; height:18px; cursor:pointer;">
+                                <span>Tải gộp cả hồ sơ "Chưa đề nghị thanh toán" vào file listbh.xlsx</span>
+                            </label>
+                            <span style="font-size:11px; color:var(--text-secondary); margin-left:26px; display:block; margin-top:2px;">
+                                💡 Nếu tích chọn, hệ thống sẽ tải lần lượt cả <b>Đã đề nghị thanh toán</b> và <b>Chưa đề nghị thanh toán</b>, sau đó gộp nối tiếp toàn bộ dữ liệu vào 1 file listbh.xlsx duy nhất.
+                            </span>
                         </div>
                     </div>
 
                     <button id="btnRunFlowB" class="btn-action btn-primary" onclick="startFlowB()">
-                        <span>📥</span> BẮT ĐẦU TẢI DANH SÁCH ĐÃ GỬI
+                        <span>📥</span> BẮT ĐẦU TẢI DANH SÁCH ĐỀ NGHỊ THANH TOÁN
                     </button>
                     <button id="btnStopFlowB" class="btn-action btn-danger" style="display:none;" onclick="stopCurrentFlow()">
                         <span>🛑</span> DỪNG TIẾN TRÌNH ĐANG CHẠY
@@ -1004,6 +1017,9 @@
             const toInp = document.getElementById('sync_toDate');
             if (fromInp && !fromInp.value) fromInp.value = firstDayStr;
             if (toInp && !toInp.value) toInp.value = todayStr;
+
+            const bThangInp = document.getElementById('b_thang');
+            if (bThangInp && !bThangInp.value) bThangInp.value = now.getMonth() + 1;
         }
 
         function setDateRange(type) {
@@ -1106,16 +1122,22 @@
 
         // KÍCH HOẠT LUỒNG B MỚI
         async function startFlowB() {
+            const thangInp = document.getElementById('b_thang');
+            const thangVal = thangInp && thangInp.value ? thangInp.value.trim() : String(new Date().getMonth() + 1);
+            const taiChuaDeNghi = document.getElementById('b_taiChuaDeNghi') ? document.getElementById('b_taiChuaDeNghi').checked : false;
+
             const payload = {
                 maCoSoKCB: document.getElementById('common_maCSKCB').value.trim(),
                 username: document.getElementById('common_username').value.trim(),
                 password: document.getElementById('common_password').value,
-                clientToken: myClientToken
+                clientToken: myClientToken,
+                thang: thangVal,
+                taiChuaDeNghi: taiChuaDeNghi
             };
 
             setRunningState(true, 'B');
             resultPanel.classList.remove('active');
-            appendLog('\n--- BẮT ĐẦU LUỒNG B MỚI (NATIVE BROWSER - TẢI CẢ THÁNG) ---');
+            appendLog(`\n--- BẮT ĐẦU LUỒNG B (NATIVE BROWSER - TẢI THÁNG ${thangVal}, GỘP CHƯA ĐỀ NGHỊ: ${taiChuaDeNghi ? 'CÓ' : 'KHÔNG'}) ---`);
 
             try {
                 const res = await fetch('/api/automation/v2/flow-b', {
@@ -1129,18 +1151,18 @@
                     statusBadge.className = 'badge badge-success';
                     statusBadge.textContent = 'Thành công';
                     
-                    document.getElementById('resultTitle').textContent = 'TẢI THÀNH CÔNG DANH SÁCH ĐÃ GỬI (listbh.xlsx)';
-                    document.getElementById('statFiles').textContent = 1;
+                    document.getElementById('resultTitle').textContent = `TẢI THÀNH CÔNG DANH SÁCH ĐỀ NGHỊ THANH TOÁN (listbh.xlsx - THÁNG ${data.month || thangVal})`;
+                    document.getElementById('statFiles').textContent = data.merged ? 2 : 1;
                     document.getElementById('statRecords').textContent = data.rows || 0;
                     document.getElementById('statDuplicates').textContent = 0;
 
                     btnDownloadFile.href = '/api/automation/v2/download-file?file_type=listbh';
                     resultPanel.classList.add('active');
-                    appendLog('\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG! Bạn có thể bấm "Nạp vào CSDL đối soát" để so khớp CSDL cả tháng.');
+                    appendLog(`\n🎉 LUỒNG B HOÀN TẤT THÀNH CÔNG! ${data.message || ''}`);
 
                     showCompletionModal(
-                        'HOÀN TẤT TẢI DANH SÁCH ĐÃ GỬI (LUỒNG B)!',
-                        'Đã xuất và tải thành công danh sách hồ sơ BHYT đề nghị thanh toán cả tháng.',
+                        'HOÀN TẤT TẢI DANH SÁCH ĐỀ NGHỊ (LUỒNG B)!',
+                        data.message || `Đã xuất và tải thành công danh sách đề nghị thanh toán Tháng ${data.month || thangVal}.`,
                         'listbh.xlsx',
                         `${data.rows || 0} hồ sơ`,
                         '/api/automation/v2/download-file?file_type=listbh'

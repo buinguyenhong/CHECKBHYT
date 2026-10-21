@@ -56,6 +56,45 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-21 09:00 - Antigravity (Nâng Cấp Luồng B: Chọn Tháng & Tùy Chọn Tải Gộp Chưa Đề Nghị Thanh Toán)
+
+### Mục tiêu
+- Thêm ô chọn Tháng (nhập số 1-12, mặc định là tháng hiện tại) trên giao diện Luồng B; tự động chọn Kỳ quyết toán là "Tháng" và chọn đúng Tháng trên Cổng BHYT (`/DanhSachHSKCB/Index`).
+- Tải danh sách "Đã đề nghị thanh toán" (như cũ).
+- Bổ sung tùy chọn (checkbox) "Tải gộp Chưa đề nghị": nếu tích chọn thì tải thêm danh sách "Chưa đề nghị thanh toán" và gộp nối tiếp 2 file Excel thành 1 file duy nhất `listbh.xlsx` để tải về hoặc nạp đối soát. Nếu không tích thì giữ nguyên chế độ chạy đơn.
+- Giữ nguyên 100% cấu trúc cột gốc của Cổng BHYT và giữ nguyên toàn bộ các dòng (không drop duplicates).
+- Đồng bộ tính năng hoàn chỉnh trên cả 3 môi trường: WebApp (`/portal-automation`), Tool tải tại chỗ (`portal_downloader`), và Máy trạm RPA Runner (`client_runner`).
+
+### Thay đổi
+- `web_app/services/portal_automation.py`:
+  - Cập nhật hàm `run_flow_b` nhận thêm tham số `thang=None, tai_chua_de_nghi=False`.
+  - Tự động chuyển Kỳ quyết toán (`cbx_thoigian`) sang "Tháng" và chọn Tháng (`cbx_thang`) qua DevExpress API + DOM fallback.
+  - Xây dựng helper `select_status_and_download` điều khiển chọn trạng thái và tải file có Thread Heartbeat 10s.
+  - Phân nhánh: Chạy đơn (chỉ tải "Đã đề nghị thanh toán") hoặc Chạy kép (tải "Đã đề nghị thanh toán" + "Chưa đề nghị thanh toán", gộp bằng `pd.concat([df_da, df_chua], ignore_index=True)` ra `uploaded_files/listbh.xlsx`).
+- `web_app/main.py`:
+  - Cập nhật API route `POST /api/automation/v2/flow-b` tiếp nhận `thang` và `tai_chua_de_nghi` (hỗ trợ cả camelCase `taiChuaDeNghi`), trả về `month` và `merged` trong JSON response.
+- `web_app/templates/portal_automation.html`:
+  - Bổ sung ô nhập `b_thang` và checkbox `b_taiChuaDeNghi` trên panel Luồng B.
+  - Khởi tạo mặc định `b_thang.value = now.getMonth() + 1`.
+  - Hàm `startFlowB()` gửi payload đầy đủ; Modal popup hiển thị rõ số lượng hồ sơ và tháng quyết toán.
+- `portal_downloader/downloader_server.py` & `portal_downloader/templates/index.html`:
+  - Đồng bộ logic chọn Tháng và tùy chọn Tải gộp trên giao diện tool tải tại chỗ.
+- `client_runner/client_agent.py`:
+  - Thêm biến `b_thang`, `b_tai_chua_de_nghi` và các điều khiển trên Card 2 của Tkinter GUI.
+  - Cập nhật `LocalHttpHandler.do_POST` và `trigger_flow_from_web` nhận `thang` và `tai_chua_de_nghi` từ WebApp.
+  - Nâng cấp `_run_flow_b_worker` thực thi chọn tháng và tải gộp tương tự, tự động nạp hoặc upload `listbh.xlsx` lên server WebApp.
+- `Project.md`:
+  - Cập nhật chi tiết mục `19.3. Quy trình chuẩn hóa Luồng B (Tải danh sách đề nghị thanh toán & Tải gộp listbh.xlsx)`.
+
+### Nghiệp vụ ảnh hưởng
+- File `listbh.xlsx` khi chạy tùy chọn tải gộp sẽ chứa đầy đủ cả hồ sơ đã đề nghị và chưa đề nghị thanh toán trong kỳ của tháng đã chọn, giúp nghiệp vụ đối soát không bị bỏ sót các ca chưa đề nghị thanh toán trên Cổng BHYT.
+
+### Kiểm tra
+- Đã chạy `python -m py_compile` trên tất cả các tệp Python đã chỉnh sửa (`portal_automation.py`, `main.py`, `downloader_server.py`, `client_agent.py`), kết quả: 100% exit code 0, không có lỗi cú pháp.
+
+### Lưu ý cho phiên sau
+- Khi Cổng BHYT thay đổi ID điều khiển combo tháng/kỳ quyết toán, đối chiếu lại selectors `cbx_thoigian` và `cbx_thang`.
+
 ## 2026-10-13 10:40 - Antigravity (Sắp Xếp Ưu Tiên Ca Quá Hạn & Tự Động Phân Trang Cắt Thành Hình Ảnh Thứ 2 Cho Báo Cáo Zalo)
 
 ### Mục tiêu

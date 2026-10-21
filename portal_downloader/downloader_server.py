@@ -789,7 +789,14 @@ def run_flow_b(params: dict) -> dict:
     password = params.get("password", "")
     base_url = "https://gdbhyt.baohiemxahoi.gov.vn/"
 
-    add_log("🚀 KHỞI ĐỘNG LUỒNG B (TẢI TOÀN BỘ DANH SÁCH ĐÃ GỬI CẢ THÁNG)...")
+    thang = params.get("thang", None)
+    tai_chua_de_nghi = bool(params.get("taiChuaDeNghi", False) or params.get("tai_chua_de_nghi", False))
+    if thang is not None and str(thang).strip().isdigit() and 1 <= int(str(thang).strip()) <= 12:
+        target_month = str(int(str(thang).strip()))
+    else:
+        target_month = str(datetime.datetime.now().month)
+
+    add_log(f"🚀 KHỞI ĐỘNG LUỒNG B (TẢI DANH SÁCH ĐỀ NGHỊ THANH TOÁN THÁNG {target_month}, GỘP CHƯA ĐỀ NGHỊ: {'CÓ' if tai_chua_de_nghi else 'KHÔNG'})...")
 
     with sync_playwright() as p:
         global active_browser, active_context, stop_requested
@@ -819,134 +826,231 @@ def run_flow_b(params: dict) -> dict:
             wait_for_grid_ready(page, timeout_ms=60000)
             if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
-            # 3. Chọn Trạng thái: 'Đã đề nghị thanh toán'
-            add_log("🏷️ Đang chọn trạng thái: 'Đã đề nghị thanh toán'...")
-            status_selected = page.evaluate("""() => {
+            # 3. Chọn Kỳ quyết toán là 'Tháng' và chọn đúng Tháng target_month
+            add_log(f"📅 Đang chọn Kỳ quyết toán: 'Tháng' và Tháng: {target_month}...")
+            month_set = page.evaluate("""(monthStr) => {
                 try {
                     const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                    const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
-                    if (cb) {
-                        const count = typeof cb.GetItemCount === 'function' ? cb.GetItemCount() : 0;
-                        for (let i = 0; i < count; i++) {
-                            const it = cb.GetItem(i);
-                            if (it && it.text && it.text.trim().toLowerCase().includes('đã đề nghị thanh toán')) {
-                                cb.SetSelectedIndex(i);
-                                if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
-                                if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
-                                return true;
+                    // 1. Chọn Kỳ quyết toán -> 'Tháng'
+                    const cbTime = window.cbx_thoigian || (cc ? cc.GetByName('cbx_thoigian') : null);
+                    if (cbTime) {
+                        const cnt = typeof cbTime.GetItemCount === 'function' ? cbTime.GetItemCount() : 0;
+                        for (let i = 0; i < cnt; i++) {
+                            const it = cbTime.GetItem(i);
+                            if (it && it.text && it.text.trim().toLowerCase().includes('tháng')) {
+                                cbTime.SetSelectedIndex(i);
+                                if (typeof cbTime.ProcessItemClick === 'function') cbTime.ProcessItemClick(i);
+                                break;
                             }
                         }
-                        cb.SetText('Đã đề nghị thanh toán');
-                        if (typeof cb.SetValue === 'function') cb.SetValue('2');
-                        if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                    }
+                    // 2. Chọn Tháng -> monthStr
+                    const cbM = window.cbx_thang || (cc ? cc.GetByName('cbx_thang') : null);
+                    if (cbM) {
+                        const cnt = typeof cbM.GetItemCount === 'function' ? cbM.GetItemCount() : 0;
+                        let matched = false;
+                        for (let i = 0; i < cnt; i++) {
+                            const it = cbM.GetItem(i);
+                            if (it && (String(it.text).trim() === monthStr || String(it.value).trim() === monthStr)) {
+                                cbM.SetSelectedIndex(i);
+                                if (typeof cbM.ProcessItemClick === 'function') cbM.ProcessItemClick(i);
+                                if (typeof cbM.HideDropDown === 'function') cbM.HideDropDown();
+                                matched = true;
+                                break;
+                            }
+                        }
+                        if (!matched) {
+                            cbM.SetText(monthStr);
+                            if (typeof cbM.SetValue === 'function') cbM.SetValue(monthStr);
+                            if (typeof cbM.HideDropDown === 'function') cbM.HideDropDown();
+                        }
                         return true;
                     }
                 } catch(e) {}
                 return false;
-            }""")
+            }""", target_month)
 
-            if not status_selected:
-                btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img").first
-                if btn_cb.is_visible(timeout=2000):
-                    btn_cb.click(force=True)
-                    time.sleep(0.4)
-                    item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, .dxeListBoxItem").filter(has_text=re.compile(r"Đã đề nghị thanh toán", re.IGNORECASE)).first
-                    if item.is_visible(timeout=2000):
-                        item.click(force=True)
+            if not month_set:
+                try:
+                    btn_m = page.locator("#cbx_thang_B-1, #cbx_thang_B-1Img").first
+                    if btn_m.is_visible(timeout=2000):
+                        btn_m.click(force=True)
+                        time.sleep(0.4)
+                        item_m = page.locator("#cbx_thang_DDD_L_LBT td, .dxeListBoxItem").filter(has_text=re.compile(rf"^{target_month}$")).first
+                        if item_m.is_visible(timeout=2000):
+                            item_m.click(force=True)
+                except Exception as me:
+                    add_log(f"DOM fallback tháng: {me}")
 
-            add_log("✅ Đã chọn trạng thái 'Đã đề nghị thanh toán'!")
+            add_log(f"✅ Đã chọn kỳ quyết toán Tháng {target_month}!")
             wait_for_grid_ready(page, timeout_ms=30000)
             if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
 
-            # 4. Bấm Tìm kiếm (Không lọc ngày -> Tải toàn bộ cả tháng)
-            add_log("🔍 Bấm nút Tìm kiếm (Tải toàn bộ hồ sơ cả tháng)...")
-            searched = page.evaluate("""() => {
-                try {
-                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                    const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
-                    if (btn && typeof btn.DoClick === 'function') {
-                        btn.DoClick();
-                        return true;
-                    }
-                } catch(e) {}
-                return false;
-            }""")
-            if not searched:
-                s_el = page.locator("#bt_TimKiem_CD, #bt_TimKiem, #btnTimKiem").first
-                if s_el.is_visible(timeout=2000): s_el.click(force=True)
-
-            add_log("⏳ Đang chờ máy chủ Cổng BHYT nạp dữ liệu danh sách cả tháng (tối đa 20 phút)...")
-            wait_for_grid_ready(page, timeout_ms=1200000)
-            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
-            add_log("✅ Danh sách hồ sơ cả tháng đã nạp xong!")
-
-            # 5. Xuất Excel
-            add_log("📥 Đang kích hoạt Xuất Excel danh sách đã gửi cả tháng...")
-            page.evaluate("""() => {
-                try {
-                    const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                    const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
-                    if (btn && typeof btn.DoClick === 'function') btn.DoClick();
-                } catch(e) {}
-            }""")
-            time.sleep(1.5)
-            if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
-
-            add_log("⚡ Đang bấm nút 'Xuất excel' để tải file listbh.xlsx (Thời gian chờ tối đa 20 phút kèm Heartbeat)...")
-            dest_path = os.path.join(OUTPUT_DIR, "listbh.xlsx")
-
-            stop_hb = threading.Event()
-            def heartbeat_worker():
-                start_t = time.time()
-                while not stop_hb.wait(10.0):
-                    if stop_requested:
-                        break
-                    elapsed = int(time.time() - start_t)
-                    add_log(f"⏳ [Heartbeat] Đang chờ Cổng BHYT xuất file cả tháng... (Đã chờ {elapsed}s / tối đa 1200s - Kết nối mạng ổn định)")
-
-            hb_thread = threading.Thread(target=heartbeat_worker, daemon=True)
-            hb_thread.start()
-
-            try:
-                with page.expect_download(timeout=1200000) as download_info:
-                    clicked_exp = page.evaluate("""() => {
-                        try {
-                            const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
-                            const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
-                            if (btn && typeof btn.DoClick === 'function') {
-                                btn.DoClick();
-                                return true;
+            def select_status_and_download(status_text: str, dest_file_path: str) -> int:
+                add_log(f"🏷️ Đang chọn trạng thái: '{status_text}'...")
+                status_selected = page.evaluate("""(stText) => {
+                    try {
+                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                        const cb = window.cb_TrangThaiTT || (cc ? cc.GetByName('cb_TrangThaiTT') : null);
+                        if (cb) {
+                            const count = typeof cb.GetItemCount === 'function' ? cb.GetItemCount() : 0;
+                            for (let i = 0; i < count; i++) {
+                                const it = cb.GetItem(i);
+                                if (it && it.text && it.text.trim().toLowerCase().includes(stText.toLowerCase())) {
+                                    cb.SetSelectedIndex(i);
+                                    if (typeof cb.ProcessItemClick === 'function') cb.ProcessItemClick(i);
+                                    if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                                    return true;
+                                }
                             }
-                        } catch(e) {}
-                        return false;
-                    }""")
-                    if not clicked_exp:
-                        btn_d = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel')").first
-                        if btn_d.is_visible(timeout=5000): btn_d.click(force=True)
+                            cb.SetText(stText);
+                            if (typeof cb.HideDropDown === 'function') cb.HideDropDown();
+                            return true;
+                        }
+                    } catch(e) {}
+                    return false;
+                }""", status_text)
 
-                download = download_info.value
-                download.save_as(dest_path)
-            finally:
-                stop_hb.set()
-                try: hb_thread.join(timeout=1.0)
+                if not status_selected:
+                    btn_cb = page.locator("#cb_TrangThaiTT_B-1, #cb_TrangThaiTT_B-1Img").first
+                    if btn_cb.is_visible(timeout=2000):
+                        btn_cb.click(force=True)
+                        time.sleep(0.4)
+                        item = page.locator("#cb_TrangThaiTT_DDD_L_LBT td, .dxeListBoxItem").filter(has_text=re.compile(re.escape(status_text), re.IGNORECASE)).first
+                        if item.is_visible(timeout=2000):
+                            item.click(force=True)
+
+                add_log(f"✅ Đã chọn trạng thái '{status_text}'!")
+                wait_for_grid_ready(page, timeout_ms=30000)
+                if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
+
+                # Bấm Tìm kiếm
+                add_log(f"🔍 Bấm nút Tìm kiếm dữ liệu ('{status_text}')...")
+                searched = page.evaluate("""() => {
+                    try {
+                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                        const btn = window.bt_TimKiem || (cc ? (cc.GetByName('bt_TimKiem') || cc.GetByName('btnTimKiem')) : null);
+                        if (btn && typeof btn.DoClick === 'function') {
+                            btn.DoClick();
+                            return true;
+                        }
+                    } catch(e) {}
+                    return false;
+                }""")
+                if not searched:
+                    s_el = page.locator("#bt_TimKiem_CD, #bt_TimKiem, #btnTimKiem").first
+                    if s_el.is_visible(timeout=2000): s_el.click(force=True)
+
+                add_log(f"⏳ Đang chờ máy chủ Cổng BHYT nạp dữ liệu '{status_text}' Tháng {target_month} (tối đa 20 phút)...")
+                wait_for_grid_ready(page, timeout_ms=1200000)
+                if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
+                add_log(f"✅ Dữ liệu '{status_text}' đã nạp xong!")
+
+                # Xuất Excel
+                add_log(f"📥 Đang kích hoạt Xuất Excel ('{status_text}')...")
+                page.evaluate("""() => {
+                    try {
+                        const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                        const btn = window.btnExport || (cc ? cc.GetByName('btnExport') : null);
+                        if (btn && typeof btn.DoClick === 'function') btn.DoClick();
+                    } catch(e) {}
+                }""")
+                time.sleep(1.5)
+                if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
+
+                add_log(f"⚡ Đang bấm nút 'Xuất excel' để tải file ('{status_text}')...")
+                stop_hb = threading.Event()
+                def heartbeat_worker():
+                    start_t = time.time()
+                    while not stop_hb.wait(10.0):
+                        if stop_requested:
+                            break
+                        elapsed = int(time.time() - start_t)
+                        add_log(f"⏳ [Heartbeat] Đang chờ Cổng BHYT xuất file '{status_text}'... ({elapsed}s / tối đa 1200s)")
+
+                hb_thread = threading.Thread(target=heartbeat_worker, daemon=True)
+                hb_thread.start()
+
+                try:
+                    with page.expect_download(timeout=1200000) as download_info:
+                        clicked_exp = page.evaluate("""() => {
+                            try {
+                                const cc = window.ASPxClientControl ? window.ASPxClientControl.GetControlCollection() : null;
+                                const btn = window.btnExportExcel || (cc ? cc.GetByName('btnExportExcel') : null);
+                                if (btn && typeof btn.DoClick === 'function') {
+                                    btn.DoClick();
+                                    return true;
+                                }
+                            } catch(e) {}
+                            return false;
+                        }""")
+                        if not clicked_exp:
+                            btn_d = page.locator("#btnExportExcel_CD, #btnExportExcel, .dxbButton:has-text('Xuất excel')").first
+                            if btn_d.is_visible(timeout=5000): btn_d.click(force=True)
+
+                    download = download_info.value
+                    download.save_as(dest_file_path)
+                finally:
+                    stop_hb.set()
+                    try: hb_thread.join(timeout=1.0)
+                    except Exception: pass
+
+                if stop_requested: raise Exception("Tiến trình đã bị dừng bởi người dùng.")
+
+                c_rows = 0
+                try:
+                    df = pd.read_excel(dest_file_path)
+                    c_rows = len(df)
+                except Exception as de:
+                    add_log(f"Kiểm tra file '{status_text}': {de}")
+
+                add_log(f"✅ Tải thành công file '{status_text}': {c_rows} bản ghi.")
+                return c_rows
+
+            final_dest_path = os.path.join(OUTPUT_DIR, "listbh.xlsx")
+
+            if not tai_chua_de_nghi:
+                total_rows = select_status_and_download("Đã đề nghị thanh toán", final_dest_path)
+                detail_msg = f"Tải thành công {total_rows} bản ghi 'Đã đề nghị thanh toán' Tháng {target_month}."
+            else:
+                temp_da_path = os.path.join(OUTPUT_DIR, "temp_listbh_da_de_nghi.xlsx")
+                temp_chua_path = os.path.join(OUTPUT_DIR, "temp_listbh_chua_de_nghi.xlsx")
+
+                add_log("🔄 [Đợt 1/2] Đang tải danh sách 'Đã đề nghị thanh toán'...")
+                rows_da = select_status_and_download("Đã đề nghị thanh toán", temp_da_path)
+
+                add_log("🔄 [Đợt 2/2] Đang tải danh sách 'Chưa đề nghị thanh toán'...")
+                rows_chua = select_status_and_download("Chưa đề nghị thanh toán", temp_chua_path)
+
+                add_log(f"📂 Đang gộp 2 danh sách Excel (Đã đề nghị: {rows_da} dòng, Chưa đề nghị: {rows_chua} dòng)...")
+                try: df_da = pd.read_excel(temp_da_path)
+                except Exception: df_da = pd.DataFrame()
+                try: df_chua = pd.read_excel(temp_chua_path)
+                except Exception: df_chua = pd.DataFrame()
+
+                df_merged = pd.concat([df_da, df_chua], ignore_index=True)
+                df_merged.to_excel(final_dest_path, index=False)
+                total_rows = len(df_merged)
+
+                detail_msg = f"Tải và gộp thành công {total_rows} bản ghi Tháng {target_month} (Đã đề nghị: {rows_da}, Chưa đề nghị: {rows_chua})."
+                add_log(f"🎉 Gộp thành công toàn bộ dữ liệu vào listbh.xlsx: {total_rows} dòng!")
+
+                try:
+                    if os.path.exists(temp_da_path): os.remove(temp_da_path)
+                    if os.path.exists(temp_chua_path): os.remove(temp_chua_path)
                 except Exception: pass
 
-            add_log(f"✅ Tải tệp danh sách đã gửi thành công: {dest_path}")
             context.storage_state(path=SESSION_FILE)
-
-            row_count = 0
-            try:
-                df = pd.read_excel(dest_path)
-                row_count = len(df)
-                add_log(f"📊 Đã nạp file listbh.xlsx với {row_count} dòng dữ liệu.")
-            except Exception as de:
-                add_log(f"Đọc file Excel: {de}")
+            add_log(f"✅ Hoàn tất Luồng B: {final_dest_path} ({total_rows} bản ghi)")
 
             return {
                 "status": "success",
                 "flow": "B",
-                "file_path": dest_path,
-                "rows": row_count
+                "file_path": final_dest_path,
+                "rows": total_rows,
+                "month": target_month,
+                "merged": tai_chua_de_nghi,
+                "message": detail_msg
             }
 
         finally:

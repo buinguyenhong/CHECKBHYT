@@ -1150,13 +1150,21 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
 - `client_runner/Cai_Dat_May_Tram.bat`: Script cài đặt 1-click cho máy trạm (thư viện + Chromium).
 - `client_runner/Chay_RPA_May_Tram.bat`: Script khởi chạy Client Runner trên máy trạm.
 
-### 19.3. Quy trình chuẩn hóa Luồng B (Tải danh sách đã gửi listbh.xlsx)
-1. **Đặc thù giao diện:** Giao diện "Danh sách đề nghị thanh toán" trên Cổng BHYT hoàn toàn không có ô chọn ngày (Từ ngày / Đến ngày), do đó hệ thống không thao tác ngày tháng ở luồng này.
-2. **Cơ chế Điều khiển & Tải file chuẩn xác:**
-   - **Bước 1 (Chọn Trạng thái):** Gọi `cb_TrangThaiTT.SetSelectedIndex(...)` chọn "Đã đề nghị thanh toán" và kích hoạt `ProcessItemClick()`.
-   - **Bước 2 (Tìm kiếm & Chờ dữ liệu):** Kích hoạt `bt_TimKiem.DoClick()` -> Chờ các hàng dữ liệu của bảng nạp xong hoàn toàn (`wait_portal_idle`).
-   - **Bước 3 (Xuất Excel):** Mở menu `#bt_XuatExcel` -> Chờ popup menu xuất hiện -> Dùng Playwright click chính xác mục con "Xuất excel" (`table.dxm-item:has-text('Xuất excel')`) trong khối `expect_download` để lưu tệp thành `listbh.xlsx`.
-   - **Bước 4 (Thông báo hoàn tất & UI Khung log):** Tự động bật Modal Popup thông báo tải xong file (số lượng hồ sơ, nút tải về và nút nạp đối soát CSDL). Khung log thời gian thực được cố định chiều cao tối đa (max-height 420px) với thanh cuộn scrollbar nội bộ, không làm kéo dài trang web.
+### 19.3. Quy trình chuẩn hóa Luồng B (Tải danh sách đề nghị thanh toán & Tải gộp listbh.xlsx)
+1. **Lựa chọn Kỳ quyết toán & Tháng:** 
+   - Trên Cổng BHYT (`/DanhSachHSKCB/Index`), tự động chọn Kỳ quyết toán là **"Tháng"** (`cbx_thoigian`).
+   - Tự động chọn đúng **Tháng** theo tham số người dùng nhập (mặc định là Tháng hiện tại) qua DevExpress Client API (`cbx_thang.SetSelectedIndex(...)` / `ProcessItemClick(...)` / `SetValue(...)`) kèm fallback DOM click.
+2. **Cơ chế Điều khiển & Tùy chọn Tải gộp linh hoạt:**
+   - **Chế độ đơn (Mặc định):** Chọn trạng thái "Đã đề nghị thanh toán" (`cb_TrangThaiTT`), bấm Tìm kiếm (`bt_TimKiem`), mở menu Xuất Excel (`btnExport`) và click "Xuất excel" (`btnExportExcel`) trong khối `expect_download` kèm tiến trình Heartbeat theo dõi kết nối để tải về `listbh.xlsx`.
+   - **Chế độ tải gộp (Tùy chọn - Tích chọn "Tải gộp Chưa đề nghị"):**
+     - Đợt 1: Tải danh sách **"Đã đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_da_de_nghi.xlsx`.
+     - Đợt 2: Tải tiếp danh sách **"Chưa đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_chua_de_nghi.xlsx`.
+     - Gộp dữ liệu: Sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` gộp nối tiếp toàn bộ dòng và giữ nguyên 100% cấu trúc các cột gốc của Cổng BHYT thành một file duy nhất `listbh.xlsx` (không drop trùng lặp).
+3. **Đồng bộ toàn diện trên 3 nền tảng:**
+   - **WebApp Server (`/portal-automation`):** Giao diện thêm ô nhập Tháng và Checkbox "Tải gộp Chưa đề nghị", truyền tham số qua API `/api/automation/v2/flow-b`.
+   - **Công cụ Tải tại chỗ (`portal_downloader`):** Bổ sung ô nhập Tháng và Checkbox Tải gộp trên giao diện `downloader_server.py`.
+   - **Máy trạm RPA Client (`client_runner`):** Bổ sung trường cấu hình Tháng và Checkbox trên giao diện Tkinter `client_agent.py`, hỗ trợ nhận lệnh điều khiển từ xa từ WebApp hoặc bấm chạy trực tiếp tại máy trạm và tự động đẩy file `listbh.xlsx` đã gộp lên Server.
+4. **Thông báo hoàn tất & UI Khung log:** Tự động bật Modal Popup thông báo kết quả (chi tiết số lượng hồ sơ Đã đề nghị, Chưa đề nghị, tổng gộp, tháng quyết toán), nút tải file Excel về máy và nút kích hoạt đối soát CSDL HIS tức thì. Khung log thời gian thực duy trì cố định chiều cao tối đa với thanh cuộn tự động cuộn theo dòng mới.
 
 ### 19.4. Quy trình chuẩn hóa Luồng C (Tải danh sách lỗi chi tiết & Đối soát C)
 1. **Quy tắc ngày tìm kiếm (Today):** Dữ liệu bệnh án gửi cổng là trong ngày hôm nay (`Today`), dù đợt khám của bệnh nhân có thể từ những ngày trước đó. Hệ thống mở popup lịch bằng icon `#deTuNgay_B-1` -> Click nút **`Today`** (`#deTuNgay_DDD_C_BT` / `.dxeCalendarTodayButton_EIS`) đảm bảo máy chủ nhận đủ các trường ẩn của DevExpress.

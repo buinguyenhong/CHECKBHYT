@@ -1162,16 +1162,21 @@ async def run_automation_v2_flow_b(
     username = str(data.get("username", "")).strip() or "066091019320"
     password = str(data.get("password", "")).strip()
     client_token = str(data.get("clientToken", "")).strip()
+    thang = data.get("thang", None)
+    tai_chua_de_nghi = bool(data.get("taiChuaDeNghi", False) or data.get("tai_chua_de_nghi", False))
 
     portal_service.update_config(ma_cskcb=ma_cskcb, username=username, password=password)
 
     try:
-        add_portal_log("--- BẮT ĐẦU LUỒNG B MỚI (TẢI listbh.xlsx) ---")
-        result = await asyncio.to_thread(portal_service.run_flow_b, add_portal_log, client_token)
+        cur_m = thang or datetime.datetime.now().month
+        add_portal_log(f"--- BẮT ĐẦU LUỒNG B (TẢI listbh.xlsx - THÁNG {cur_m}, GỘP CHƯA ĐỀ NGHỊ: {'CÓ' if tai_chua_de_nghi else 'KHÔNG'}) ---")
+        result = await asyncio.to_thread(portal_service.run_flow_b, add_portal_log, client_token, thang, tai_chua_de_nghi)
         return {
             "status": result.get("status", "success"),
             "flow": "B",
             "rows": result.get("rows", 0),
+            "month": result.get("month", cur_m),
+            "merged": result.get("merged", tai_chua_de_nghi),
             "file_path": result.get("file_path", ""),
             "message": result.get("message", "Tải hoàn tất Luồng B.")
         }
