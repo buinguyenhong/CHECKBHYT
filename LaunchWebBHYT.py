@@ -609,6 +609,11 @@ class BHYTLauncher:
             )
             if res:
                 self.stop_server_on_port_sync(int(port))
+                # Chờ socket Windows giải phóng hẳn
+                for _ in range(6):
+                    if not self.is_port_active(int(port)):
+                        break
+                    time.sleep(0.5)
             else:
                 return
 
@@ -620,9 +625,10 @@ class BHYTLauncher:
             env["BHYT_NO_RELOAD"] = "1"  # Khóa reload tối ưu hóa RAM chạy ngầm
             env["PYTHONIOENCODING"] = "utf-8"
             env["PYTHONUTF8"] = "1"
+            env["PYTHONUNBUFFERED"] = "1"  # Ghi log tức thì, không lưu buffer RAM
             
             python_bin = self.get_python_exe(folder)
-            cmd = [python_bin, run_script_path, "--port", str(port)]
+            cmd = [python_bin, "-u", run_script_path, "--port", str(port)]
             
             log_file_path = os.path.join(folder, "web_app_server.log")
             log_file = open(log_file_path, "a", encoding="utf-8")
@@ -641,14 +647,16 @@ class BHYTLauncher:
             )
             log_file.close()
 
-            # Chờ kiểm tra trạng thái port thực tế
+            # Chờ kiểm tra trạng thái port thực tế (tối đa ~15 giây cho máy nạp đủ FastAPI/Pandas/DB)
             server_started = False
-            for _ in range(8):  # Đợi tối đa ~4 giây
+            for _ in range(30):
                 time.sleep(0.5)
                 if self.is_port_active(int(port)):
                     server_started = True
                     break
                 if proc.poll() is not None:
+                    # Tiến trình đã thực sự crash hoặc thoát sớm
+                    time.sleep(0.5)
                     break
 
             if server_started:
@@ -659,6 +667,7 @@ class BHYTLauncher:
                     f"Bạn có thể đóng bảng điều khiển này, máy chủ LAN vẫn hoạt động ổn định."
                 )
             else:
+                ret_code = proc.poll()
                 error_detail = "Máy chủ không phản hồi hoặc đã dừng ngay sau khi bật."
                 if os.path.exists(log_file_path):
                     try:
@@ -668,9 +677,11 @@ class BHYTLauncher:
                                 error_detail = "".join(lines[-15:])
                     except Exception:
                         pass
+                
+                status_extra = f" (Mã thoát tiến trình: {ret_code})" if ret_code is not None else " (Tiến trình vẫn đang nạp hoặc bị chặn cổng)"
                 messagebox.showerror(
                     "Lỗi khởi chạy",
-                    f"Không thể khởi chạy máy chủ hoặc tiến trình đã dừng!\n\nChi tiết log:\n{error_detail}"
+                    f"Không thể khởi chạy máy chủ hoặc tiến trình đã dừng{status_extra}!\n\nChi tiết log:\n{error_detail}"
                 )
             
         except Exception as e:
@@ -703,6 +714,13 @@ class BHYTLauncher:
                 if pid != '0' and pid.isdigit():
                     subprocess.run(f'taskkill /F /PID {pid}', shell=True, creationflags=0x08000000)
                     killed += 1
+
+            # Chờ Windows giải phóng socket TIME_WAIT hoàn toàn
+            for _ in range(10):
+                time.sleep(0.3)
+                if not self.is_port_active(port):
+                    break
+
             return killed
         except Exception:
             return 0

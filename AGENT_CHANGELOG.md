@@ -56,6 +56,28 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-21 14:40 - Antigravity (Sửa Lỗi Khởi Chạy Server Chạy Ngầm Trên Launcher LaunchWebBHYT)
+
+### Mục tiêu
+- Khắc phục lỗi hiển thị thông báo popup "Không thể khởi chạy máy chủ hoặc tiến trình đã dừng!" khi bấm nút khởi chạy ngầm trên `LaunchWebBHYT.py`.
+
+### Nguyên nhân
+1. **Xung đột socket TIME_WAIT khi khởi động lại cổng:** Sau khi chạy lệnh `taskkill` dừng tiến trình cũ trên cổng 8000, Windows kernel cần từ 0.5s - 1.5s để dọn dẹp kết nối TCP socket. Do launcher khởi chạy tiến trình mới ngay lập tức mà không chờ socket giải phóng, Uvicorn bị lỗi `[WinError 10048] Only one usage of each socket address is normally permitted` và dừng đột ngột.
+2. **Thời gian chờ mở cổng quá ngắn (4 giây):** Vòng lặp chờ cổng trước đây chỉ lặp 8 lần x 0.5s = 4 giây. Đối với máy tính văn phòng/HDD hoặc khi import các thư viện nặng (FastAPI, Pandas, Openpyxl, Playwright, SQLAlchemy...), tiến trình cần từ 5 - 10 giây để nạp xong. Sau 4 giây cổng chưa kịp mở, launcher đã vội vã báo lỗi dù tiến trình vẫn đang chạy bình thường.
+3. **Bộ đệm stdout (buffer) làm chậm log:** Thiếu cờ `PYTHONUNBUFFERED=1` và `-u` khiến các thông báo lỗi và log từ tiến trình con bị đệm trong RAM, dẫn tới chi tiết log trong popup chỉ hiển thị các dòng request cũ của server phiên trước.
+
+### Thay đổi
+- `LaunchWebBHYT.py`:
+  - Trong `stop_server_on_port_sync`: Bổ sung vòng lặp chờ tối đa 3 giây để đảm bảo socket Windows giải phóng hoàn toàn (`not self.is_port_active(port)`).
+  - Trong `start_server_background`: 
+    - Thêm vòng lặp chờ giải phóng socket nếu vừa kill tiến trình cũ.
+    - Bổ sung biến môi trường `env["PYTHONUNBUFFERED"] = "1"` và cờ `-u` vào câu lệnh gọi Python.
+    - Tăng thời gian chờ kiểm tra cổng lên tối đa 15 giây (30 lần x 0.5s).
+    - Phân biệt rõ ràng trường hợp tiến trình thực sự crash (`proc.poll() is not None` kèm mã thoát exit code) và trường hợp tiến trình vẫn đang nạp chậm.
+
+### Kiểm tra
+- Đã chạy `python -m py_compile LaunchWebBHYT.py` không có lỗi cú pháp.
+
 ## 2026-10-21 09:00 - Antigravity (Nâng Cấp Luồng B: Chọn Tháng & Tùy Chọn Tải Gộp Chưa Đề Nghị Thanh Toán)
 
 ### Mục tiêu
