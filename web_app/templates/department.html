@@ -740,6 +740,7 @@
                         <tr>
                             <th>STT</th>
                             <th>Mã liên kết</th>
+                            <th>Mã y tế</th>
                             <th>Họ tên</th>
                             <th>Mã thẻ BHYT</th>
                             <th>Ngày ra viện</th>
@@ -754,7 +755,7 @@
                     </thead>
                     <tbody id="recordsBody">
                         <tr>
-                            <td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            <td colspan="13" style="text-align: center; color: var(--text-secondary); padding: 30px;">
                                 Đang tải danh sách dữ liệu...
                             </td>
                         </tr>
@@ -1115,6 +1116,7 @@
         } else {
             deptPagination.filtered = records.filter(r => {
                 return (r.ma_lk && r.ma_lk.toLowerCase().includes(query)) ||
+                       (r.ma_y_te && r.ma_y_te.toLowerCase().includes(query)) ||
                        (r.ho_ten && r.ho_ten.toLowerCase().includes(query)) ||
                        (r.ma_the && r.ma_the.toLowerCase().includes(query)) ||
                        (r.maloi && r.maloi.toLowerCase().includes(query)) ||
@@ -1208,7 +1210,7 @@
         tbody.innerHTML = '';
 
         if (pageData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ nào tương ứng.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ nào tương ứng.</td></tr>`;
             return;
         }
 
@@ -1238,6 +1240,7 @@
             tr.innerHTML = `
                 <td style="font-weight:700; color:var(--text-secondary);">${startIdx + idx + 1}</td>
                 <td><strong>${r.ma_lk}</strong></td>
+                <td>${r.ma_y_te || '<span style="color:var(--text-secondary); font-style:italic;">Trống</span>'}</td>
                 <td>${r.ho_ten}</td>
                 <td><code style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:13px;">${r.ma_the}</code></td>
                 <td>${formattedDate}</td>

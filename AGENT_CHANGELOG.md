@@ -56,6 +56,29 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-22 11:15 - Antigravity (Hiển Thị Cột Mã Y Tế Trên Giao Diện Danh Sách Lỗi, Danh Sách Fail & Khoa Phòng)
+
+### Mục tiêu
+- Hiển thị thêm cột **Mã y tế** (`ma_y_te`) của ca bệnh trên các giao diện:
+  1. Tab **Danh sách dữ liệu lỗi** (`#tab_loi`) trên `admin.html`.
+  2. Tab **Danh sách ca FAIL** (`#tab_fail`) trên `admin.html`.
+  3. Giao diện hồ sơ của **Khoa phòng lâm sàng** (`#recordsTable`) trên `department.html`.
+- Bổ sung trường `ma_y_te` vào logic tìm kiếm nhanh theo từ khóa tại cả 3 bảng.
+
+### Thay đổi
+- `web_app/templates/admin.html`:
+  - Thêm cột `<th>Mã y tế</th>` ngay sau cột `<th>Mã liên kết</th>` tại `#loiTable` và `#failTable`.
+  - Cập nhật hàm `renderLoiPage()` và `renderFailPage()` render `<td>${r.ma_y_te || 'Trống'}</td>`.
+  - Cập nhật `colspan` tương ứng (Lỗi: 16 -> 17, Fail: 11 -> 12).
+  - Bổ sung `(r.ma_y_te && r.ma_y_te.toLowerCase().includes(query))` vào hàm `filterLoiTable()` và `filterFailByMonth()`.
+- `web_app/templates/department.html`:
+  - Thêm cột `<th>Mã y tế</th>` sau `<th>Mã liên kết</th>` tại `#recordsTable`.
+  - Cập nhật hàm `renderTable()` render `ma_y_te` và cập nhật `colspan` từ 12 -> 13.
+  - Bổ sung `r.ma_y_te` vào hàm tìm kiếm nhanh `filterDeptRecords()`.
+
+### Kiểm tra
+- Đã kiểm tra cú pháp và `git diff` toàn diện, đảm bảo layout responsive và hoạt động tìm kiếm chính xác.
+
 ## 2026-10-21 14:40 - Antigravity (Sửa Lỗi Khởi Chạy Server Chạy Ngầm Trên Launcher LaunchWebBHYT)
 
 ### Mục tiêu
