@@ -2,13 +2,14 @@ import time
 from typing import Dict, Any, List, Tuple
 from .rule_models import CaseXmlData, RuleResult, RuleStatus, RuleViolation
 from .rules import check_rules_9324, check_rules_4210, check_rules_4750, check_rules_4750_ctn
+from .catalog import get_rule_catalog
 
 class ValidationEngine:
     """
     Bộ máy thực thi kiểm tra quy tắc XML độc lập cho từng hồ sơ.
     Hỗ trợ đa chuẩn: 9324, 4210, 4750.
     """
-    def __init__(self, default_standard: str = "4750"):
+    def __init__(self, default_standard: str = "AUTO"):
         self.default_standard = default_standard
 
     def detect_standard(self, case: CaseXmlData) -> str:
@@ -23,7 +24,7 @@ class ValidationEngine:
         # Dấu hiệu nhận biết chuẩn 4750 / CV 130:
         # Trường T_TONGCHI_BV, MA_LOAI_KCB định dạng mới, hoặc các trường đặc thù CV 130
         keys_4750 = ["T_TONGCHI_BV", "MA_TAI_NAN", "CAN_NANG", "SO_CCCD", "MA_THE_TAM"]
-        if any(k in xml1 for k in keys_4750) or "XML11" in case.raw_tables or "XML13" in case.raw_tables:
+        if any(k in xml1 for k in keys_4750) or "XML11" in case.raw_tables or "XML13" in case.raw_tables or "XML14" in case.raw_tables:
             return "4750"
 
         # Dấu hiệu nhận biết chuẩn 4210:
@@ -35,7 +36,7 @@ class ValidationEngine:
         if "T_TONGCHI" in xml1 and "T_BNCCT" not in xml1:
             return "9324"
 
-        # Nếu không có dấu hiệu đặc thù rõ ràng nhưng có cấu hình mặc định khả thi:
+        # Nếu người dùng có cấu hình chuẩn chỉ định rõ ràng:
         if self.default_standard in ["9324", "4210", "4750"]:
             return self.default_standard
 
@@ -97,6 +98,23 @@ class ValidationEngine:
                 results = check_rules_4210(case)
             else:  # 4750
                 results = check_rules_4750(case) + check_rules_4750_ctn(case)
+
+            # 3.1. Đối chiếu danh mục quy tắc để ghi nhận các quy tắc chưa triển khai code
+            evaluated_codes = {r.rule_code for r in results}
+            catalog = get_rule_catalog()
+            std_catalog_rules = [r for r in catalog if r["standard"] == standard]
+
+            for cat_r in std_catalog_rules:
+                c_code = cat_r["rule_code"]
+                if c_code not in evaluated_codes:
+                    results.append(RuleResult(
+                        rule_code=c_code,
+                        standard=standard,
+                        rule_name=cat_r["rule_name"],
+                        status=RuleStatus.INCOMPLETE_DATA,
+                        reason="Quy tắc chưa có mã thực thi trong phiên bản hiện tại hoặc thiếu nguồn danh mục chuẩn."
+                    ))
+
         except Exception as ex:
             return {
                 "ma_lk": case.ma_lk,
@@ -134,23 +152,19 @@ class ValidationEngine:
             elif r.status == RuleStatus.NOT_APPLICABLE:
                 not_applicable_count += 1
 
-        # Xác định trạng thái tổng hợp theo đúng đặc tả:
+        # Xác định trạng thái tổng hợp:
         # - Có lỗi vi phạm -> HAS_ERRORS
-        # - Không có lỗi nhưng có quy tắc thiếu dữ liệu -> INCOMPLETE_DATA
-        # - Không có lỗi, tất cả quy tắc áp dụng đều đạt -> NO_ERRORS_FOUND
+        # - Không có lỗi nhưng còn quy tắc chưa đánh giá -> INCOMPLETE_DATA (tránh báo sạch sai)
+        # - Không có lỗi, tất cả quy tắc đều PASSED -> NO_ERRORS_FOUND
         if violated_count > 0:
-            if incomplete_count > 0:
-                overall_status = "HAS_ERRORS"  # Vừa có lỗi vừa có phần chưa đánh giá
-                summary = f"Phát hiện {violated_count} lỗi vi phạm và còn {incomplete_count} quy tắc chưa đủ dữ liệu."
-            else:
-                overall_status = "HAS_ERRORS"
-                summary = f"Phát hiện {violated_count} lỗi vi phạm theo chuẩn {standard}."
+            overall_status = "HAS_ERRORS"
+            summary = f"Phát hiện {violated_count} lỗi vi phạm theo chuẩn {standard} (đã kiểm tra {passed_count + violated_count} quy tắc)."
         elif incomplete_count > 0:
             overall_status = "INCOMPLETE_DATA"
-            summary = f"Dữ liệu chưa đầy đủ để đánh giá toàn bộ quy tắc ({incomplete_count} quy tắc thiếu dữ liệu/danh mục)."
+            summary = f"Đã kiểm tra {passed_count} quy tắc (không phát hiện lỗi); còn {incomplete_count} quy tắc chưa đủ điều kiện đánh giá."
         else:
             overall_status = "NO_ERRORS_FOUND"
-            summary = f"Đạt chuẩn {standard}! Đã kiểm tra {passed_count} quy tắc và không phát hiện lỗi."
+            summary = f"Đạt chuẩn {standard}! Đã kiểm tra đầy đủ {passed_count} quy tắc và không phát hiện lỗi."
 
         execution_ms = int((time.time() - start_time) * 1000)
 

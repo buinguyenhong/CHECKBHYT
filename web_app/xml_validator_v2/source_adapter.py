@@ -5,6 +5,11 @@ import pandas as pd
 from services.his_service import get_conn, discard_conn, build_conn_str, SQL_QUERY_TIMEOUT_SECONDS, SQL_CONNECT_TIMEOUT_SECONDS
 
 XML_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xml_db_config.json")
+DEFAULT_XML_TABLES = [
+    "XML1_CV130", "XML2_CV130", "XML3_CV130", "XML4_CV130", "XML5_CV130",
+    "XML6_CV130", "XML7_CV130", "XML8_CV130", "XML9_CV130", "XML10_CV130",
+    "XML11_CV130", "XML12_CV130", "XML13_CV130", "XML14_CV130", "XML15_CV130"
+]
 
 def load_xml_db_config() -> dict:
     default_cfg = {
@@ -14,16 +19,16 @@ def load_xml_db_config() -> dict:
         "auth": "Windows Auth",
         "user": "",
         "password": "",
-        "tables": [
-            "XML1_CV130", "XML2_CV130", "XML3_CV130", "XML4_CV130", "XML5_CV130",
-            "XML7_CV130", "XML8_CV130", "XML9_CV130", "XML11_CV130", "XML13_CV130"
-        ]
+        "tables": DEFAULT_XML_TABLES
     }
     if os.path.exists(XML_CONFIG_FILE):
         try:
             with open(XML_CONFIG_FILE, "r", encoding="utf-8") as f:
                 saved = json.load(f)
                 default_cfg.update(saved)
+                # Đảm bảo danh sách bảng luôn chứa đủ các bảng hợp lệ nếu chưa cấu hình
+                if not default_cfg.get("tables"):
+                    default_cfg["tables"] = DEFAULT_XML_TABLES
         except Exception:
             pass
     return default_cfg
@@ -76,15 +81,17 @@ class XmlSourceAdapter:
         try:
             conn = self.get_connection()
         except Exception as e:
-            # Nếu không thể kết nối SQL Server (ví dụ ở môi trường dev/offline), trả về rỗng kèm cờ
+            # Lỗi kết nối CSDL XML phải được ném ra để Service xử lý đúng trạng thái FAILED
             print(f"[!] [XmlSourceAdapter] Không thể kết nối SQL Server XML: {e}")
-            return results
+            raise ConnectionError(f"Không thể kết nối CSDL XML (SQL Server): {e}")
 
         try:
-            tables_to_query = self.cfg.get("tables", [
-                "XML1_CV130", "XML2_CV130", "XML3_CV130", "XML4_CV130", "XML5_CV130",
-                "XML7_CV130", "XML8_CV130", "XML9_CV130", "XML11_CV130", "XML13_CV130"
-            ])
+            raw_tables = self.cfg.get("tables", DEFAULT_XML_TABLES)
+            import re
+            valid_tbl_re = re.compile(r"^XML(1[0-5]?|[1-9])(_CV130|_4210|_4750)?$", re.IGNORECASE)
+            tables_to_query = [t for t in raw_tables if valid_tbl_re.match(str(t).strip())]
+            if not tables_to_query:
+                tables_to_query = DEFAULT_XML_TABLES
 
             for i in range(0, len(clean_keys), chunk_size):
                 chunk = clean_keys[i:i + chunk_size]
@@ -96,6 +103,7 @@ class XmlSourceAdapter:
                     
                     # CHỈ THỰC HIỆN CÂU LỆNH SELECT, WITH (NOLOCK) ĐỂ TRÁNH LOCK BẢNG NGHIỆP VỤ
                     sql = f"SELECT * FROM dbo.{tbl} WITH (NOLOCK) WHERE MA_LK IN ({quoted_keys})"
+                    cur = None
                     try:
                         cur = conn.cursor()
                         cur.execute(sql)
@@ -117,10 +125,15 @@ class XmlSourceAdapter:
                                 if tbl_short not in results[row_lk]:
                                     results[row_lk][tbl_short] = []
                                 results[row_lk][tbl_short].append(row_dict)
-                        cur.close()
                     except Exception as q_err:
                         # Bảng có thể chưa tồn tại hoặc rỗng, tiếp tục bảng khác
                         print(f"[-] [XmlSourceAdapter] Không truy vấn được bảng {tbl}: {q_err}")
+                    finally:
+                        if cur:
+                            try:
+                                cur.close()
+                            except Exception:
+                                pass
 
         finally:
             if conn:

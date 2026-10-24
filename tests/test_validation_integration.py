@@ -82,27 +82,34 @@ def test_full_validation_run():
         assert latest_run.total_cases == 3
         assert latest_run.processed_cases == 3
         assert latest_run.has_error_cases == 1
-        assert latest_run.no_error_cases == 1
+        assert latest_run.incomplete_cases == 1  # Không bị gán nhầm NO_ERRORS_FOUND vì chuẩn 9324 còn quy tắc chưa có code
         assert latest_run.missing_xml_cases == 1
 
         results = db.query(ValResult).filter(ValResult.run_id == latest_run.id).all()
         assert len(results) == 3
 
         res_map = {r.ma_lk: r for r in results}
-        assert res_map["MOCK_LK_VALID_9324"].overall_status == "NO_ERRORS_FOUND"
+        assert res_map["MOCK_LK_VALID_9324"].overall_status == "INCOMPLETE_DATA"
         assert res_map["MOCK_LK_VALID_9324"].violated_rules_count == 0
+        assert res_map["MOCK_LK_VALID_9324"].incomplete_rules_count > 0
 
         assert res_map["MOCK_LK_ERR_4750"].overall_status == "HAS_ERRORS"
         assert res_map["MOCK_LK_ERR_4750"].violated_rules_count >= 1
 
         assert res_map["MOCK_LK_MISSING"].overall_status == "MISSING_XML"
 
-        # Kiểm tra xuất Excel
+        # Kiểm tra xuất Excel: Xác minh Sheet 1 xuất đủ 3 dòng kết quả (chứng minh bug ValResult.id đã được sửa triệt để)
         out_excel = os.path.join(os.path.dirname(__file__), "..", "web_app", "exports", "test_report.xlsx")
         export_run_to_excel(db, latest_run.id, out_excel)
         assert os.path.exists(out_excel)
         assert os.path.getsize(out_excel) > 0
-        print(f"Export Excel test PASSED! File size: {os.path.getsize(out_excel)} bytes")
+
+        import openpyxl
+        wb = openpyxl.load_workbook(out_excel)
+        ws1 = wb["Tổng Hợp Hồ Sơ"]
+        # Có 1 dòng header + 3 dòng kết quả = 4 dòng
+        assert ws1.max_row == 4, f"Expected 4 rows in Excel Sheet 1 but got {ws1.max_row}"
+        print(f"Export Excel test PASSED! File size: {os.path.getsize(out_excel)} bytes, Max row: {ws1.max_row}")
 
     finally:
         db.close()

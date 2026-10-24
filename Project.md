@@ -1249,3 +1249,35 @@ Nhằm đảm bảo hệ thống phản hồi tức thì và không bị treo đ
 - **Tự khởi động cùng hệ điều hành (Auto-start Service):**
   - Đăng ký máy chủ chạy ngầm qua Windows Task Scheduler (`schtasks`) với tùy chọn khởi động cùng Windows (Boot) hoặc khi người dùng đăng nhập (Logon), sử dụng `pythonw.exe` để không hiện cửa sổ console.
 
+## 22. Hệ thống Kiểm tra XML Độc lập V2 (Tab 9 - XML Validator V2)
+
+### 22.1. Mục tiêu và Nguyên tắc phân nhánh độc lập
+Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bệnh trước khi gửi cổng BHYT hoặc sau khi bị cổng từ chối, hệ thống triển khai kiến trúc 2 nhánh hoàn toàn độc lập:
+- **Nhánh A (Luồng đối soát và xử lý lỗi truyền thống):** Đối soát giữa danh sách đề nghị thanh toán từ SQL HIS (`df_sql`), danh sách đã gửi cổng (`df_listbh`) và tệp lỗi chi tiết (`df_hsloi` / `HoSoLoiChiTiet.xlsx`). Lưu trữ và tác nghiệp trên CSDL `app_state.db` (các bảng `records`, `error_definitions`, `error_history_archive`).
+- **Nhánh B (Validate XML V2 độc lập):** Đọc trực tiếp các bảng XML có sẵn trên SQL Server theo khóa `MA_LK` của các hồ sơ chưa gửi cổng thành công (`FAIL` và `LOI` có `status != 'RESOLVED'`), thực thi bộ quy tắc nghiệp vụ đa chuẩn (9324, 4210, 4750) và lưu trữ trên CSDL SQLite riêng biệt `web_app/xml_validation_v2.db`. Thất bại hay hủy tiến trình ở Nhánh B không bao giờ làm gián đoạn hay ảnh hưởng đến dữ liệu Nhánh A.
+
+### 22.2. Nguồn dữ liệu SQL Server và An toàn truy vấn
+- **Máy chủ SQL Server:** `thsrvsql01`
+- **CSDL XML:** `eHospital_ThienHanh_XML`
+- **Schema:** `dbo`
+- **Phạm vi 15 bảng XML:** Bao phủ toàn bộ từ `XML1_CV130` đến `XML15_CV130`.
+- **Khóa liên kết hồ sơ:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`.
+- **Cam kết an toàn tuyệt đối:**
+  - Chỉ phát câu lệnh `SELECT ... WITH (NOLOCK) WHERE MA_LK IN (...)` theo từng lô 50 `MA_LK`.
+  - Tuyệt đối không có lệnh `INSERT`, `UPDATE`, `DELETE`, `ALTER` hoặc gọi các Stored Procedure tạo XML.
+  - Tên bảng được kiểm soát chặt chẽ bằng allowlist biểu thức chính quy.
+
+### 22.3. Bộ quy tắc Đa chuẩn và Cơ chế Triệt tiêu Báo sạch sai (Anti-False-Negative)
+- **Hỗ trợ đa chuẩn:** Nhận diện và áp dụng quy tắc theo Quyết định 9324/QĐ-BHXH, Quyết định 4210/QĐ-BYT và Quyết định 4750/QĐ-BYT kèm đặc tả Cổng tiếp nhận (CTN 4750).
+- **Nguyên tắc phân định trạng thái trung thực:**
+  - `HAS_ERRORS`: Phát hiện ít nhất 1 quy tắc bị vi phạm (kèm chi tiết giá trị thực tế và điều kiện kỳ vọng).
+  - `INCOMPLETE_DATA`: Dữ liệu chưa đủ điều kiện đánh giá toàn diện, hoặc hồ sơ không vi phạm các quy tắc đã code nhưng còn các quy tắc logic trong Catalog chưa có mã thực thi trong phiên bản hiện tại. Hệ thống thông báo rõ: *"Đã kiểm tra X quy tắc (không phát hiện lỗi); còn Y quy tắc chưa đủ điều kiện đánh giá"*.
+  - `NO_ERRORS_FOUND`: Chỉ cấp nhãn ĐẠT HỢP LỆ khi 100% quy tắc áp dụng của chuẩn đó đều được kiểm tra và hoàn toàn không có vi phạm.
+  - `MISSING_XML`: Không tìm thấy bản ghi XML của hồ sơ trên SQL Server.
+  - `RULESET_UNDETERMINED`: Dữ liệu XML thiếu các trường đặc thù để nhận diện chuẩn áp dụng.
+
+### 22.4. Xuất Báo cáo Excel Chuyên dụng
+- Module `report_exporter.py` hỗ trợ xuất báo cáo kiểm tra XML chuyên sâu ra tệp Excel định dạng OpenXML:
+  - **Sheet 1 (Tổng Hợp Hồ Sơ):** Xuất toàn bộ danh sách hồ sơ kiểm tra theo đợt (`ValResult.run_id == run_id`), phân loại chuẩn, trạng thái validate, số lỗi, số đạt và tóm tắt kết quả.
+  - **Sheet 2 (Chi Tiết Vi Phạm):** Danh sách chi tiết từng lỗi vi phạm của từng hồ sơ (chuẩn, mã lỗi, tên quy tắc, bảng XML, trường dữ liệu, giá trị thực tế, điều kiện kỳ vọng và nội dung giải thích).
+

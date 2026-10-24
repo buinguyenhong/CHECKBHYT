@@ -13,7 +13,7 @@ def export_run_to_excel(db_session, run_id: int, output_filepath: str) -> str:
     if not run:
         raise ValueError(f"Không tìm thấy đợt kiểm tra ID: {run_id}")
 
-    results = db_session.query(ValResult).filter(ValResult.id == run_id).all()
+    results = db_session.query(ValResult).filter(ValResult.run_id == run_id).all()
     errors = db_session.query(ValidationError).filter(ValidationError.run_id == run_id).all()
 
     wb = openpyxl.Workbook()

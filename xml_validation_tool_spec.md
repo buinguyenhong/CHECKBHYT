@@ -51,16 +51,24 @@ sequenceDiagram
 
 ## 📋 3. Nguồn dữ liệu XML từ CSDL Bệnh Viện (CV 130)
 
-Hệ thống truy vấn trực tiếp từ các bảng XML trên SQL Server theo mã `MA_LK`:
-*   **XML1_CV130 (Bảng 1):** Chỉ tiêu tổng hợp khám bệnh, chữa bệnh (Hành chính, loại KCB, tổng chi, viện phí, BHTT chi trả).
-*   **XML2_CV130 (Bảng 2):** Chỉ tiêu chi tiết thuốc thanh toán BHYT (Số lượng, đơn giá, tỷ lệ thanh toán, thành tiền).
-*   **XML3_CV130 (Bảng 3):** Chỉ tiêu chi tiết dịch vụ kỹ thuật và vật tư y tế (Mã nhóm, số lượng, stent, tiền giường, tiền vận chuyển).
-*   **XML4_CV130 (Bảng 4):** Chỉ tiêu kết quả cận lâm sàng.
-*   **XML5_CV130 (Bảng 5):** Chỉ tiêu theo dõi diễn biến lâm sàng.
-*   **XML7_CV130 (Bảng 7):** Giấy ra viện / Giấy tờ chuyển tuyến.
-*   **XML8_CV130 (Bảng 8):** Tóm tắt bệnh án.
-*   **XML9_CV130 (Bảng 9):** Bảng kê chi phí KCB.
-*   **XML11_CV130, XML13_CV130:** Chỉ tiêu chi tiết hồ sơ bổ sung theo Quyết định 4750.
+Hệ thống truy vấn trực tiếp từ CSDL `eHospital_ThienHanh_XML` trên SQL Server `thsrvsql01` theo mã nghiệp vụ `MA_LK`:
+*   **Các cột khóa liên kết ghi nhận trong metadata:** `BenhAn_Id`, `TiepNhan_Id`, `BenhNhan_Id`, `XacNhanChiPhi_Id`, `MA_LK`. Toàn bộ 15 bảng XML con đều mang khóa ngoại nghiệp vụ là `MA_LK`.
+*   **Danh sách đủ 15 bảng XML theo Quyết định 4750 / CV 130:**
+    *   **XML1_CV130 (Bảng 1):** Chỉ tiêu tổng hợp khám bệnh, chữa bệnh (Hành chính, loại KCB, tổng chi, viện phí, BHTT chi trả).
+    *   **XML2_CV130 (Bảng 2):** Chỉ tiêu chi tiết thuốc thanh toán BHYT (Số lượng, đơn giá, tỷ lệ thanh toán, thành tiền).
+    *   **XML3_CV130 (Bảng 3):** Chỉ tiêu chi tiết dịch vụ kỹ thuật và vật tư y tế (Mã nhóm, số lượng, stent, tiền giường, tiền vận chuyển).
+    *   **XML4_CV130 (Bảng 4):** Chỉ tiêu kết quả cận lâm sàng (quy mô gần 16 triệu dòng).
+    *   **XML5_CV130 (Bảng 5):** Chỉ tiêu theo dõi diễn biến lâm sàng.
+    *   **XML6_CV130 (Bảng 6):** Hồ sơ bệnh án trích tóm tắt.
+    *   **XML7_CV130 (Bảng 7):** Giấy ra viện / Giấy chuyển tuyến.
+    *   **XML8_CV130 (Bảng 8):** Tóm tắt hồ sơ bệnh án (áp dụng điều trị nội trú / ban ngày).
+    *   **XML9_CV130 (Bảng 9):** Giấy chứng sinh.
+    *   **XML10_CV130 (Bảng 10):** Bảng kê chi phí KCB bổ sung.
+    *   **XML11_CV130 (Bảng 11):** Giấy nghỉ dưỡng thai.
+    *   **XML12_CV130 (Bảng 12):** Giấy chứng nhận nghỉ việc hưởng BHXH.
+    *   **XML13_CV130 (Bảng 13):** Giấy khám chữa bệnh định kỳ.
+    *   **XML14_CV130 (Bảng 14):** Thông tin hẹn khám lại / Giấy hẹn khám lại.
+    *   **XML15_CV130 (Bảng 15):** Chi tiết thông tin nhân thân người bệnh.
 
 ---
 

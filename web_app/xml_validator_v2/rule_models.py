@@ -43,35 +43,26 @@ class CaseXmlData:
     xml3: List[Dict[str, Any]] = field(default_factory=list)
     xml4: List[Dict[str, Any]] = field(default_factory=list)
     xml5: List[Dict[str, Any]] = field(default_factory=list)
+    xml6: List[Dict[str, Any]] = field(default_factory=list)
     xml7: List[Dict[str, Any]] = field(default_factory=list)
     xml8: List[Dict[str, Any]] = field(default_factory=list)
     xml9: List[Dict[str, Any]] = field(default_factory=list)
+    xml10: List[Dict[str, Any]] = field(default_factory=list)
     xml11: List[Dict[str, Any]] = field(default_factory=list)
+    xml12: List[Dict[str, Any]] = field(default_factory=list)
     xml13: List[Dict[str, Any]] = field(default_factory=list)
+    xml14: List[Dict[str, Any]] = field(default_factory=list)
+    xml15: List[Dict[str, Any]] = field(default_factory=list)
     raw_tables: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
 
     def get_table(self, name: str) -> List[Dict[str, Any]]:
         name_clean = name.upper().split("_")[0]
         if name_clean == "XML1":
             return [self.xml1] if self.xml1 else []
-        elif name_clean == "XML2":
-            return self.xml2
-        elif name_clean == "XML3":
-            return self.xml3
-        elif name_clean == "XML4":
-            return self.xml4
-        elif name_clean == "XML5":
-            return self.xml5
-        elif name_clean == "XML7":
-            return self.xml7
-        elif name_clean == "XML8":
-            return self.xml8
-        elif name_clean == "XML9":
-            return self.xml9
-        elif name_clean == "XML11":
-            return self.xml11
-        elif name_clean == "XML13":
-            return self.xml13
+        if hasattr(self, name_clean.lower()):
+            val = getattr(self, name_clean.lower())
+            if isinstance(val, list) and len(val) > 0:
+                return val
         return self.raw_tables.get(name_clean, [])
 
 def to_decimal(val: Any, default: Decimal = Decimal("0.0")) -> Decimal:

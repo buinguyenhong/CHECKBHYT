@@ -237,8 +237,34 @@ def trigger_validation_run(
     
     if use_unsent:
         # Lấy danh sách hồ sơ chưa gửi cổng từ đợt đối soát gần nhất trong bảng records (chỉ đọc)
+        # BẮT BUỘC: chỉ lấy các ca chưa thành công (status != 'RESOLVED') thuộc đợt đối soát chỉ định hoặc gần nhất
         from models import Record
-        unsent_records = app_db.query(Record).filter(Record.type_group.in_(["FAIL", "LOI"])).all()
+        from sqlalchemy import func
+
+        target_date_str = payload.get("doi_soat_date")
+        target_date = None
+        if target_date_str:
+            try:
+                target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
+            except Exception:
+                pass
+
+        query = app_db.query(Record).filter(
+            Record.type_group.in_(["FAIL", "LOI"]),
+            Record.status != "RESOLVED"
+        )
+
+        if not target_date:
+            latest_date = app_db.query(func.max(Record.ngay_doi_soat)).filter(
+                Record.type_group.in_(["FAIL", "LOI"]),
+                Record.status != "RESOLVED"
+            ).scalar()
+            target_date = latest_date
+
+        if target_date:
+            query = query.filter(Record.ngay_doi_soat == target_date)
+
+        unsent_records = query.all()
         # Loại bỏ trùng MA_LK
         seen = set()
         for rec in unsent_records:

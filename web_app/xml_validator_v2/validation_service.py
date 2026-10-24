@@ -55,8 +55,9 @@ def run_validation_job(
     init_val_db()
     db: Session = ValSessionLocal()
 
-    now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_code = f"RUN_{now_str}"
+    now_dt = datetime.datetime.now()
+    now_str = now_dt.strftime("%Y%m%d_%H%M%S")
+    run_code = f"RUN_{now_str}_{now_dt.microsecond // 1000:03d}"
     
     val_run = ValRun(
         run_code=run_code,
@@ -132,11 +133,16 @@ def run_validation_job(
                 xml3_data = case_xml_tables.get("XML3", [])
                 xml4_data = case_xml_tables.get("XML4", [])
                 xml5_data = case_xml_tables.get("XML5", [])
+                xml6_data = case_xml_tables.get("XML6", [])
                 xml7_data = case_xml_tables.get("XML7", [])
                 xml8_data = case_xml_tables.get("XML8", [])
                 xml9_data = case_xml_tables.get("XML9", [])
+                xml10_data = case_xml_tables.get("XML10", [])
                 xml11_data = case_xml_tables.get("XML11", [])
+                xml12_data = case_xml_tables.get("XML12", [])
                 xml13_data = case_xml_tables.get("XML13", [])
+                xml14_data = case_xml_tables.get("XML14", [])
+                xml15_data = case_xml_tables.get("XML15", [])
 
                 case_xml_obj = CaseXmlData(
                     ma_lk=lk,
@@ -149,11 +155,16 @@ def run_validation_job(
                     xml3=xml3_data,
                     xml4=xml4_data,
                     xml5=xml5_data,
+                    xml6=xml6_data,
                     xml7=xml7_data,
                     xml8=xml8_data,
                     xml9=xml9_data,
+                    xml10=xml10_data,
                     xml11=xml11_data,
+                    xml12=xml12_data,
                     xml13=xml13_data,
+                    xml14=xml14_data,
+                    xml15=xml15_data,
                     raw_tables=case_xml_tables
                 )
 

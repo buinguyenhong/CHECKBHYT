@@ -56,7 +56,40 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-10-24 11:05 - Antigravity (Tích Hợp Quy Tắc Ràng Buộc Cổng Tiếp Nhận CTN Theo QĐ 4750 Từ Tệp Excel)
+## 2026-10-24 14:45 - Antigravity (Khắc Phục Sau Audit Độc Lập & Cập Nhật Hỗ Trợ Đầy Đủ 15 Bảng XML CSDL)
+
+### Mục tiêu
+- Xử lý triệt để các phát hiện quan trọng từ cuộc Audit độc lập XML Validator V2.
+- Đồng bộ cơ chế lấy dữ liệu với CSDL thực tế `eHospital_ThienHanh_XML` (đầy đủ 15 bảng từ `XML1_CV130` đến `XML15_CV130`).
+- Khắc phục lỗi xuất Excel rỗng và lỗi lọc hồ sơ kéo nhầm ca đã `RESOLVED` trong lịch sử.
+- Triệt tiêu hoàn toàn rủi ro báo thành công sai (False Negative) trên Rule Engine.
+
+### Thay đổi
+- **Sửa lỗi xuất Excel (`report_exporter.py`):**
+  - Đổi câu lệnh truy vấn lọc từ `ValResult.id == run_id` sang `ValResult.run_id == run_id`.
+  - Sheet 1 "Tổng Hợp Hồ Sơ" giờ đây xuất đầy đủ 100% các dòng hồ sơ của đợt kiểm tra thay vì bị rỗng/1 dòng.
+- **Sửa bộ lọc chọn ca chưa gửi (`router.py`):**
+  - Bổ sung điều kiện bắt buộc `Record.status != 'RESOLVED'` để loại bỏ các ca đã được duyệt hoặc gửi thành công.
+  - Thêm điều kiện lọc theo ngày đối soát (`Record.ngay_doi_soat == target_date`), mặc định lấy theo ngày đối soát mới nhất của các ca chưa gửi, tránh quét toàn bộ lịch sử CSDL cũ.
+- **Hỗ trợ đầy đủ 15 bảng XML & Bắt lỗi kết nối (`source_adapter.py`):**
+  - Bổ sung cấu hình mặc định đầy đủ 15 bảng: `XML1_CV130` đến `XML15_CV130`.
+  - Bổ sung biểu thức chính quy allowlist kiểm tra tính hợp lệ của tên bảng XML.
+  - Khi mất kết nối SQL Server, adapter ném ngoại lệ `ConnectionError` rõ ràng thay vì nuốt lỗi và trả về dict rỗng (giúp hệ thống chuyển sang `FAILED` thay vì đánh lừa người dùng thành `MISSING_XML`).
+- **Mở rộng dữ liệu hồ sơ (`rule_models.py` & `validation_service.py`):**
+  - Bổ sung các thuộc tính `xml6`, `xml10`, `xml12`, `xml14`, `xml15` vào `CaseXmlData`.
+  - Cải tiến hàm `get_table()` để nạp dữ liệu chính xác và có cơ chế fallback `raw_tables`.
+- **Triệt tiêu False Negative trên Rule Engine (`rule_engine.py`):**
+  - Đối chiếu danh mục Catalog để tự động nạp các quy tắc chưa có mã thực thi vào danh sách đánh giá với trạng thái `INCOMPLETE_DATA`.
+  - Hồ sơ không bị gán nhãn `NO_ERRORS_FOUND` ("ĐẠT HỢP LỆ") sai sự thật nếu còn quy tắc chưa được đánh giá, chuyển thành `INCOMPLETE_DATA` kèm thông báo minh bạch số quy tắc đã kiểm tra và số quy tắc chưa đánh giá.
+  - Bỏ ép mặc định `4750` khi không nhận diện được chuẩn, chuyển về `RULESET_UNDETERMINED`.
+- **Bảo mật (`.gitignore`):**
+  - Thêm `web_app/xml_validator_v2/xml_db_config.json` vào danh sách ignore.
+- **Cập nhật kiểm thử (`tests/`):**
+  - `tests/test_xml_v2.py`: Kiểm thử 7 unit test toàn diện PASSED.
+  - `tests/test_validation_integration.py`: Kiểm tra xuất Excel đủ số dòng `max_row == 4` và trạng thái `INCOMPLETE_DATA` PASSED.
+  - `tests/test_safety_and_regression.py`: Xác nhận an toàn chỉ đọc SQL Server và bảo toàn Nhánh A PASSED.
+
+---
 
 ### Mục tiêu
 - Tích hợp bổ sung toàn bộ các quy tắc ràng buộc trường dữ liệu, cấu trúc bắt buộc và tính nhất quán chéo từ tệp đặc tả: `C:\Users\Admin\Downloads\QD4750_Check_Validate CTN QĐ_4750.xlsx`.
