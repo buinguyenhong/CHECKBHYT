@@ -168,7 +168,7 @@ def get_case_detail(
 
 @router.get("/catalog")
 def get_catalog_rules(user: User = Depends(require_admin)):
-    """Lấy danh mục 116 quy tắc để tra cứu"""
+    """Lấy danh mục 123 quy tắc kiểm tra XML (gồm 116 quy tắc logic gốc + 7 nhóm quy tắc CTN 4750) để tra cứu"""
     return get_rule_catalog()
 
 @router.get("/export-excel")

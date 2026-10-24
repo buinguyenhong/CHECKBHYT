@@ -56,6 +56,48 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-24 16:20 - Antigravity (Áp dụng Ma Trận Phụ Thuộc Bảng XML Xuyên Suốt, Trạng Thái Bảng Theo Từng Hồ Sơ, Column Projection & Đồng Bộ 123 Quy Tắc)
+
+### Mục tiêu
+- Xử lý triệt để 4 vấn đề cốt lõi được chỉ ra trong đợt review thứ hai:
+  1. Áp dụng ma trận phụ thuộc bảng XML xuyên suốt: Bất kỳ quy tắc nào (tính tiền XML2/XML3, đối chiếu XML6..XML15) đều không được trả về PASSED nếu bảng phụ thuộc bị lỗi truy vấn (hạ xuống INCOMPLETE_DATA).
+  2. Thiết kế lại trạng thái đọc bảng theo từng hồ sơ (`case_table_status`) thay vì dùng chung cả batch, ngăn ngừa hoàn toàn lỗi ghi đè trạng thái ERROR giữa các chunk. Phân biệt rõ bảng rỗng hợp lệ (EMPTY) với lỗi truy vấn (ERROR).
+  3. Áp dụng Column Projection cho 15 bảng XML (`XML_TABLE_COLUMNS`), giảm thiểu tối đa RAM và băng thông I/O đối với các bảng hàng triệu dòng (XML4 ~16M dòng, XML3 ~6.4M dòng). Thêm cấu hình `use_nolock` (mặc định True).
+  4. Đồng bộ danh mục 123 quy tắc (116 logic + 7 CTN 4750) trên toàn bộ API docstring và giao diện Tab 9 (`admin.html`).
+
+### Thay đổi
+- `web_app/xml_validator_v2/source_adapter.py`:
+  - Khai báo từ điển `XML_TABLE_COLUMNS` cho toàn bộ 15 bảng XML từ XML1 đến XML15.
+  - Sử dụng Column Projection trong câu lệnh `SELECT`, có fallback an toàn về `SELECT *` nếu schema SQL Server cũ thiếu cột.
+  - Thêm cấu hình `use_nolock: bool` (mặc định True).
+  - Cập nhật `fetch_xml_batch` trả về 3 phần tử `(results, case_table_status, batch_table_status)`. Không bao giờ ghi đè ERROR thành SUCCESS trên `batch_table_status`, và ghi nhận chính xác trạng thái `case_table_status` cho từng `MA_LK` trong chunk.
+- `web_app/xml_validator_v2/rule_models.py`:
+  - Nâng cấp `is_table_error()`, `is_table_success()` và `get_table_status()` trong `CaseXmlData` hỗ trợ cả kiểu chuỗi lẫn dictionary.
+- `web_app/xml_validator_v2/catalog.py`:
+  - Bổ sung `RULE_REQUIRED_TABLES_MAP` và hàm tra cứu `get_rule_required_tables(standard, rule_code)`.
+- `web_app/xml_validator_v2/rule_engine.py`:
+  - Thêm bước kiểm tra xuyên suốt 3.2 trong `validate_case()`: Mọi quy tắc nếu có kết quả PASSED mà bất kỳ bảng phụ thuộc nào bị lỗi truy vấn (`case.is_table_error(tbl)`), đều bị hạ xuống `RuleStatus.INCOMPLETE_DATA` kèm thông điệp giải thích rõ ràng.
+- `web_app/xml_validator_v2/validation_service.py`:
+  - Hỗ trợ unpack linh hoạt tuple 2 hoặc 3 phần tử từ `fetch_xml_batch`, truyền `table_fetch_status` riêng biệt của từng hồ sơ vào `CaseXmlData`.
+- `web_app/xml_validator_v2/router.py`:
+  - Cập nhật docstring endpoint `/catalog` thành 123 quy tắc kiểm tra XML (116 quy tắc logic gốc + 7 nhóm CTN 4750).
+- `web_app/templates/admin.html`:
+  - Sửa nút bấm thành "📋 Tra cứu 123 Quy tắc".
+  - Sửa tiêu đề modal thành "Danh Mục 123 Quy Tắc Kiểm Tra XML (116 Logic Gốc + 7 Nhóm CTN 4750)".
+  - Bổ sung tùy chọn lọc chuẩn và hiển thị badge "CTN 4750" để phân biệt rõ ràng với các quy tắc logic gốc.
+- `tests/test_safety_and_regression.py` & `tests/test_validation_integration.py`:
+  - Thêm test case `test_rule_dependency_error_demotion()` và `test_chunk_error_isolation_and_no_overwrite()`.
+  - Cập nhật mock adapter theo chuẩn tuple 3 phần tử.
+
+### Nghiệp vụ ảnh hưởng
+- Hoàn toàn triệt tiêu nguy cơ False Negative (báo sạch sai) do bảng phụ thuộc bị lỗi truy vấn.
+- Tối ưu hóa hiệu năng và bộ nhớ đáng kể khi quét các hồ sơ có nhiều chỉ số cận lâm sàng (XML4) hoặc thuốc/DVKT (XML2/XML3).
+
+### Kiểm tra
+- `python tests/test_safety_and_regression.py`: 8/8 tests PASSED.
+- `python tests/test_validation_integration.py`: PASSED (xuất Excel 7983 bytes).
+- `python tests/test_xml_v2.py`: PASSED.
+
 ## 2026-10-24 15:30 - Antigravity (Hoàn tất 7 Hạng mục Cải tiến Audit XML Validator V2: Tham số hóa ODBC, Quản lý Lỗi Bảng & Regression Test)
 
 ### Mục tiêu

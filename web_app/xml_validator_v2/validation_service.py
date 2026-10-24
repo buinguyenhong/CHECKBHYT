@@ -119,10 +119,15 @@ def run_validation_job(
             
             # 1. Truy vấn XML an toàn theo lô (Read-only)
             fetch_res = adapter.fetch_xml_batch(ma_lk_list)
-            if isinstance(fetch_res, tuple) and len(fetch_res) == 2:
-                xml_dict, table_status = fetch_res
+            if isinstance(fetch_res, tuple):
+                if len(fetch_res) >= 3:
+                    xml_dict, case_table_status, batch_table_status = fetch_res[0], fetch_res[1], fetch_res[2]
+                elif len(fetch_res) == 2:
+                    xml_dict, case_table_status = fetch_res
+                else:
+                    xml_dict, case_table_status = fetch_res[0], {}
             else:
-                xml_dict, table_status = fetch_res, {}
+                xml_dict, case_table_status = fetch_res, {}
 
             # 2. Xử lý từng hồ sơ trong lô
             for case_info in chunk:
@@ -131,6 +136,15 @@ def run_validation_job(
 
                 lk = case_info["ma_lk"]
                 case_xml_tables = xml_dict.get(lk, {})
+
+                # Trạng thái đọc bảng XML riêng biệt của hồ sơ này
+                if isinstance(case_table_status, dict):
+                    if lk in case_table_status and isinstance(case_table_status[lk], dict):
+                        lk_tbl_status = case_table_status[lk]
+                    else:
+                        lk_tbl_status = case_table_status
+                else:
+                    lk_tbl_status = {}
 
                 # Tạo snapshot dữ liệu
                 xml1_data = case_xml_tables.get("XML1", [{}])[0] if case_xml_tables.get("XML1") else None
@@ -171,7 +185,7 @@ def run_validation_job(
                     xml14=xml14_data,
                     xml15=xml15_data,
                     raw_tables=case_xml_tables,
-                    table_fetch_status=table_status
+                    table_fetch_status=lk_tbl_status
                 )
 
                 # Lưu snapshot vào CSDL

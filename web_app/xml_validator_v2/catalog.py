@@ -1119,3 +1119,43 @@ def get_rules_for_standard(standard: str) -> list:
 
 def get_rule_catalog() -> list:
     return RULE_CATALOG
+
+# =============================================================================
+# MA TRẬN BẢNG XML PHỤ THUỘC (RULE -> REQUIRED TABLES)
+# Định nghĩa danh sách các bảng XML bắt buộc phải truy vấn thành công.
+# Nếu bất kỳ bảng nào trong danh sách bị lỗi truy vấn từ SQL Server,
+# quy tắc đó KHÔNG ĐƯỢC PHÉP trả về PASSED (buộc hạ xuống INCOMPLETE_DATA).
+# =============================================================================
+RULE_REQUIRED_TABLES_MAP = {
+    # Nhóm quy tắc tính tiền và đối chiếu chi tiết thuốc / DVKT
+    "3": ["XML2", "XML3"],
+    "4": ["XML1", "XML2", "XML3"],
+    "10": ["XML1", "XML3"],
+    "12": ["XML1", "XML2"],
+    "14": ["XML3"],
+    "31": ["XML1", "XML2", "XML3"],
+
+    # Nhóm quy tắc đối chiếu chéo và kiểm tra theo CTN 4750
+    "CTN_REQ_XML1": ["XML1"],
+    "CTN_REQ_XML2": ["XML2"],
+    "CTN_REQ_XML3": ["XML3"],
+    "CTN_CCCD_FORMAT": ["XML1"],
+    "CTN_CROSS_CONSISTENCY": ["XML1", "XML6", "XML7", "XML8", "XML9", "XML13", "XML14", "XML15"],
+    "CTN_XML8_APPLICABILITY": ["XML1", "XML8"],
+    "CTN_XML14_APPOINTMENT_DATE": ["XML1", "XML14"],
+}
+
+def get_rule_required_tables(standard: str, rule_code: str) -> list:
+    """Trả về danh sách bảng XML phụ thuộc của một quy tắc"""
+    # 1. Tìm chính xác theo cặp (standard, rule_code)
+    key_std = f"{standard}_{rule_code}"
+    if key_std in RULE_REQUIRED_TABLES_MAP:
+        return RULE_REQUIRED_TABLES_MAP[key_std]
+    
+    # 2. Tìm theo rule_code độc lập
+    if rule_code in RULE_REQUIRED_TABLES_MAP:
+        return RULE_REQUIRED_TABLES_MAP[rule_code]
+
+    # 3. Mặc định hầu hết các quy tắc hành chính / tổng hợp đều dựa vào XML1
+    return ["XML1"]
+

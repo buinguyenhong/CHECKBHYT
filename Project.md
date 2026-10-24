@@ -1257,25 +1257,24 @@ Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bện
 - **Nhánh B (Validate XML V2 độc lập):** Đọc trực tiếp các bảng XML có sẵn trên SQL Server theo khóa `MA_LK` của các hồ sơ chưa gửi cổng thành công (`FAIL` và `LOI` có `status != 'RESOLVED'`), thực thi bộ quy tắc nghiệp vụ đa chuẩn (9324, 4210, 4750) và lưu trữ trên CSDL SQLite riêng biệt `web_app/xml_validation_v2.db`. Thất bại hay hủy tiến trình ở Nhánh B không bao giờ làm gián đoạn hay ảnh hưởng đến dữ liệu Nhánh A.
 
 ### 22.2. Nguồn dữ liệu SQL Server và An toàn truy vấn
+### 22.2. Nguồn dữ liệu SQL Server, Column Projection và An toàn truy vấn
 - **Máy chủ SQL Server:** `thsrvsql01`
 - **CSDL XML:** `eHospital_ThienHanh_XML`
 - **Schema:** `dbo`
 - **Phạm vi 15 bảng XML:** Bao phủ toàn bộ từ `XML1_CV130` đến `XML15_CV130`.
 - **Khóa liên kết hồ sơ:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`.
-### 22.2. Nguồn dữ liệu SQL Server và An toàn truy vấn
-- **Máy chủ SQL Server:** `thsrvsql01`
-- **CSDL XML:** `eHospital_ThienHanh_XML`
-- **Schema:** `dbo`
-- **Phạm vi 15 bảng XML:** Bao phủ toàn bộ từ `XML1_CV130` đến `XML15_CV130`.
-- **Khóa liên kết hồ sơ:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`.
-- **Cam kết an toàn tuyệt đối và Tham số hóa truy vấn (Parameterized Query):**
-  - Sử dụng Parameterized Query chuẩn ODBC: `SELECT * FROM dbo.{tbl} WITH (NOLOCK) WHERE MA_LK IN (?, ?, ?)` với `cur.execute(sql, tuple(chunk))`. Không dùng f-string nội suy giá trị trực tiếp, đảm bảo chống SQL Injection và tương thích hoàn toàn với Python 3.10, 3.11, 3.12, 3.13+.
+- **Cam kết an toàn tuyệt đối, Column Projection và Tham số hóa truy vấn:**
+  - **Tối ưu Column Projection:** Thay vì `SELECT *` tốn dung lượng mạng và bộ nhớ RAM trên các bảng quy mô cực lớn (XML4 ~16 triệu dòng, XML3 ~6.4 triệu dòng), hệ thống xác định rõ danh mục cột cần thiết (`XML_TABLE_COLUMNS`) cho 15 bảng XML. Có cơ chế fallback tự động về `SELECT *` nếu schema SQL Server cũ thiếu trường.
+  - **Tùy chọn Lock Hint:** Hỗ trợ cấu hình `use_nolock: bool` (mặc định True để tránh leo thang khóa S-Lock làm ảnh hưởng đến bác sĩ/nhân viên thu ngân viện).
+  - **Tham số hóa ODBC:** Sử dụng Parameterized Query chuẩn ODBC: `SELECT cols FROM dbo.{tbl} {lock_hint} WHERE MA_LK IN (?, ?, ?)` với `cur.execute(sql, tuple(chunk))`, loại bỏ hoàn toàn nguy cơ SQL Injection và tương thích 100% Python 3.10+.
   - Tuyệt đối không có lệnh `INSERT`, `UPDATE`, `DELETE`, `ALTER` hoặc gọi các Stored Procedure tạo XML.
-  - Tên bảng được kiểm soát chặt chẽ bằng allowlist biểu thức chính quy.
-  - Quản lý trạng thái đọc độc lập của từng bảng XML (`SUCCESS`, `EMPTY`, `ERROR`). Nếu một bảng gặp sự cố truy vấn, lỗi được khoanh vùng trong bảng đó và đưa vào `CaseXmlData.table_fetch_status`. Các quy tắc thẩm định phụ thuộc bảng lỗi bắt buộc trả về `INCOMPLETE_DATA`, triệt tiêu hoàn toàn rủi ro báo đạt giả (False Negative).
+  - **Trạng thái đọc theo từng hồ sơ (`case_table_status`):** Ghi nhận trạng thái đọc riêng biệt cho từng bệnh nhân trong từng chunk. Phân biệt rõ bảng rỗng hợp lệ (`EMPTY` do bệnh nhân không có thuốc/DVKT) với lỗi truy vấn (`ERROR`). Lỗi của một chunk không bao giờ bị ghi đè hay xóa dấu vết bởi chunk thành công sau đó.
 
-### 22.3. Bộ quy tắc Đa chuẩn và Cơ chế Triệt tiêu Báo sạch sai (Anti-False-Negative)
+### 22.3. Bộ quy tắc Đa chuẩn, Ma Trận Phụ Thuộc Bảng và Triệt tiêu Báo sạch sai (Anti-False-Negative)
 - **Hỗ trợ đa chuẩn với Catalog 123 quy tắc:** Nhận diện và áp dụng quy tắc theo Quyết định 9324/QĐ-BHXH, Quyết định 4210/QĐ-BYT và Quyết định 4750/QĐ-BYT kèm đặc tả Cổng tiếp nhận (CTN 4750), gồm 116 quy tắc logic gốc và 7 nhóm quy tắc CTN 4750.
+- **Ma trận phụ thuộc bảng XML xuyên suốt (`RULE_REQUIRED_TABLES_MAP`):**
+  - Mọi quy tắc trước khi trả về `PASSED` đều phải đối chiếu với danh sách bảng phụ thuộc bắt buộc.
+  - Nếu bất kỳ bảng phụ thuộc nào (ví dụ XML2/XML3 đối với quy tắc tính tiền, hoặc XML6..XML15 đối với quy tắc đối chiếu chéo nhân thân) bị lỗi truy vấn (`case.is_table_error()`), quy tắc đó bắt buộc bị hạ xuống `RuleStatus.INCOMPLETE_DATA`, triệt tiêu hoàn toàn rủi ro kết luận hợp lệ giả (False Negative).
 - **Nguyên tắc phân định trạng thái trung thực:**
   - `HAS_ERRORS`: Phát hiện ít nhất 1 quy tắc bị vi phạm (kèm chi tiết giá trị thực tế và điều kiện kỳ vọng).
   - `INCOMPLETE_DATA`: Dữ liệu chưa đủ điều kiện đánh giá toàn diện, bảng dữ liệu phụ thuộc gặp lỗi truy vấn, hoặc hồ sơ không vi phạm các quy tắc đã code nhưng còn các quy tắc logic trong Catalog chưa có mã thực thi trong phiên bản hiện tại. Hệ thống thông báo rõ: *"Đã kiểm tra X quy tắc (không phát hiện lỗi); còn Y quy tắc chưa đủ điều kiện đánh giá"*.

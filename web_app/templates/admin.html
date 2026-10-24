@@ -1567,7 +1567,7 @@
                     <button class="btn btn-primary" id="btnRunValidateUnsent" onclick="triggerValidateUnsentCases()" style="display: flex; align-items: center; gap: 6px;">
                         <span>▶️</span> Kiểm tra XML ca chưa gửi cổng
                     </button>
-                    <button class="btn btn-secondary" onclick="openXmlCatalogModal()">📋 Tra cứu 116 Quy tắc</button>
+                    <button class="btn btn-secondary" onclick="openXmlCatalogModal()">📋 Tra cứu 123 Quy tắc</button>
                     <button class="btn btn-success" id="btnExportExcelXmlV2" onclick="downloadXmlV2Report()">📥 Xuất Excel Báo Cáo</button>
                     <button class="btn btn-outline" onclick="openXmlConfigModal()">⚙️ Cấu hình CSDL XML</button>
                     <button class="btn btn-outline" onclick="loadXmlV2RunsHistory()">🕒 Lịch sử</button>
@@ -1710,23 +1710,24 @@
         </div>
     </div>
 
-    <!-- MODAL 2: TRA CỨU 116 QUY TẮC NGHIỆP VỤ -->
+    <!-- MODAL 2: TRA CỨU 123 QUY TẮC NGHIỆP VỤ (116 LOGIC + 7 CTN 4750) -->
     <div id="modalXmlRuleCatalog" class="modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); overflow-y: auto;">
         <div style="background: var(--bg-panel); margin: 30px auto; padding: 25px; border-radius: 8px; width: 92%; max-width: 1100px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                 <div>
-                    <h3 style="margin: 0; color: var(--text-main);">Danh Mục 116 Quy Tắc Kiểm Tra XML Logic (Rule Catalog)</h3>
-                    <span style="font-size: 12px; color: var(--text-secondary);">Trích xuất từ tài liệu GDH &amp; TLGDH theo 3 chuẩn: 9324, 4210, 4750</span>
+                    <h3 style="margin: 0; color: var(--text-main);">Danh Mục 123 Quy Tắc Kiểm Tra XML (116 Logic Gốc + 7 Nhóm CTN 4750)</h3>
+                    <span style="font-size: 12px; color: var(--text-secondary);">Trích xuất từ tài liệu GDH &amp; TLGDH và Phụ lục CTN QĐ 4750 theo các chuẩn: 9324, 4210, 4750</span>
                 </div>
                 <button onclick="closeXmlCatalogModal()" style="background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer;">&times;</button>
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
-                <select id="xmlCatalogStdFilter" class="form-control" style="width: 180px;" onchange="renderXmlCatalogTable()">
-                    <option value="ALL">Tất cả chuẩn (116 quy tắc)</option>
-                    <option value="9324">Chuẩn 9324 (12 quy tắc)</option>
-                    <option value="4210">Chuẩn 4210 (50 quy tắc)</option>
-                    <option value="4750">Chuẩn 4750 (54 quy tắc)</option>
+                <select id="xmlCatalogStdFilter" class="form-control" style="width: 220px;" onchange="renderXmlCatalogTable()">
+                    <option value="ALL">Tất cả chuẩn (123 quy tắc)</option>
+                    <option value="9324">Chuẩn 9324 (45 quy tắc)</option>
+                    <option value="4210">Chuẩn 4210 (17 quy tắc)</option>
+                    <option value="4750">Chuẩn 4750 (61 quy tắc: 54 Logic + 7 CTN)</option>
+                    <option value="CTN">Nhóm quy tắc CTN 4750 (7 nhóm)</option>
                 </select>
                 <input type="text" id="xmlCatalogSearchInput" placeholder="Tìm theo Mã lỗi hoặc Tên quy tắc..." class="form-control" style="width: 300px;" onkeyup="renderXmlCatalogTable()">
             </div>
@@ -4576,7 +4577,9 @@
         tbody.innerHTML = '';
 
         let filtered = xmlV2CatalogCache;
-        if (stdFilter !== 'ALL') {
+        if (stdFilter === 'CTN') {
+            filtered = filtered.filter(r => r.rule_code.startsWith('CTN_'));
+        } else if (stdFilter !== 'ALL') {
             filtered = filtered.filter(r => r.standard === stdFilter);
         }
         if (search) {
@@ -4593,11 +4596,16 @@
         }
 
         filtered.forEach((r, idx) => {
+            const isCtn = r.rule_code.startsWith('CTN_');
+            const stdBadge = isCtn
+                ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 6px; font-weight:600;">CTN 4750</span>`
+                : `<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 2px 6px; font-weight:600;">${r.standard}</span>`;
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="text-align: center; color: var(--text-secondary);">${idx + 1}</td>
-                <td style="text-align: center;"><span class="badge" style="background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 2px 6px; font-weight:600;">${r.standard}</span></td>
-                <td style="text-align: center; font-weight: bold; color: #ef4444;">${r.rule_code}</td>
+                <td style="text-align: center;">${stdBadge}</td>
+                <td style="text-align: center; font-weight: bold; color: ${isCtn ? '#10b981' : '#ef4444'};">${r.rule_code}</td>
                 <td style="text-align: center;"><span class="badge" style="background: #475569; color: white; padding: 2px 6px; font-size: 0.75rem;">${r.category}</span></td>
                 <td><b>${r.rule_name}</b></td>
                 <td style="font-size: 0.85rem; color: var(--text-secondary); white-space: pre-line;">${r.description || ''}</td>

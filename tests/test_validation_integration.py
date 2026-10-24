@@ -52,9 +52,9 @@ class MockXmlSourceAdapter(XmlSourceAdapter):
                     {"MA_NHOM": "14", "SO_LUONG": 1, "DON_GIA": 150000, "TYLE_TT": 100, "THANH_TIEN": 150000, "T_BHTT": 0}
                 ]
             }
-        # Hồ sơ 3: "MOCK_LK_MISSING" không có dữ liệu XML -> res["MOCK_LK_MISSING"] = {}
-        table_status = {f"XML{i}": {"status": "SUCCESS", "rows": 10} for i in range(1, 16)}
-        return res, table_status
+        case_table_status = {k: {f"XML{i}": "SUCCESS" for i in range(1, 16)} for k in ma_lk_list}
+        batch_table_status = {f"XML{i}": {"status": "SUCCESS", "rows": 10} for i in range(1, 16)}
+        return res, case_table_status, batch_table_status
 
 def test_full_validation_run():
     init_val_db()

@@ -2,7 +2,7 @@ import time
 from typing import Dict, Any, List, Tuple
 from .rule_models import CaseXmlData, RuleResult, RuleStatus, RuleViolation
 from .rules import check_rules_9324, check_rules_4210, check_rules_4750, check_rules_4750_ctn
-from .catalog import get_rule_catalog
+from .catalog import get_rule_catalog, get_rule_required_tables
 
 class ValidationEngine:
     """
@@ -114,6 +114,16 @@ class ValidationEngine:
                         status=RuleStatus.INCOMPLETE_DATA,
                         reason="Quy tắc chưa có mã thực thi trong phiên bản hiện tại hoặc thiếu nguồn danh mục chuẩn."
                     ))
+
+            # 3.2. BẢO VỆ XUYÊN SUỐT: Kiểm tra bảng XML phụ thuộc đối với mọi quy tắc (Chặn False Negative)
+            # Nếu quy tắc dự kiến PASSED nhưng bất kỳ bảng phụ thuộc nào bị lỗi truy vấn -> Buộc hạ xuống INCOMPLETE_DATA
+            for r in results:
+                if r.status == RuleStatus.PASSED:
+                    required_tables = get_rule_required_tables(r.standard, r.rule_code)
+                    errored_tables = [tbl for tbl in required_tables if case.is_table_error(tbl)]
+                    if errored_tables:
+                        r.status = RuleStatus.INCOMPLETE_DATA
+                        r.reason = f"Bảng phụ thuộc {', '.join(errored_tables)} gặp sự cố truy vấn từ CSDL SQL Server, chưa đủ dữ liệu để kết luận hợp lệ."
 
         except Exception as ex:
             return {

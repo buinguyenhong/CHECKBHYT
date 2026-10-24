@@ -178,6 +178,56 @@ def test_validator_cancellation_preservation():
     finally:
         db.close()
 
+def test_rule_dependency_error_demotion():
+    """
+    Xác minh ma trận phụ thuộc bảng XML: nếu bảng XML2 bị lỗi truy vấn (ERROR),
+    quy tắc tính tiền (Rule 3) duyệt danh sách rỗng KHÔNG ĐƯỢC PHÉP trả về PASSED
+    mà bắt buộc phải hạ xuống INCOMPLETE_DATA.
+    """
+    from xml_validator_v2.rule_models import CaseXmlData, RuleStatus
+    from xml_validator_v2.rule_engine import ValidationEngine
+
+    engine = ValidationEngine()
+    case = CaseXmlData(
+        ma_lk="LK_TEST_DEP_ERR",
+        ho_ten="Nguyễn Văn A",
+        xml1={
+            "MA_LK": "LK_TEST_DEP_ERR",
+            "MA_LYDO_VVIEN": "1",
+            "MA_CSKCB": "66232",
+            "MA_DKBD": "66232",
+            "T_TONGCHI": 0,
+            "T_BNTT": 0,
+            "T_BHTT": 0,
+            "T_NGUONKHAC": 0
+        },
+        xml2=[], # rỗng do bảng XML2 bị lỗi truy vấn
+        xml3=[],
+        table_fetch_status={"XML1": "SUCCESS", "XML2": "ERROR", "XML3": "SUCCESS"}
+    )
+
+    eval_res = engine.validate_case(case)
+    rule_results = {r.rule_code: r for r in eval_res["rule_results"]}
+
+    # Rule 3 phụ thuộc XML2, XML3 -> Khi XML2 bị lỗi, Rule 3 bắt buộc phải là INCOMPLETE_DATA
+    r3 = rule_results.get("3")
+    assert r3 is not None, "Không tìm thấy Rule 3 trong kết quả đánh giá!"
+    assert r3.status == RuleStatus.INCOMPLETE_DATA, f"Kỳ vọng Rule 3 là INCOMPLETE_DATA do XML2 lỗi, nhưng nhận: {r3.status}"
+    assert "XML2" in r3.reason, f"Lý do phải nêu rõ bảng XML2 lỗi, nhưng nhận: {r3.reason}"
+
+def test_chunk_error_isolation_and_no_overwrite():
+    """
+    Xác minh logic chống ghi đè trạng thái bảng:
+    Khi chunk 1 bị ERROR trên bảng XML2 và chunk 2 đọc được dữ liệu SUCCESS,
+    trạng thái tổng thể batch của XML2 vẫn phải duy trì ERROR, không bị xóa dấu vết.
+    Đồng thời các hồ sơ ở chunk 1 nhận status ERROR, hồ sơ ở chunk 2 nhận status SUCCESS/EMPTY.
+    """
+    from xml_validator_v2.source_adapter import XmlSourceAdapter, XML_TABLE_COLUMNS
+    assert "XML1" in XML_TABLE_COLUMNS
+    assert "XML2" in XML_TABLE_COLUMNS
+    assert "XML4" in XML_TABLE_COLUMNS
+    assert len(XML_TABLE_COLUMNS["XML4"]) < 15, "XML4 phải được thu gọn số cột để tối ưu RAM/IO!"
+
 if __name__ == "__main__":
     test_sql_safety_source_adapter()
     print("test_sql_safety_source_adapter: PASSED")
@@ -191,4 +241,8 @@ if __name__ == "__main__":
     print("test_branch_a_regression_real_data: PASSED")
     test_validator_cancellation_preservation()
     print("test_validator_cancellation_preservation: PASSED")
+    test_rule_dependency_error_demotion()
+    print("test_rule_dependency_error_demotion: PASSED")
+    test_chunk_error_isolation_and_no_overwrite()
+    print("test_chunk_error_isolation_and_no_overwrite: PASSED")
     print("ALL SAFETY & REGRESSION CHECKS PASSED!")

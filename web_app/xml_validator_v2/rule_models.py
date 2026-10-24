@@ -56,10 +56,18 @@ class CaseXmlData:
     raw_tables: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
     table_fetch_status: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
-    def is_table_error(self, name: str) -> bool:
+    def get_table_status(self, name: str) -> str:
         name_clean = name.upper().split("_")[0]
-        st = self.table_fetch_status.get(name_clean, {})
-        return st.get("status") == "ERROR"
+        st = self.table_fetch_status.get(name_clean, "EMPTY")
+        if isinstance(st, dict):
+            return str(st.get("status", "EMPTY")).upper()
+        return str(st).upper()
+
+    def is_table_error(self, name: str) -> bool:
+        return self.get_table_status(name) == "ERROR"
+
+    def is_table_success(self, name: str) -> bool:
+        return self.get_table_status(name) == "SUCCESS"
 
     def get_table(self, name: str) -> List[Dict[str, Any]]:
         name_clean = name.upper().split("_")[0]
