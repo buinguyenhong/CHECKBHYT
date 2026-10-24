@@ -1553,102 +1553,253 @@
         </div>
     </div>
 
-    <!-- TAB 8: XML VALIDATOR -->
+    <!-- TAB 9: XML VALIDATOR V2 (HỆ THỐNG KIỂM TRA XML ĐỘC LẬP) -->
     <div id="tab_xml-validator" class="tab-pane">
         <div class="panel">
-            <div class="panel-header">
-                <h2>Công cụ Kiểm tra Lỗi Hồ sơ XML BHYT (XML Validator)</h2>
+            <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h2>Hệ Thống Kiểm Tra XML Độc Lập (Validate XML)</h2>
+                    <span style="font-size: 12px; color: var(--success); font-weight: 600; display: block; margin-top: 4px;">
+                        🛡️ Chế độ Read-Only: Chỉ truy vấn đọc CSDL XML (eHospital_ThienHanh_XML), tuyệt đối không ghi dữ liệu hoặc gọi Store tạo XML.
+                    </span>
+                </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                    <div id="xmlWatcherStatus" style="font-weight: 600; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem;">Watcher: Đang lấy trạng thái...</div>
-                    <button class="btn btn-primary" id="btnToggleXmlWatcher" onclick="toggleXmlWatcher()">Bật/Tắt Watcher</button>
-                    <button class="btn btn-secondary" onclick="triggerXmlScan()">Phân tích XML ngay</button>
-                    <button class="btn btn-success" onclick="downloadXmlReport()">Tải file TongHopLoi.xlsx</button>
-                </div>
-                
-                <!-- PROGRESS BAR THEO DÕI QUÁ TRÌNH KIỂM TRA XML -->
-                <div id="xmlProgressContainer" style="display: none; margin-top: 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; position: relative; height: 26px; width: 100%;">
-                    <div id="xmlProgressBar" style="background: linear-gradient(90deg, var(--primary), var(--primary-hover)); height: 100%; width: 0%; transition: width 0.2s ease;"></div>
-                    <span id="xmlProgressText" style="position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 13px; font-weight: bold; line-height: 24px; color: var(--text-main); text-shadow: 0 1px 2px rgba(0,0,0,0.8);">0% (Đang tải...)</span>
+                    <button class="btn btn-primary" id="btnRunValidateUnsent" onclick="triggerValidateUnsentCases()" style="display: flex; align-items: center; gap: 6px;">
+                        <span>▶️</span> Kiểm tra XML ca chưa gửi cổng
+                    </button>
+                    <button class="btn btn-secondary" onclick="openXmlCatalogModal()">📋 Tra cứu 116 Quy tắc</button>
+                    <button class="btn btn-success" id="btnExportExcelXmlV2" onclick="downloadXmlV2Report()">📥 Xuất Excel Báo Cáo</button>
+                    <button class="btn btn-outline" onclick="openXmlConfigModal()">⚙️ Cấu hình CSDL XML</button>
+                    <button class="btn btn-outline" onclick="loadXmlV2RunsHistory()">🕒 Lịch sử</button>
                 </div>
             </div>
-            <div class="grid-form" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+
+            <!-- THANH TIẾN TRÌNH THỜI GIAN THỰC -->
+            <div id="xmlV2ProgressContainer" style="display: none; margin-top: 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; position: relative; height: 28px; width: 100%;">
+                <div id="xmlV2ProgressBar" style="background: linear-gradient(90deg, #3b82f6, #10b981); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                <div style="position: absolute; width: 100%; top: 0; left: 0; display: flex; justify-content: space-between; align-items: center; height: 100%; padding: 0 12px; font-size: 13px; font-weight: bold; color: var(--text-main); text-shadow: 0 1px 2px rgba(0,0,0,0.8);">
+                    <span id="xmlV2ProgressText">0% (Đang khởi tạo...)</span>
+                    <button onclick="cancelXmlV2Run()" style="background: #ef4444; color: white; border: none; border-radius: 3px; padding: 2px 8px; font-size: 11px; cursor: pointer;">Hủy tiến trình</button>
+                </div>
+            </div>
+
+            <!-- KPI THỐNG KÊ KẾT QUẢ ĐỢT KIỂM TRA -->
+            <div class="grid-form" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 15px;">
                 <div class="kpi-card" style="border-left: 4px solid var(--primary); padding: 12px;">
-                    <div class="kpi-label">Tổng hồ sơ (MA_LK)</div>
-                    <div class="kpi-val" id="xmlKpiPatients" style="font-size: 1.5rem;">0</div>
+                    <div class="kpi-label">Tổng hồ sơ kiểm tra</div>
+                    <div class="kpi-val" id="xmlV2KpiTotal" style="font-size: 1.5rem; color: var(--primary);">0</div>
                 </div>
-                <div class="kpi-card" style="border-left: 4px solid var(--success); padding: 12px;">
-                    <div class="kpi-label">Tổng số tệp XML</div>
-                    <div class="kpi-val" id="xmlKpiFiles" style="font-size: 1.5rem;">0</div>
+                <div class="kpi-card" style="border-left: 4px solid #ef4444; padding: 12px;">
+                    <div class="kpi-label">Hồ sơ có lỗi (HAS_ERRORS)</div>
+                    <div class="kpi-val" id="xmlV2KpiErrors" style="font-size: 1.5rem; color: #ef4444;">0</div>
                 </div>
-                <div class="kpi-card" style="border-left: 4px solid #f87171; padding: 12px;">
-                    <div class="kpi-label">Hồ sơ có lỗi</div>
-                    <div class="kpi-val" id="xmlKpiErrorPatients" style="font-size: 1.5rem;">0</div>
+                <div class="kpi-card" style="border-left: 4px solid #10b981; padding: 12px;">
+                    <div class="kpi-label">Đạt yêu cầu (NO_ERRORS)</div>
+                    <div class="kpi-val" id="xmlV2KpiPassed" style="font-size: 1.5rem; color: #10b981;">0</div>
                 </div>
-                <div class="kpi-card" style="border-left: 4px solid #f43f5e; padding: 12px;">
-                    <div class="kpi-label">Tổng số lỗi phát hiện</div>
-                    <div class="kpi-val" id="xmlKpiErrors" style="font-size: 1.5rem;">0</div>
+                <div class="kpi-card" style="border-left: 4px solid #f97316; padding: 12px;">
+                    <div class="kpi-label">Không tìm thấy XML</div>
+                    <div class="kpi-val" id="xmlV2KpiMissing" style="font-size: 1.5rem; color: #f97316;">0</div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- TẢI LÊN FILE XML TRỰC TIẾP -->
-        <div class="panel" style="margin-top: 20px;">
-            <div class="panel-header">
-                <h2>Tải lên &amp; Kiểm tra XML trực tiếp (Không cần Watcher)</h2>
-            </div>
-            <div style="margin-top: 15px;">
-                <div id="xmlDragDropZone" style="border: 2px dashed var(--primary); border-radius: 8px; padding: 30px; text-align: center; background: rgba(59, 130, 246, 0.02); cursor: pointer; transition: all 0.2s ease;" onclick="document.getElementById('xmlFileInput').click()">
-                    <span style="font-size: 2.5rem; display: block; margin-bottom: 10px;">📂</span>
-                    <span style="font-weight: bold; color: var(--text-main); display: block;">Kéo &amp; thả các file XML vào đây hoặc nhấp để chọn file</span>
-                    <span style="font-size: 12px; color: var(--text-secondary); display: block; margin-top: 5px;">Hỗ trợ chọn nhiều file XML cùng lúc. Hệ thống sẽ tự động dọn dẹp thư mục Input cũ trước khi lưu và phân tích.</span>
-                    <input type="file" id="xmlFileInput" multiple accept=".xml" style="display: none;" onchange="handleXmlFilesUpload(this.files)">
-                </div>
-            </div>
-        </div>
-        
-        <!-- CẤU HÌNH ĐƯỜNG DẪN THƯ MỤC XML -->
-        <div class="panel" style="margin-top: 20px;">
-            <div class="panel-header">
-                <h2>Cấu hình Đường dẫn Thư mục XML</h2>
-                <button class="btn btn-primary" onclick="saveXmlConfig()">Lưu cấu hình thư mục</button>
-            </div>
-            <div class="grid-form" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
-                <div class="form-group">
-                    <label style="font-weight: 700;">Thư mục chứa file XML đầu vào (Input):</label>
-                    <input type="text" id="xmlConfigInputDir" class="form-control" placeholder="Ví dụ: Input hoặc D:\HIS_XML">
-                    <span style="font-size: 12px; color: var(--text-secondary);">Thư mục chứa các tệp XML do HIS bệnh viện xuất ra để quét tự động.</span>
-                </div>
-                <div class="form-group">
-                    <label style="font-weight: 700;">Thư mục lưu báo cáo kết quả (Output):</label>
-                    <input type="text" id="xmlConfigOutputDir" class="form-control" placeholder="Ví dụ: Output hoặc D:\Validator_Reports">
-                    <span style="font-size: 12px; color: var(--text-secondary);">Thư mục lưu file báo cáo Excel (TongHopLoi.xlsx) và JSON kết quả (ket_qua.json).</span>
+                <div class="kpi-card" style="border-left: 4px solid #eab308; padding: 12px;">
+                    <div class="kpi-label">Chưa đủ dữ liệu/danh mục</div>
+                    <div class="kpi-val" id="xmlV2KpiIncomplete" style="font-size: 1.5rem; color: #eab308;">0</div>
                 </div>
             </div>
         </div>
 
+        <!-- BẢNG DANH SÁCH KẾT QUẢ KIỂM TRA HỒ SƠ -->
         <div class="panel" style="margin-top: 20px;">
-            <div class="panel-header">
-                <h2>Danh sách Lỗi cấu trúc/logic XML phát hiện</h2>
-                <input type="text" id="searchXmlError" placeholder="Tìm theo MA_LK hoặc Tên bệnh nhân..." class="form-control" style="width: 250px;" onkeyup="filterXmlErrorsTable()">
+            <div class="panel-header" style="flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <h2>Danh sách Hồ sơ &amp; Trạng thái Validate XML</h2>
+                    <span id="xmlV2CurrentRunCode" style="font-size: 12px; background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-weight: 600;">Chưa có dữ liệu</span>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <select id="xmlV2StatusFilter" class="form-control" style="width: 190px;" onchange="loadXmlV2Results(1)">
+                        <option value="ALL">Tất cả trạng thái</option>
+                        <option value="HAS_ERRORS">Có lỗi (HAS_ERRORS)</option>
+                        <option value="NO_ERRORS_FOUND">Đạt (NO_ERRORS_FOUND)</option>
+                        <option value="MISSING_XML">Thiếu XML (MISSING_XML)</option>
+                        <option value="INCOMPLETE_DATA">Chưa đủ dữ liệu</option>
+                        <option value="RULESET_UNDETERMINED">Chưa rõ chuẩn</option>
+                    </select>
+                    <input type="text" id="xmlV2SearchInput" placeholder="Tìm theo MA_LK hoặc Họ tên..." class="form-control" style="width: 240px;" onkeyup="debounceXmlV2Search()">
+                    <button class="btn btn-secondary" onclick="loadXmlV2Results(1)">Lọc</button>
+                </div>
             </div>
+
             <div class="table-responsive">
-                <table class="table">
+                <table class="table" style="font-size: 0.9rem;">
                     <thead>
                         <tr>
-                            <th>MA_LK</th>
+                            <th style="width: 45px; text-align: center;">STT</th>
+                            <th>Mã liên kết (MA_LK)</th>
                             <th>Họ tên</th>
+                            <th>Loại ca</th>
                             <th>Mã thẻ BHYT</th>
-                            <th>Tên khoa</th>
-                            <th>XML lỗi</th>
-                            <th>Mã quy tắc</th>
-                            <th>Thẻ lỗi</th>
-                            <th>Chi tiết lỗi</th>
+                            <th>Ngày ra</th>
+                            <th style="text-align: center;">Chuẩn áp dụng</th>
+                            <th style="text-align: center;">Trạng thái Validate</th>
+                            <th style="text-align: center;">Số lỗi</th>
+                            <th style="text-align: center;">Quy tắc đạt</th>
+                            <th>Tóm tắt kết luận</th>
+                            <th style="text-align: center; width: 100px;">Thao tác</th>
                         </tr>
                     </thead>
-                    <tbody id="xmlErrorsBody">
-                        <tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">Chưa có dữ liệu phân tích. Hãy bấm "Phân tích XML ngay" hoặc xuất file XML vào thư mục Input.</td></tr>
+                    <tbody id="xmlV2ResultsTableBody">
+                        <tr>
+                            <td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 35px;">
+                                Chưa có đợt kiểm tra XML nào được thực hiện. Bấm <b>"Kiểm tra XML ca chưa gửi cổng"</b> ở trên để bắt đầu.
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- PHÂN TRANG -->
+            <div id="xmlV2Pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 5px 0;">
+                <span id="xmlV2PaginationInfo" style="font-size: 13px; color: var(--text-secondary);">Hiển thị 0 / 0 hồ sơ</span>
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-outline" id="xmlV2BtnPrev" onclick="changeXmlV2Page(-1)" disabled>&laquo; Trang trước</button>
+                    <button class="btn btn-outline" id="xmlV2BtnNext" onclick="changeXmlV2Page(1)" disabled>Trang sau &raquo;</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: CHI TIẾT HỒ SƠ & CÁC LỖI VI PHẠM -->
+    <div id="modalXmlCaseDetail" class="modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); overflow-y: auto;">
+        <div style="background: var(--bg-panel); margin: 30px auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 1000px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                <div>
+                    <h3 id="xmlDetailTitle" style="margin: 0; color: var(--text-main);">Chi tiết Vi phạm XML Hồ sơ</h3>
+                    <div id="xmlDetailSubtitle" style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;"></div>
+                </div>
+                <button onclick="closeXmlCaseDetailModal()" style="background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer;">&times;</button>
+            </div>
+
+            <!-- THÔNG TIN TỔNG QUAN -->
+            <div id="xmlDetailMetaBox" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 15px; padding: 12px; background: rgba(59, 130, 246, 0.04); border-radius: 6px; border: 1px solid var(--border-color);">
+            </div>
+
+            <!-- BẢNG LỖI VI PHẠM -->
+            <h4 style="margin-top: 20px; margin-bottom: 10px; color: #ef4444;">Danh sách Quy tắc Vi phạm</h4>
+            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                <table class="table" style="font-size: 0.85rem;">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">STT</th>
+                            <th style="width: 80px; text-align: center;">Chuẩn</th>
+                            <th style="width: 70px; text-align: center;">Mã lỗi</th>
+                            <th>Tên quy tắc</th>
+                            <th style="width: 90px; text-align: center;">Bảng / Cột</th>
+                            <th>Giá trị thực tế</th>
+                            <th>Điều kiện kỳ vọng</th>
+                            <th>Nội dung giải thích</th>
+                        </tr>
+                    </thead>
+                    <tbody id="xmlDetailErrorsTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeXmlCaseDetailModal()">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: TRA CỨU 116 QUY TẮC NGHIỆP VỤ -->
+    <div id="modalXmlRuleCatalog" class="modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); overflow-y: auto;">
+        <div style="background: var(--bg-panel); margin: 30px auto; padding: 25px; border-radius: 8px; width: 92%; max-width: 1100px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                <div>
+                    <h3 style="margin: 0; color: var(--text-main);">Danh Mục 116 Quy Tắc Kiểm Tra XML Logic (Rule Catalog)</h3>
+                    <span style="font-size: 12px; color: var(--text-secondary);">Trích xuất từ tài liệu GDH &amp; TLGDH theo 3 chuẩn: 9324, 4210, 4750</span>
+                </div>
+                <button onclick="closeXmlCatalogModal()" style="background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer;">&times;</button>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
+                <select id="xmlCatalogStdFilter" class="form-control" style="width: 180px;" onchange="renderXmlCatalogTable()">
+                    <option value="ALL">Tất cả chuẩn (116 quy tắc)</option>
+                    <option value="9324">Chuẩn 9324 (12 quy tắc)</option>
+                    <option value="4210">Chuẩn 4210 (50 quy tắc)</option>
+                    <option value="4750">Chuẩn 4750 (54 quy tắc)</option>
+                </select>
+                <input type="text" id="xmlCatalogSearchInput" placeholder="Tìm theo Mã lỗi hoặc Tên quy tắc..." class="form-control" style="width: 300px;" onkeyup="renderXmlCatalogTable()">
+            </div>
+
+            <div class="table-responsive" style="margin-top: 15px; max-height: 480px; overflow-y: auto;">
+                <table class="table" style="font-size: 0.85rem;">
+                    <thead>
+                        <tr>
+                            <th style="width: 45px; text-align: center;">STT</th>
+                            <th style="width: 80px; text-align: center;">Chuẩn</th>
+                            <th style="width: 75px; text-align: center;">Mã lỗi</th>
+                            <th style="width: 140px; text-align: center;">Nhóm quy tắc</th>
+                            <th>Tên quy tắc</th>
+                            <th>Điều kiện vi phạm / Diễn giải</th>
+                        </tr>
+                    </thead>
+                    <tbody id="xmlCatalogTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeXmlCatalogModal()">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: CẤU HÌNH KẾT NỐI CSDL XML -->
+    <div id="modalXmlDbConfig" class="modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); overflow-y: auto;">
+        <div style="background: var(--bg-panel); margin: 50px auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 650px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                <div>
+                    <h3 style="margin: 0; color: var(--text-main);">Cấu Hình Kết Nối CSDL SQL Server XML</h3>
+                    <span style="font-size: 12px; color: var(--success); font-weight: 600;">Chỉ lưu thông số kết nối để đọc dữ liệu XML (SELECT)</span>
+                </div>
+                <button onclick="closeXmlConfigModal()" style="background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer;">&times;</button>
+            </div>
+
+            <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px;">
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 13px;">ODBC Driver:</label>
+                    <input type="text" id="cfgXmlDriver" class="form-control" value="ODBC Driver 17 for SQL Server">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 13px;">Máy chủ SQL Server (Server):</label>
+                    <input type="text" id="cfgXmlServer" class="form-control" placeholder="Ví dụ: thsrvsql01 hoặc localhost,1433">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 13px;">Tên Database XML (Database):</label>
+                    <input type="text" id="cfgXmlDatabase" class="form-control" value="eHospital_ThienHanh_XML">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 13px;">Phương thức xác thực (Auth):</label>
+                    <select id="cfgXmlAuth" class="form-control" onchange="toggleXmlSqlAuthFields()">
+                        <option value="Windows Auth">Windows Authentication</option>
+                        <option value="SQL Auth">SQL Server Authentication</option>
+                    </select>
+                </div>
+                <div id="cfgXmlSqlAuthBox" style="display: none; flex-direction: column; gap: 10px;">
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 13px;">Tên người dùng (User):</label>
+                        <input type="text" id="cfgXmlUser" class="form-control" placeholder="sa">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 13px;">Mật khẩu (Password):</label>
+                        <input type="password" id="cfgXmlPassword" class="form-control" placeholder="Nhập mật khẩu mới nếu thay đổi">
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px;">
+                <button class="btn btn-secondary" onclick="closeXmlConfigModal()">Hủy</button>
+                <button class="btn btn-primary" onclick="saveXmlDbConfig()">Lưu cấu hình</button>
             </div>
         </div>
     </div>
@@ -1897,7 +2048,7 @@
         if (tabId === 'users') { fetchUsers(); }
         if (tabId === 'reports') { fetchDeptReport(); }
         if (tabId === 'error-defs') { fetchErrorDefinitions(); }
-        if (tabId === 'xml-validator') { fetchXmlValidatorResults(); }
+        if (tabId === 'xml-validator') { loadXmlV2Results(1); }
         if (tabId === 'archive') { initArchiveTab(); }
     }
 
@@ -4147,282 +4298,399 @@
     let xmlWatcherActive = false;
     let xmlErrorsData = [];
 
-    async function checkXmlWatcherStatus() {
+    // ==========================================
+    // XML VALIDATOR V2 (TAB 9) JAVASCRIPT LOGIC
+    // ==========================================
+    let currentXmlV2RunId = null;
+    let xmlV2CurrentPage = 1;
+    let xmlV2ProgressTimer = null;
+    let xmlV2CatalogCache = [];
+    let xmlV2SearchTimeout = null;
+
+    async function triggerValidateUnsentCases() {
+        if (!confirm("Bạn có muốn kích hoạt kiểm tra XML cho các hồ sơ chưa gửi cổng thành công từ đợt đối soát hiện tại?")) {
+            return;
+        }
         try {
-            const res = await fetch('/api/admin/xml-validator/status');
-            if (res.ok) {
-                const data = await res.json();
-                const statusLabel = document.getElementById('xmlWatcherStatus');
-                xmlWatcherActive = data.watcher_running;
-                if (xmlWatcherActive) {
-                    statusLabel.innerText = "Watcher: ĐANG HOẠT ĐỘNG (Autodetect)";
-                    statusLabel.style.background = "var(--success)";
-                    statusLabel.style.color = "white";
-                } else {
-                    statusLabel.innerText = "Watcher: ĐANG TẮT";
-                    statusLabel.style.background = "#ef4444";
-                    statusLabel.style.color = "white";
-                }
+            document.getElementById('xmlV2ProgressContainer').style.display = 'block';
+            document.getElementById('xmlV2ProgressBar').style.width = '5%';
+            document.getElementById('xmlV2ProgressText').innerText = '5% (Đang lấy danh sách ca chưa gửi cổng...)';
+
+            const res = await fetch('/api/admin/xml-v2/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ use_current_unsent: true, scope_type: 'UNSENT_BATCH' })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                startXmlV2ProgressPolling();
+            } else {
+                alert("Lỗi: " + (data.detail || data.message || "Không thể khởi động kiểm tra."));
+                document.getElementById('xmlV2ProgressContainer').style.display = 'none';
             }
         } catch (e) {
             console.error(e);
+            alert("Lỗi kết nối khi kích hoạt kiểm tra XML.");
+            document.getElementById('xmlV2ProgressContainer').style.display = 'none';
         }
     }
 
-    async function toggleXmlWatcher() {
-        try {
-            const enable = !xmlWatcherActive;
-            const res = await fetch(`/api/admin/xml-validator/toggle?enable=${enable}`, { method: 'POST' });
-            if (res.ok) {
-                await checkXmlWatcherStatus();
-            }
-        } catch (e) {
-            alert("Lỗi khi thay đổi trạng thái Watcher.");
-        }
-    }
+    function startXmlV2ProgressPolling() {
+        document.getElementById('xmlV2ProgressContainer').style.display = 'block';
+        if (xmlV2ProgressTimer) clearInterval(xmlV2ProgressTimer);
 
-    let xmlProgressInterval = null;
-
-    function startXmlProgressPolling() {
-        document.getElementById('xmlProgressContainer').style.display = 'block';
-        if (xmlProgressInterval) clearInterval(xmlProgressInterval);
-        
-        xmlProgressInterval = setInterval(async () => {
+        xmlV2ProgressTimer = setInterval(async () => {
             try {
-                const res = await fetch('/api/admin/xml-validator/progress');
+                const res = await fetch('/api/admin/xml-v2/progress');
                 if (res.ok) {
                     const data = await res.json();
                     const percent = data.percent || 0;
                     const message = data.message || '';
-                    const status = data.status || 'idle';
-                    
-                    document.getElementById('xmlProgressBar').style.width = percent + '%';
-                    document.getElementById('xmlProgressText').innerText = `${percent}% - ${message}`;
-                    
-                    if (status === 'completed' || status === 'error' || status === 'idle') {
-                        clearInterval(xmlProgressInterval);
-                        xmlProgressInterval = null;
-                        
-                        if (status === 'completed') {
-                            // Tải lại kết quả hiển thị bảng lỗi
-                            fetchXmlValidatorResults(true); 
-                        }
-                        
+                    const status = data.status || 'IDLE';
+
+                    document.getElementById('xmlV2ProgressBar').style.width = percent + '%';
+                    document.getElementById('xmlV2ProgressText').innerText = `${percent}% - ${message}`;
+
+                    if (data.run_id) currentXmlV2RunId = data.run_id;
+
+                    // Cập nhật thẻ KPIs
+                    document.getElementById('xmlV2KpiTotal').innerText = data.total_cases || 0;
+                    document.getElementById('xmlV2KpiErrors').innerText = data.has_error_cases || 0;
+                    document.getElementById('xmlV2KpiPassed').innerText = data.no_error_cases || 0;
+                    document.getElementById('xmlV2KpiMissing').innerText = data.missing_xml_cases || 0;
+                    document.getElementById('xmlV2KpiIncomplete').innerText = data.incomplete_cases || 0;
+
+                    if (status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELLED') {
+                        clearInterval(xmlV2ProgressTimer);
+                        xmlV2ProgressTimer = null;
+                        await loadXmlV2Results(1);
                         setTimeout(() => {
-                            document.getElementById('xmlProgressContainer').style.display = 'none';
-                        }, 4000);
+                            if (status === 'COMPLETED') {
+                                document.getElementById('xmlV2ProgressContainer').style.display = 'none';
+                            }
+                        }, 5000);
                     }
                 }
             } catch (e) {
-                console.error("Lỗi khi check tiến trình XML:", e);
+                console.error("Lỗi polling tiến trình XML V2:", e);
             }
-        }, 500);
+        }, 800);
     }
 
-    async function handleXmlFilesUpload(files) {
-        if (!files || files.length === 0) return;
-        
-        // Hiển thị thanh tiến trình lập tức
-        const container = document.getElementById('xmlProgressContainer');
-        const bar = document.getElementById('xmlProgressBar');
-        const text = document.getElementById('xmlProgressText');
-        if (container) container.style.display = 'block';
-        if (bar) bar.style.width = '10%';
-        if (text) text.innerText = '10% (Đang chuẩn bị tệp tin tải lên...)';
-        
-        const formData = new FormData();
-        for (let i = 0; i < files.length; i++) {
-            formData.append('files', files[i]);
-        }
-        
+    async function cancelXmlV2Run() {
+        if (!confirm("Bạn có chắc chắn muốn hủy đợt kiểm tra này?")) return;
         try {
-            if (bar) bar.style.width = '30%';
-            if (text) text.innerText = '30% (Đang tải các tệp XML lên máy chủ...)';
-            
-            const res = await fetch('/api/admin/xml-validator/upload', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (res.ok) {
-                if (bar) bar.style.width = '60%';
-                if (text) text.innerText = '60% (Tải lên thành công! Đang kích hoạt phân tích...)';
-                // Bắt đầu theo dõi tiến độ quét bằng cơ chế polling đã có
-                startXmlProgressPolling();
-            } else {
-                const err = await res.json();
-                alert("Lỗi tải lên: " + (err.detail || "Không rõ nguyên nhân"));
-                if (container) container.style.display = 'none';
-            }
+            await fetch('/api/admin/xml-v2/cancel', { method: 'POST' });
         } catch (e) {
             console.error(e);
-            alert("Lỗi kết nối khi tải tệp lên.");
-            if (container) container.style.display = 'none';
         }
-        
-        // Reset ô chọn file
-        document.getElementById('xmlFileInput').value = '';
     }
 
-    // Thiết lập sự kiện kéo thả Drag & Drop
-    function setupXmlDragDrop() {
-        const dropZone = document.getElementById('xmlDragDropZone');
-        if (!dropZone) return;
-        
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropZone.style.background = 'rgba(59, 130, 246, 0.1)';
-                dropZone.style.borderColor = 'var(--primary-hover)';
-            }, false);
-        });
+    async function loadXmlV2Results(page = 1) {
+        xmlV2CurrentPage = page;
+        const statusFilter = document.getElementById('xmlV2StatusFilter').value;
+        const search = document.getElementById('xmlV2SearchInput').value.trim();
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropZone.style.background = 'rgba(59, 130, 246, 0.02)';
-                dropZone.style.borderColor = 'var(--primary)';
-            }, false);
-        });
+        let url = `/api/admin/xml-v2/results?page=${page}&page_size=50`;
+        if (currentXmlV2RunId) url += `&run_id=${currentXmlV2RunId}`;
+        if (statusFilter && statusFilter !== 'ALL') url += `&status_filter=${statusFilter}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
 
-        dropZone.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            handleXmlFilesUpload(files);
-        }, false);
-    }
-
-    async function triggerXmlScan() {
         try {
-            const res = await fetch('/api/admin/xml-validator/trigger', { method: 'POST' });
-            if (res.ok) {
-                startXmlProgressPolling();
-            }
-        } catch (e) {
-            alert("Lỗi khi gửi yêu cầu phân tích.");
-        }
-    }
-
-    async function fetchXmlValidatorResults(skipProgressCheck = false) {
-        await checkXmlWatcherStatus();
-        await loadXmlConfig();
-        
-        // Nếu không bỏ qua, check xem tiến trình có đang quét ngầm không
-        if (!skipProgressCheck) {
-            try {
-                const resProg = await fetch('/api/admin/xml-validator/progress');
-                if (resProg.ok) {
-                    const prog = await resProg.json();
-                    if (prog.status === 'scanning') {
-                        startXmlProgressPolling();
-                        return;
-                    }
-                }
-            } catch (e) {}
-        }
-        
-        try {
-            const res = await fetch('/api/admin/xml-validator/results');
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
-                xmlErrorsData = data.errors || [];
-                
-                // Cập nhật KPIs
-                const sum = data.summary || {};
-                document.getElementById('xmlKpiPatients').innerText = sum.total_patients || 0;
-                document.getElementById('xmlKpiFiles').innerText = sum.total_files || 0;
-                document.getElementById('xmlKpiErrorPatients').innerText = sum.error_patients || 0;
-                document.getElementById('xmlKpiErrors').innerText = sum.error_count || 0;
-                
-                renderXmlErrorsTable(xmlErrorsData);
+                renderXmlV2ResultsTable(data);
             }
         } catch (e) {
-            console.error(e);
+            console.error("Lỗi tải kết quả XML V2:", e);
         }
     }
 
-    function renderXmlErrorsTable(errors) {
-        const tbody = document.getElementById('xmlErrorsBody');
+    function renderXmlV2ResultsTable(data) {
+        const tbody = document.getElementById('xmlV2ResultsTableBody');
         tbody.innerHTML = '';
-        if (errors.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không phát hiện thấy lỗi hồ sơ XML nào.</td></tr>`;
+
+        if (data.run) {
+            currentXmlV2RunId = data.run.id;
+            document.getElementById('xmlV2CurrentRunCode').innerText = `${data.run.run_code} (${data.run.created_at})`;
+            document.getElementById('xmlV2KpiTotal').innerText = data.run.total_cases || 0;
+            document.getElementById('xmlV2KpiErrors').innerText = data.run.has_error_cases || 0;
+            document.getElementById('xmlV2KpiPassed').innerText = data.run.no_error_cases || 0;
+            document.getElementById('xmlV2KpiMissing').innerText = data.run.missing_xml_cases || 0;
+            document.getElementById('xmlV2KpiIncomplete').innerText = data.run.incomplete_cases || 0;
+        }
+
+        const items = data.items || [];
+        if (items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 35px;">Không tìm thấy hồ sơ nào phù hợp với bộ lọc.</td></tr>`;
+            document.getElementById('xmlV2PaginationInfo').innerText = `Hiển thị 0 / 0 hồ sơ`;
             return;
         }
-        errors.forEach(e => {
+
+        const startIdx = (data.page - 1) * data.page_size + 1;
+        items.forEach((item, idx) => {
+            const tr = document.createElement('tr');
+            
+            // Format Badge Trạng Thái
+            let badgeBg = '#64748b';
+            let badgeText = item.overall_status;
+            if (item.overall_status === 'HAS_ERRORS') {
+                badgeBg = '#ef4444';
+                badgeText = 'CÓ LỖI';
+            } else if (item.overall_status === 'NO_ERRORS_FOUND') {
+                badgeBg = '#10b981';
+                badgeText = 'ĐẠT (HỢP LỆ)';
+            } else if (item.overall_status === 'MISSING_XML') {
+                badgeBg = '#f97316';
+                badgeText = 'THIẾU XML';
+            } else if (item.overall_status === 'INCOMPLETE_DATA') {
+                badgeBg = '#eab308';
+                badgeText = 'CHƯA ĐỦ DỮ LIỆU';
+            } else if (item.overall_status === 'RULESET_UNDETERMINED') {
+                badgeBg = '#8b5cf6';
+                badgeText = 'CHƯA XÁC ĐỊNH CHUẨN';
+            }
+
+            const errorCountDisplay = item.violated_count > 0 
+                ? `<span style="color:#ef4444; font-weight:bold;">${item.violated_count}</span>` 
+                : `<span style="color:var(--text-secondary);">0</span>`;
+
+            tr.innerHTML = `
+                <td style="text-align: center; color: var(--text-secondary);">${startIdx + idx}</td>
+                <td><span style="font-weight: 700; color: var(--primary);">${item.ma_lk}</span></td>
+                <td><b>${item.ho_ten || ''}</b></td>
+                <td>${item.loai_ca || ''}</td>
+                <td><code>${item.ma_the || ''}</code></td>
+                <td>${item.ngay_ra_vien || ''}</td>
+                <td style="text-align: center;"><span class="badge" style="background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-weight:600;">${item.applied_standard}</span></td>
+                <td style="text-align: center;"><span class="badge" style="background: ${badgeBg}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.8rem;">${badgeText}</span></td>
+                <td style="text-align: center;">${errorCountDisplay}</td>
+                <td style="text-align: center; color: #10b981; font-weight: 600;">${item.passed_count || 0}</td>
+                <td style="font-size: 0.85rem; color: var(--text-secondary); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.summary || ''}">${item.summary || ''}</td>
+                <td style="text-align: center;">
+                    <button class="btn btn-outline" style="padding: 3px 8px; font-size: 12px;" onclick="viewXmlCaseDetail('${item.ma_lk}')">Chi tiết</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Phân trang info
+        const total = data.total || 0;
+        const totalPages = Math.ceil(total / data.page_size) || 1;
+        document.getElementById('xmlV2PaginationInfo').innerText = `Hiển thị ${startIdx}-${startIdx + items.length - 1} / ${total} hồ sơ (Trang ${data.page}/${totalPages})`;
+        document.getElementById('xmlV2BtnPrev').disabled = (data.page <= 1);
+        document.getElementById('xmlV2BtnNext').disabled = (data.page >= totalPages);
+    }
+
+    function changeXmlV2Page(delta) {
+        loadXmlV2Results(xmlV2CurrentPage + delta);
+    }
+
+    function debounceXmlV2Search() {
+        if (xmlV2SearchTimeout) clearTimeout(xmlV2SearchTimeout);
+        xmlV2SearchTimeout = setTimeout(() => {
+            loadXmlV2Results(1);
+        }, 400);
+    }
+
+    async function viewXmlCaseDetail(maLk) {
+        if (!currentXmlV2RunId) return;
+        try {
+            const res = await fetch(`/api/admin/xml-v2/case-detail?run_id=${currentXmlV2RunId}&ma_lk=${encodeURIComponent(maLk)}`);
+            if (res.ok) {
+                const data = await res.json();
+                const info = data.case_info || {};
+                
+                document.getElementById('xmlDetailTitle').innerText = `Chi tiết Vi phạm XML — Hồ sơ: ${info.ma_lk}`;
+                document.getElementById('xmlDetailSubtitle').innerText = `Bệnh nhân: ${info.ho_ten} | Mã thẻ: ${info.ma_the} | Loại ca: ${info.loai_ca}`;
+
+                // Meta Box
+                const metaBox = document.getElementById('xmlDetailMetaBox');
+                metaBox.innerHTML = `
+                    <div><b>Chuẩn áp dụng:</b> <span style="color:var(--primary); font-weight:bold;">${info.applied_standard}</span></div>
+                    <div><b>Trạng thái:</b> <b>${info.overall_status}</b></div>
+                    <div><b>Số lỗi vi phạm:</b> <b style="color:#ef4444;">${info.violated_count}</b></div>
+                    <div><b>Bảng XML tìm thấy trên SQL:</b> <code>${data.xml_tables_found || 'Không tìm thấy'}</code></div>
+                `;
+
+                // Errors Table
+                const errTbody = document.getElementById('xmlDetailErrorsTableBody');
+                errTbody.innerHTML = '';
+                const errors = data.errors || [];
+                if (errors.length === 0) {
+                    errTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #10b981; padding: 25px; font-weight:600;">Không có vi phạm quy tắc nào trên hồ sơ này.</td></tr>`;
+                } else {
+                    errors.forEach((err, idx) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="text-align: center;">${idx + 1}</td>
+                            <td style="text-align: center;"><span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 2px 6px;">${err.standard}</span></td>
+                            <td style="text-align: center; font-weight: bold; color: #ef4444;">${err.rule_code}</td>
+                            <td><b>${err.rule_name}</b></td>
+                            <td style="text-align: center;"><code>${err.xml_table}.${err.field_name || ''}</code></td>
+                            <td style="color: #ef4444; font-family: monospace;">${err.actual_value || ''}</td>
+                            <td style="color: #10b981; font-family: monospace;">${err.expected_condition || ''}</td>
+                            <td style="color: var(--text-main); font-size: 0.85rem;">${err.message || ''}</td>
+                        `;
+                        errTbody.appendChild(tr);
+                    });
+                }
+
+                document.getElementById('modalXmlCaseDetail').style.display = 'block';
+            }
+        } catch (e) {
+            console.error("Lỗi lấy chi tiết hồ sơ:", e);
+            alert("Không thể tải thông tin chi tiết hồ sơ.");
+        }
+    }
+
+    function closeXmlCaseDetailModal() {
+        document.getElementById('modalXmlCaseDetail').style.display = 'none';
+    }
+
+    async function openXmlCatalogModal() {
+        document.getElementById('modalXmlRuleCatalog').style.display = 'block';
+        if (xmlV2CatalogCache.length === 0) {
+            try {
+                const res = await fetch('/api/admin/xml-v2/catalog');
+                if (res.ok) {
+                    xmlV2CatalogCache = await res.json();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        renderXmlCatalogTable();
+    }
+
+    function closeXmlCatalogModal() {
+        document.getElementById('modalXmlRuleCatalog').style.display = 'none';
+    }
+
+    function renderXmlCatalogTable() {
+        const stdFilter = document.getElementById('xmlCatalogStdFilter').value;
+        const search = document.getElementById('xmlCatalogSearchInput').value.toLowerCase().trim();
+        const tbody = document.getElementById('xmlCatalogTableBody');
+        tbody.innerHTML = '';
+
+        let filtered = xmlV2CatalogCache;
+        if (stdFilter !== 'ALL') {
+            filtered = filtered.filter(r => r.standard === stdFilter);
+        }
+        if (search) {
+            filtered = filtered.filter(r => 
+                r.rule_code.toLowerCase().includes(search) || 
+                r.rule_name.toLowerCase().includes(search) ||
+                (r.description && r.description.toLowerCase().includes(search))
+            );
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không tìm thấy quy tắc nào.</td></tr>`;
+            return;
+        }
+
+        filtered.forEach((r, idx) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><span style="font-weight:600;">${e.ma_lk || ''}</span></td>
-                <td>${e.ho_ten || ''}</td>
-                <td>${e.ma_the || ''}</td>
-                <td>${e.ten_khoa || ''}</td>
-                <td><span class="badge" style="background:#475569; color:white; padding:2px 6px; border-radius:4px; font-size:0.8rem;">${e.xml_type || ''}</span></td>
-                <td><span style="color:#ef4444; font-weight:700;">${e.rule_id || ''}</span></td>
-                <td><code>${e.tag_name || ''}</code></td>
-                <td style="color:#f87171;">${e.message || ''}</td>
+                <td style="text-align: center; color: var(--text-secondary);">${idx + 1}</td>
+                <td style="text-align: center;"><span class="badge" style="background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 2px 6px; font-weight:600;">${r.standard}</span></td>
+                <td style="text-align: center; font-weight: bold; color: #ef4444;">${r.rule_code}</td>
+                <td style="text-align: center;"><span class="badge" style="background: #475569; color: white; padding: 2px 6px; font-size: 0.75rem;">${r.category}</span></td>
+                <td><b>${r.rule_name}</b></td>
+                <td style="font-size: 0.85rem; color: var(--text-secondary); white-space: pre-line;">${r.description || ''}</td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    function filterXmlErrorsTable() {
-        const query = document.getElementById('searchXmlError').value.toLowerCase().trim();
-        if (query === "") {
-            renderXmlErrorsTable(xmlErrorsData);
+    function downloadXmlV2Report() {
+        if (!currentXmlV2RunId) {
+            alert("Chưa có đợt kiểm tra XML nào được chọn để xuất báo cáo.");
             return;
         }
-        const filtered = xmlErrorsData.filter(e => 
-            (e.ma_lk && e.ma_lk.toLowerCase().includes(query)) ||
-            (e.ho_ten && e.ho_ten.toLowerCase().includes(query)) ||
-            (e.ten_khoa && e.ten_khoa.toLowerCase().includes(query)) ||
-            (e.message && e.message.toLowerCase().includes(query))
-        );
-        renderXmlErrorsTable(filtered);
+        window.open(`/api/admin/xml-v2/export-excel?run_id=${currentXmlV2RunId}`, '_blank');
     }
 
-    function downloadXmlReport() {
-        window.open('/api/admin/xml-validator/download', '_blank');
-    }
-
-    async function loadXmlConfig() {
+    async function openXmlConfigModal() {
         try {
-            const res = await fetch('/api/admin/xml-validator/config');
+            const res = await fetch('/api/admin/xml-v2/config');
             if (res.ok) {
-                const data = await res.json();
-                document.getElementById('xmlConfigInputDir').value = data.input_dir || '';
-                document.getElementById('xmlConfigOutputDir').value = data.output_dir || '';
+                const cfg = await res.json();
+                document.getElementById('cfgXmlDriver').value = cfg.driver || 'ODBC Driver 17 for SQL Server';
+                document.getElementById('cfgXmlServer').value = cfg.server || 'thsrvsql01';
+                document.getElementById('cfgXmlDatabase').value = cfg.database || 'eHospital_ThienHanh_XML';
+                document.getElementById('cfgXmlAuth').value = cfg.auth || 'Windows Auth';
+                document.getElementById('cfgXmlUser').value = cfg.user || '';
+                document.getElementById('cfgXmlPassword').value = '';
+                toggleXmlSqlAuthFields();
+                document.getElementById('modalXmlDbConfig').style.display = 'block';
             }
         } catch (e) {
-            console.error("Lỗi tải cấu hình XML:", e);
+            console.error(e);
+            alert("Lỗi tải cấu hình CSDL XML.");
         }
     }
 
-    async function saveXmlConfig() {
-        const inputDir = document.getElementById('xmlConfigInputDir').value.trim();
-        const outputDir = document.getElementById('xmlConfigOutputDir').value.trim();
-        
-        if (!inputDir || !outputDir) {
-            alert("Vui lòng điền đầy đủ đường dẫn thư mục Input và Output.");
-            return;
-        }
-        
+    function toggleXmlSqlAuthFields() {
+        const auth = document.getElementById('cfgXmlAuth').value;
+        document.getElementById('cfgXmlSqlAuthBox').style.display = (auth === 'SQL Auth') ? 'flex' : 'none';
+    }
+
+    function closeXmlConfigModal() {
+        document.getElementById('modalXmlDbConfig').style.display = 'none';
+    }
+
+    async function saveXmlDbConfig() {
+        const payload = {
+            driver: document.getElementById('cfgXmlDriver').value.trim(),
+            server: document.getElementById('cfgXmlServer').value.trim(),
+            database: document.getElementById('cfgXmlDatabase').value.trim(),
+            auth: document.getElementById('cfgXmlAuth').value,
+            user: document.getElementById('cfgXmlUser').value.trim(),
+            password: document.getElementById('cfgXmlPassword').value
+        };
         try {
-            const res = await fetch('/api/admin/xml-validator/config', {
+            const res = await fetch('/api/admin/xml-v2/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ input_dir: inputDir, output_dir: outputDir })
+                body: JSON.stringify(payload)
             });
             if (res.ok) {
-                alert("Cập nhật và lưu cấu hình thư mục thành công. Watcher đã được khởi động lại với thư mục mới.");
-                await checkXmlWatcherStatus();
-                fetchXmlValidatorResults();
+                alert("Đã lưu cấu hình kết nối CSDL XML thành công.");
+                closeXmlConfigModal();
             } else {
-                const err = await res.json();
-                alert("Lỗi khi lưu cấu hình: " + (err.detail || "Không rõ nguyên nhân"));
+                alert("Lỗi khi lưu cấu hình kết nối.");
             }
         } catch (e) {
             alert("Lỗi kết nối khi lưu cấu hình.");
         }
     }
+
+    async function loadXmlV2RunsHistory() {
+        try {
+            const res = await fetch('/api/admin/xml-v2/runs');
+            if (res.ok) {
+                const runs = await res.json();
+                if (runs.length === 0) {
+                    alert("Chưa có đợt kiểm tra XML nào trong lịch sử.");
+                    return;
+                }
+                let msg = "LỊCH SỬ CÁC ĐỢT KIỂM TRA XML GẦN ĐÂY:\n\n";
+                runs.slice(0, 8).forEach(r => {
+                    msg += `• [${r.run_code}] (${r.created_at}): ${r.status} | Tổng: ${r.total_cases} ca | Lỗi: ${r.has_error_cases} | Đạt: ${r.no_error_cases}\n`;
+                });
+                alert(msg);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Initialize Tab 9 data when page loads
+    loadXmlV2Results(1);
 
     // Initialize
     loadConfig();

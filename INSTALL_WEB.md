@@ -83,6 +83,12 @@ Khoi dong may chu uvicorn...
     *   Vào **Tab 4: Quản lý Khoa Phòng**.
     *   Nhập thông tin đăng nhập cho khoa (ví dụ: user `khoasan` / pass `123456`, map đúng tên khoa điều trị là `Sản` hoặc `Khoa Sản` tương ứng trên HIS).
     *   Bác sĩ lâm sàng của khoa đó sẽ đăng nhập bằng tài khoản này để xem và sửa lỗi.
+4.  **Vận hành Tab 9: Kiểm tra XML Độc Lập (Validate XML V2)**:
+    *   Vào **Tab 9: Kiểm tra XML**.
+    *   Bấm **"Cấu hình CSDL XML"** để xác nhận kết nối tới máy chủ CSDL XML (mặc định server `thsrvsql01`, database `eHospital_ThienHanh_XML`).
+    *   Bấm **"Kiểm tra XML ca chưa gửi cổng"** để hệ thống tự động lọc các ca chưa gửi thành công từ đợt đối soát hiện tại và thực hiện kiểm tra 116 quy tắc logic theo chuẩn 9324, 4210, 4750.
+    *   Theo dõi tiến trình thời gian thực, xem chi tiết lỗi vi phạm và xuất báo cáo Excel (`BaoCao_ValidateXML_*.xlsx`).
+    *   Hệ thống chạy hoàn toàn ở chế độ Read-Only, snapshot và kết quả lưu riêng tại tệp `web_app/xml_validation_v2.db`.
 
 ---
 

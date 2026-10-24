@@ -56,7 +56,70 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
-## 2026-10-22 11:15 - Antigravity (Hiển Thị Cột Mã Y Tế Trên Giao Diện Danh Sách Lỗi, Danh Sách Fail & Khoa Phòng)
+## 2026-10-24 11:05 - Antigravity (Tích Hợp Quy Tắc Ràng Buộc Cổng Tiếp Nhận CTN Theo QĐ 4750 Từ Tệp Excel)
+
+### Mục tiêu
+- Tích hợp bổ sung toàn bộ các quy tắc ràng buộc trường dữ liệu, cấu trúc bắt buộc và tính nhất quán chéo từ tệp đặc tả: `C:\Users\Admin\Downloads\QD4750_Check_Validate CTN QĐ_4750.xlsx`.
+
+### Thay đổi
+- **Tạo mới `web_app/xml_validator_v2/rules/rules_4750_ctn.py`:**
+  - `CTN_REQ_XML1`: Kiểm tra các trường bắt buộc không được rỗng ở Bảng 1 (`MA_LK`, `MA_CSKCB`, `MA_BN`, `HO_TEN`, `NGAY_SINH`, `GIOI_TINH`, `DIA_CHI`, `NGAY_VAO`, `NGAY_RA`, `MA_LOAI_KCB`, `MA_BENH_CHINH`, `KET_QUA_DTRI`, `TINH_TRANG_RV`).
+  - `CTN_REQ_XML2`: Kiểm tra các trường bắt buộc ở Bảng 2 Thuốc (`MA_THUOC`, `TEN_THUOC`, `HAM_LUONG`, `DON_VI_TINH`, `SO_LUONG`, `DON_GIA`, `TYLE_TT`, `THANH_TIEN`, `MA_KHOA`).
+  - `CTN_REQ_XML3`: Kiểm tra các trường bắt buộc ở Bảng 3 DVKT, VTYT (`MA_DICH_VU`, `TEN_DICH_VU`, `SO_LUONG`, `DON_GIA`, `TYLE_TT`, `THANH_TIEN`, `MA_KHOA`).
+  - `CTN_CCCD_FORMAT`: Kiểm tra định dạng số CCCD / CMND / Hộ chiếu (9/12 số hoặc 1 chữ hoa + 7 số).
+  - `CTN_CROSS_CONSISTENCY`: Kiểm tra tính nhất quán thông tin nhân thân (`HO_TEN`, `NGAY_SINH`, `GIOI_TINH`) giữa Bảng 1 (XML1) và các bảng phụ (XML6, XML7, XML8, XML9, XML13, XML14, XML15).
+  - `CTN_XML8_APPLICABILITY`: Ràng buộc Bảng 8 (Tóm tắt HSBA) chỉ áp dụng cho điều trị nội trú / ngoại trú ban ngày (`03`, `04`, `06`).
+  - `CTN_XML14_APPOINTMENT_DATE`: Ràng buộc thời điểm hẹn khám lại ở Bảng 14 bắt buộc phải lớn hơn ngày ra viện (`NGAY_HEN_KL > NGAY_RA`).
+- **Cập nhật `rule_engine.py`:** Tự động gọi kết hợp cả quy tắc logic và quy tắc CTN từ Excel khi hồ sơ thuộc chuẩn 4750.
+- **Cập nhật `catalog.py`:** Đăng ký 7 nhóm quy tắc CTN 4750 mới vào Rule Catalog để người dùng tra cứu trực quan tại Tab 9.
+- **Cập nhật `tests/test_xml_v2.py`:** Bổ sung hàm `test_ctn_4750_rules()` kiểm thử toàn diện các điều kiện vi phạm CTN.
+
+### Kiểm tra
+- Chạy toàn bộ test suites: `test_xml_v2.py`, `test_safety_and_regression.py`, `test_validation_integration.py` đều PASSED 100%.
+
+---
+
+### Mục tiêu
+- Thay thế hoàn toàn module XML Validator cũ tại Tab 9 (`#tab_xml-validator`) bằng hệ thống Validate XML mới độc lập theo Đặc tả kỹ thuật.
+- Bảo toàn nguyên vẹn 100% Nhánh A (đối soát `HoSoLoiChiTiet.xlsx`, `records`, `error_definitions`).
+- Chỉ ĐỌC dữ liệu XML trên SQL Server (`eHospital_ThienHanh_XML`, bảng `XML1_CV130` - `XML15_CV130`), tuyệt đối không ghi hoặc gọi SP tạo XML.
+- Tách biệt hoàn toàn sang CSDL SQLite riêng (`xml_validation_v2.db`).
+- Triển khai bộ quy tắc đa chuẩn trích xuất từ 2 file Word: 9324 (12 rules), 4210 (50 rules), 4750 (54 rules) với tính toán `Decimal`.
+
+### Thay đổi
+- **Tạo mới package `web_app/xml_validator_v2/`:**
+  - `models.py`: Khai báo schema SQLite riêng biệt (`val_runs`, `val_case_snapshots`, `val_results`, `val_errors`, `val_rule_catalog`).
+  - `db.py`: Quản lý engine & session cho file `xml_validation_v2.db`.
+  - `source_adapter.py`: Adapter truy vấn SQL Server XML chỉ đọc theo lô `MA_LK` (`SELECT ... WITH (NOLOCK)`).
+  - `rule_models.py`: Mô hình `RuleResult`, `RuleViolation`, `CaseXmlData`, các hàm số học `Decimal`.
+  - `catalog.py`: Danh mục Rule Catalog 116 quy tắc nghiệp vụ.
+  - `rules/rules_9324.py`: 12 quy tắc chuẩn 9324.
+  - `rules/rules_4210.py`: 50 quy tắc chuẩn 4210.
+  - `rules/rules_4750.py`: 54 quy tắc chuẩn 4750.
+  - `rule_engine.py`: Bộ máy phát hiện chuẩn, thực thi kiểm tra, tổng hợp 7 trạng thái chuẩn.
+  - `validation_service.py`: Điều phối đợt kiểm tra, quản lý tiến trình ngầm, lưu snapshot & kết quả.
+  - `report_exporter.py`: Xuất báo cáo kết quả kiểm tra ra file Excel định dạng chuẩn.
+  - `router.py`: REST API router `/api/admin/xml-v2/*`.
+- **Cập nhật `web_app/main.py`:**
+  - Đăng ký `xml_v2_router` và tự động khởi tạo CSDL `xml_validation_v2.db`.
+- **Cập nhật `web_app/templates/admin.html`:**
+  - Thay thế toàn bộ giao diện HTML và JS của `#tab_xml-validator` bằng UI Validate XML mới: thanh tiến trình thời gian thực, thẻ KPI thống kê, bảng danh sách hồ sơ (phân trang, lọc trạng thái, tìm kiếm), modal chi tiết vi phạm từng hồ sơ, modal tra cứu 116 quy tắc và cấu hình CSDL XML.
+  - Cập nhật hàm `switchTab('xml-validator')` gọi `loadXmlV2Results(1)`.
+- **Tạo test suites trong `tests/`:**
+  - `tests/test_xml_v2.py`: Kiểm thử unit rules, phép tính Decimal, định dạng ngày giờ, nhận diện chuẩn.
+  - `tests/test_safety_and_regression.py`: Kiểm tra an toàn SQL Server (chỉ đọc) và bảo toàn Nhánh A.
+  - `tests/test_validation_integration.py`: Kiểm thử tích hợp toàn bộ luồng chạy và xuất Excel.
+
+### Nghiệp vụ ảnh hưởng
+- Tab 9 hiện tại kiểm tra trực tiếp XML từ CSDL viện cho các hồ sơ chưa gửi cổng của đợt đối soát.
+- Nhánh A (đối soát `HoSoLoiChiTiet.xlsx`, `records`, `FAIL`/`LOI`, sinh SQL reset) được bảo toàn nguyên vẹn 100%.
+
+### Kiểm tra
+- Chạy `tests/test_xml_v2.py`: 6/6 tests PASSED.
+- Chạy `tests/test_safety_and_regression.py`: Tất cả các kiểm tra an toàn & hồi quy PASSED.
+- Chạy `tests/test_validation_integration.py`: Toàn bộ luồng Validate và Export Excel PASSED.
+
+---
 
 ### Mục tiêu
 - Hiển thị thêm cột **Mã y tế** (`ma_y_te`) của ca bệnh trên các giao diện:

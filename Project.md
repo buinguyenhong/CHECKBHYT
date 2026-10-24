@@ -87,11 +87,16 @@ File quan trọng:
 - `portal_downloader/`: bộ công cụ tải & gộp hồ sơ BHYT chạy trực tiếp tại chỗ trên máy đang thao tác (`downloader_server.py`, `Chay_Tool_Tai_BHYT.bat`, `templates/index.html`), hỗ trợ Auto-OCR và Popup xác thực Captcha trực tiếp, bật trình duyệt trước mặt người dùng và 1-click gửi file lên Máy chủ CHECKBHYT để đối soát CSDL.
 - `Chay_Tool_Tai_BHYT.bat`: tệp thực thi 1-click tại thư mục gốc khởi động nhanh công cụ tải dữ liệu BHYT cục bộ.
 - `client_runner/`: bộ công cụ RPA Runner chạy trên máy trạm (`client_agent.py`, `Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
-- `web_app/xml_validator/`: thư mục chứa mô-đun đối soát và kiểm tra cấu trúc hồ sơ XML BHYT (in-process).
-  - `xml_parser.py`: Đọc tệp XML, giải mã Container XML ký số và gom nhóm theo MA_LK.
-  - `rule_engine.py`: Chứa 26 quy tắc nghiệp vụ BHYT kiểm tra lỗi.
-  - `report_generator.py`: Sinh báo cáo tổng hợp lỗi Excel và JSON kết quả.
-- `web_app/templates/admin.html`: giao diện phòng IT (Đối soát HIS/BHYT, Quản lý tài khoản khoa, Tab kiểm tra XML BHYT, card liên kết tới Trung tâm Tự động hóa Cổng BHYT).
+- `web_app/xml_validator_v2/`: thư mục chứa hệ thống Validate XML độc lập thế hệ mới tại Tab 9 (`/api/admin/xml-v2/*`).
+  - `source_adapter.py`: Bộ truy vấn SQL Server XML chỉ đọc (`SELECT ... FROM dbo.XML1_CV130..XML15_CV130 WITH (NOLOCK)` theo lô `MA_LK`), tuyệt đối không ghi dữ liệu hoặc gọi SP tạo XML.
+  - `models.py` & `db.py`: CSDL SQLite độc lập riêng biệt (`xml_validation_v2.db`) với các bảng `val_runs`, `val_case_snapshots`, `val_results`, `val_errors`, `val_rule_catalog`.
+  - `catalog.py`: Danh mục 116 quy tắc nghiệp vụ trích xuất từ tài liệu GDH & TLGDH.
+  - `rules/`: Triển khai độc lập 3 bộ quy tắc: `rules_9324.py` (12 quy tắc), `rules_4210.py` (50 quy tắc), `rules_4750.py` (54 quy tắc) sử dụng kiểu số học `Decimal` chống trôi sai số.
+  - `rule_engine.py`: Bộ máy phát hiện chuẩn tự động và tổng hợp 7 trạng thái kết quả (`HAS_ERRORS`, `NO_ERRORS_FOUND`, `MISSING_XML`, `INCOMPLETE_DATA`, `RULESET_UNDETERMINED`, `VALIDATION_FAILED`, `PARTIAL`).
+  - `validation_service.py`: Điều phối đợt kiểm tra, quản lý tiến trình ngầm và lưu snapshot truy vết.
+  - `report_exporter.py`: Xuất file Excel báo cáo lỗi chi tiết.
+  - `router.py`: REST API router phục vụ Tab 9.
+- `web_app/templates/admin.html`: giao diện phòng IT (Đối soát HIS/BHYT, Quản lý tài khoản khoa, Tab 9 Kiểm tra XML BHYT thế hệ mới, card liên kết tới Trung tâm Tự động hóa Cổng BHYT).
 - `web_app/templates/portal_automation.html`: màn hình chuyên biệt độc lập (`/portal-automation`) phục vụ vận hành Luồng B & Luồng C thế hệ mới với Live-Streaming Log SSE, phân luồng Captcha theo client token, nút Dừng khẩn cấp, cụm cấu hình dùng chung tài khoản BHYT và ô chọn Khoảng ngày (Từ ngày - Đến ngày) để đối soát CSDL SQL HIS linh hoạt 1-click.
 - `web_app/templates/department.html`: giao diện khoa lâm sàng.
 - `web_app/templates/login.html`: đăng nhập.

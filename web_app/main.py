@@ -276,6 +276,12 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Đăng ký module XML Validator V2 độc lập cho Tab 9
+from xml_validator_v2.router import router as xml_v2_router
+from xml_validator_v2.db import init_val_db
+init_val_db()
+app.include_router(xml_v2_router)
+
 def save_last_kpis(db: Session, stats: dict, df_listbh: pd.DataFrame, ngay_doi_soat: datetime.date):
     """Lưu KPI lần đối soát gần nhất. Không dùng count(records) vì records chỉ lưu ca cần xử lý."""
     cfg = db.query(AppConfig).first()

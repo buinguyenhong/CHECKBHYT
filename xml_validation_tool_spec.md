@@ -1,20 +1,21 @@
-# TÀI LIỆU ĐẶC TẢ KỸ THUẬT: MÔ-ĐUN KIỂM TRA LỖI HỒ SƠ XML (BHYT)
-*Dành cho Agent/Developer thực hiện lập trình và tích hợp*
+# TÀI LIỆU ĐẶC TẢ KỸ THUẬT: HỆ THỐNG VALIDATE XML ĐỘC LẬP TẠI TAB 9 (V2)
+*Hệ thống Kiểm Tra Lỗi Hồ Sơ XML BHYT Tự Động Từ CSDL HIS — Dự án CHECKBHYT*
 
-Tài liệu này mô tả chi tiết yêu cầu kỹ thuật, kiến trúc mô-đun, các quy tắc nghiệp vụ kiểm tra và phương thức tích hợp cho mô-đun **XML Validator Tool**. Mô-đun này được thiết kế như một **công cụ độc lập (standalone module)** nhằm tích hợp vào một ứng dụng web cục bộ (local web-app) xử lý bảo hiểm hiện có.
+Tài liệu này mô tả chi tiết yêu cầu kỹ thuật, kiến trúc độc lập, các quy tắc nghiệp vụ kiểm tra và phương thức tích hợp cho hệ thống **XML Validator V2** thay thế mô-đun cũ tại Tab 9.
 
 ---
 
-## 📌 1. Nguyên tắc thiết kế mô-đun (Độc lập & Tích hợp nhẹ)
+## 📌 1. Nguyên tắc thiết kế mô-đun (Độc lập & An toàn CSDL)
 
 > [!IMPORTANT]
-> **Yêu cầu cốt lõi:** Mô-đun này phải hoàn toàn độc lập với mã nguồn lõi của web-app hiện có. Nó tương tác với ứng dụng chính thông qua **File System (Thư mục quét tự động)** và **API/JSON kết quả**. Không được thay đổi cấu trúc cơ sở dữ liệu hoặc luồng hoạt động chính của ứng dụng hiện tại.
+> **Yêu cầu cốt lõi:**
+> 1. Hoàn toàn độc lập với Nhánh A (đối soát `HoSoLoiChiTiet.xlsx`, bảng `records`, `error_definitions`). Không làm thay đổi kết quả hay trạng thái của Nhánh A.
+> 2. **Chế độ CHỈ ĐỌC (Read-Only):** Truy vấn dữ liệu từ CSDL `eHospital_ThienHanh_XML` bằng câu lệnh `SELECT ... WITH (NOLOCK)` theo từng lô `MA_LK`. Tuyệt đối **không gọi Stored Procedure tạo lại XML**, không thực thi bất kỳ lệnh `INSERT`, `UPDATE`, `DELETE` nào trên SQL Server viện.
+> 3. **Vùng lưu trữ SQLite riêng:** Sử dụng tệp `xml_validation_v2.db` với các bảng có tiền tố `val_*`, tách biệt hoàn toàn với `app_state.db`.
 
-*   **Tính độc lập:** Mô-đun chạy như một tiến trình nền (background worker) hoặc một service riêng biệt bằng Python.
-*   **Cơ chế kích hoạt (Trigger):**
-    *   **Tự động:** Quét (watch) một thư mục chỉ định (`Input Folder`). Khi phát hiện có file XML mới xuất hiện, mô-đun tự động chạy phân tích.
-    *   **Thủ công:** Web-app chính gọi đến một Endpoint API cục bộ của mô-đun để yêu cầu kiểm tra thư mục hoặc file cụ thể.
-*   **Cơ chế đầu ra (Output):** Xuất báo cáo lỗi chi tiết dưới dạng tệp `JSON` và `Excel` vào thư mục đầu ra (`Output Folder`). Web-app chính có thể đọc tệp JSON này để hiển thị giao diện báo cáo cho người dùng.
+*   **Tính độc lập:** Mô-đun nằm trong package `web_app/xml_validator_v2/` với Source Adapter, Rule Engine, Service và Router riêng.
+*   **Cơ chế kích hoạt:** Kích hoạt kiểm tra cho các hồ sơ **chưa gửi thành công lên cổng** từ đợt đối soát hiện tại hoặc theo khoảng ngày.
+*   **Cơ chế đầu ra:** Hiển thị trên giao diện Tab 9 mới, tra cứu chi tiết vi phạm từng hồ sơ, xuất báo cáo Excel (`report_exporter.py`).
 
 ---
 
@@ -22,42 +23,53 @@ Tài liệu này mô tả chi tiết yêu cầu kỹ thuật, kiến trúc mô-�
 
 ```mermaid
 sequenceDiagram
-    participant App as Web-App chính (Local)
-    participant InputDir as Thư mục Input (Dữ liệu XML)
-    participant Watcher as Bộ quét Watcher (Python)
-    participant Engine as Động cơ Quy tắc (Rule Engine)
-    participant OutputDir as Thư mục Output (Kết quả)
+    participant WebApp as Web-App Tab 9
+    participant Service as ValidationService
+    participant Adapter as XmlSourceAdapter
+    participant SQLServer as SQL Server (eHospital_ThienHanh_XML)
+    participant SQLiteVal as SQLite Mới (xml_validation_v2.db)
+    participant Engine as ValidationEngine (9324/4210/4750)
 
-    Note over App, InputDir: Người dùng xuất file XML từ HIS vào thư mục Input
-    Watcher->>InputDir: Giám sát thư mục liên tục (Sử dụng thư viện watchdog)
-    InputDir-->>Watcher: Phát hiện file XML mới
-    Watcher->>Engine: Gom nhóm file theo MA_LK và kích hoạt phân tích
-    Note over Engine: Đọc XML -> Kiểm tra cấu trúc -> Chạy Quy tắc (26 Rules)
-    Engine->>OutputDir: Xuất file báo cáo: TongHopLoi.xlsx & ket_qua.json
-    Watcher->>App: Gửi tín hiệu thông báo hoàn thành (Websocket hoặc Webhook)
-    App->>OutputDir: Đọc ket_qua.json và hiển thị lỗi trực quan lên UI
+    WebApp->>Service: Kích hoạt kiểm tra các ca chưa gửi cổng
+    Service->>SQLiteVal: Tạo bản ghi ValRun (Status: RUNNING)
+    loop Theo từng lô MA_LK (Chunk: 50 ca)
+        Service->>Adapter: Yêu cầu lấy dữ liệu XML cho lô MA_LK
+        Adapter->>SQLServer: SELECT * FROM dbo.XML1_CV130..XML15_CV130 WHERE MA_LK IN (...) (Chỉ Đọc)
+        SQLServer-->>Adapter: Trả về dữ liệu các bảng XML
+        Adapter-->>Service: Dữ liệu XML thô
+        Service->>SQLiteVal: Lưu ValCaseSnapshot (Snapshot dữ liệu)
+        Service->>Engine: Thực thi kiểm tra quy tắc (Decimal arithmetic)
+        Engine-->>Service: Kết quả tổng hợp & danh sách vi phạm
+        Service->>SQLiteVal: Lưu ValResult & ValidationError
+        Service->>WebApp: Cập nhật tiến trình thời gian thực (%)
+    end
+    Service->>SQLiteVal: Cập nhật ValRun (Status: COMPLETED)
+    WebApp->>SQLiteVal: Đọc kết quả hiển thị bảng và KPIs Tab 9
 ```
 
 ---
 
-## 📋 3. Định nghĩa các bảng dữ liệu XML (Theo chuẩn Bộ Y tế)
+## 📋 3. Nguồn dữ liệu XML từ CSDL Bệnh Viện (CV 130)
 
-Khi phân tích, Agent cần nhận dạng các file XML theo quy ước chuẩn:
-*   **XML1 (Bảng 1):** Chỉ tiêu tổng hợp khám bệnh, chữa bệnh (Thông tin hành chính, bệnh chính, loại KCB, mã liên kết `MA_LK`).
-*   **XML2 (Bảng 2):** Chỉ tiêu chi tiết thuốc thanh toán BHYT.
-*   **XML3 (Bảng 3):** Chỉ tiêu chi tiết dịch vụ kỹ thuật và vật tư y tế.
-*   **XML4 (Bảng 4):** Chỉ tiêu kết quả cận lâm sàng (Kết quả chẩn đoán hình ảnh, xét nghiệm).
-*   **XML5 (Bảng 5):** Chỉ tiêu theo dõi diễn biến lâm sàng.
-*   **XML7 (Bảng 7):** Giấy ra viện / Giấy tờ chuyển tuyến.
-*   **XML8 (Bảng 8):** Tóm tắt bệnh án.
-*   **XML9 (Bảng 9):** Bảng kê chi phí KCB.
-*   **XML13 (Bảng 13):** Bảng kê chi tiết hồ sơ khác.
+Hệ thống truy vấn trực tiếp từ các bảng XML trên SQL Server theo mã `MA_LK`:
+*   **XML1_CV130 (Bảng 1):** Chỉ tiêu tổng hợp khám bệnh, chữa bệnh (Hành chính, loại KCB, tổng chi, viện phí, BHTT chi trả).
+*   **XML2_CV130 (Bảng 2):** Chỉ tiêu chi tiết thuốc thanh toán BHYT (Số lượng, đơn giá, tỷ lệ thanh toán, thành tiền).
+*   **XML3_CV130 (Bảng 3):** Chỉ tiêu chi tiết dịch vụ kỹ thuật và vật tư y tế (Mã nhóm, số lượng, stent, tiền giường, tiền vận chuyển).
+*   **XML4_CV130 (Bảng 4):** Chỉ tiêu kết quả cận lâm sàng.
+*   **XML5_CV130 (Bảng 5):** Chỉ tiêu theo dõi diễn biến lâm sàng.
+*   **XML7_CV130 (Bảng 7):** Giấy ra viện / Giấy tờ chuyển tuyến.
+*   **XML8_CV130 (Bảng 8):** Tóm tắt bệnh án.
+*   **XML9_CV130 (Bảng 9):** Bảng kê chi phí KCB.
+*   **XML11_CV130, XML13_CV130:** Chỉ tiêu chi tiết hồ sơ bổ sung theo Quyết định 4750.
 
 ---
 
-## 🔍 4. Danh mục 26 Quy tắc Kiểm tra lỗi (Rule Dictionary)
+## 🔍 4. Danh Mục 116 Quy Tắc Kiểm Tra Lỗi Đa Chuẩn (Rule Catalog)
 
-Dưới đây là danh sách các quy tắc kiểm tra cần được lập trình cứng trong Động cơ quy tắc (`rule_engine.py`). Mọi kiểm tra lỗi phải liên kết theo trường `<MA_LK>` (Mã liên kết hồ sơ).
+Trích xuất toàn diện từ 2 tài liệu chính thức (`GDH_Danh sách các mã lỗi Chặn hồ sơ sai logic.docx` và `TLGDH_Danh sách mã lỗi chặn hồ sơ sai Logic theo 4750.docx`), phân tách rạch ròi 3 chuẩn:
+1. **Chuẩn 9324 (12 quy tắc):** Áp dụng theo Công văn 9324 (Mã 1, 3, 4, 5, 8, 9, 10, 11, 12, 14, 60, 61).
+2. **Chuẩn 4210 (50 quy tắc):** Áp dụng theo Quyết định 4210 (Mã 1, 8-11, 14-27, 31, 34-46, 47-56, 58, 60, 61, 101, 104-106).
+3. **Chuẩn 4750 (54 quy tắc):** Áp dụng theo Quyết định 4750 (Mã 1, 8-11, 14-27, 31, 34-40, 43-44, 47-56, 58, 60, 61, 108-119).
 
 ### Nhóm A: Kiểm tra lỗi định dạng và Ràng buộc bắt buộc (Không để trống)
 
