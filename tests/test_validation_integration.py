@@ -53,7 +53,8 @@ class MockXmlSourceAdapter(XmlSourceAdapter):
                 ]
             }
         # Hồ sơ 3: "MOCK_LK_MISSING" không có dữ liệu XML -> res["MOCK_LK_MISSING"] = {}
-        return res
+        table_status = {f"XML{i}": {"status": "SUCCESS", "rows": 10} for i in range(1, 16)}
+        return res, table_status
 
 def test_full_validation_run():
     init_val_db()

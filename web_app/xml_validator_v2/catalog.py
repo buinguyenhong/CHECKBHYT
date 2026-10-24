@@ -1,6 +1,8 @@
-# Danh mục 116 quy tắc trích xuất từ 2 tài liệu:
-# 1. GDH_Danh sách các mã lỗi Chặn hồ sơ sai logic.docx (9324, 4210)
-# 2. TLGDH_Danh sách mã lỗi chặn hồ sơ sai Logic theo 4750.docx (4750)
+# Danh mục 123 quy tắc kiểm tra XML:
+# 1. 116 quy tắc logic trích xuất từ:
+#    - GDH_Danh sách các mã lỗi Chặn hồ sơ sai logic.docx (9324, 4210)
+#    - TLGDH_Danh sách mã lỗi chặn hồ sơ sai Logic theo 4750.docx (4750)
+# 2. 7 nhóm quy tắc bổ sung từ QD4750_Check_Validate CTN QĐ_4750.xlsx (CTN_*)
 
 RULE_CATALOG = [
     {

@@ -208,59 +208,78 @@ def check_rules_4750_ctn(case: CaseXmlData) -> List[RuleResult]:
     ))
 
     # =========================================================================
+    # =========================================================================
     # 6. CTN_XML8_APPLICABILITY: Điều kiện áp dụng Bảng 8 (Tóm tắt HSBA)
     # Quy định: Bảng 8 chỉ có khi MA_LOAI_KCB ở XML1 in ('03', '04', '06')
     # Nếu MA_LOAI_KCB là khám bệnh ngoại trú (01/1) mà lại gửi kèm Bảng 8 -> Vi phạm
     # =========================================================================
-    ma_loai_kcb = str(xml1.get("MA_LOAI_KCB", "")).strip()
-    r_xml8_violations = []
-    if case.xml8 and len(case.xml8) > 0:
-        if ma_loai_kcb not in ["03", "3", "04", "4", "06", "6"]:
-            r_xml8_violations.append(RuleViolation(
-                standard="4750_CTN",
-                rule_code="CTN_XML8_APPLICABILITY",
-                rule_name="Bảng 8 (Tóm tắt HSBA) chỉ áp dụng cho nội trú/ban ngày",
-                xml_table="XML8",
-                field_name="MA_LOAI_KCB",
-                actual_value=ma_loai_kcb,
-                expected_condition="MA_LOAI_KCB thuộc ('03', '04', '06')",
-                message=f"Hồ sơ có Bảng 8 (Tóm tắt HSBA) nhưng loại KCB là '{ma_loai_kcb}' (chỉ áp dụng cho điều trị nội trú/ngoại trú ban ngày)."
-            ))
-    results.append(RuleResult(
-        rule_code="CTN_XML8_APPLICABILITY",
-        standard="4750",
-        rule_name="Điều kiện áp dụng Bảng 8 (Tóm tắt HSBA)",
-        status=RuleStatus.VIOLATED if r_xml8_violations else RuleStatus.PASSED,
-        violations=r_xml8_violations
-    ))
+    if case.is_table_error("XML8"):
+        results.append(RuleResult(
+            rule_code="CTN_XML8_APPLICABILITY",
+            standard="4750",
+            rule_name="Điều kiện áp dụng Bảng 8 (Tóm tắt HSBA)",
+            status=RuleStatus.INCOMPLETE_DATA,
+            reason="Bảng XML8_CV130 gặp sự cố truy vấn từ CSDL SQL Server, chưa đủ dữ liệu đánh giá."
+        ))
+    else:
+        ma_loai_kcb = str(xml1.get("MA_LOAI_KCB", "")).strip()
+        r_xml8_violations = []
+        if case.xml8 and len(case.xml8) > 0:
+            if ma_loai_kcb not in ["03", "3", "04", "4", "06", "6"]:
+                r_xml8_violations.append(RuleViolation(
+                    standard="4750_CTN",
+                    rule_code="CTN_XML8_APPLICABILITY",
+                    rule_name="Bảng 8 (Tóm tắt HSBA) chỉ áp dụng cho nội trú/ban ngày",
+                    xml_table="XML8",
+                    field_name="MA_LOAI_KCB",
+                    actual_value=ma_loai_kcb,
+                    expected_condition="MA_LOAI_KCB thuộc ('03', '04', '06')",
+                    message=f"Hồ sơ có Bảng 8 (Tóm tắt HSBA) nhưng loại KCB là '{ma_loai_kcb}' (chỉ áp dụng cho điều trị nội trú/ngoại trú ban ngày)."
+                ))
+        results.append(RuleResult(
+            rule_code="CTN_XML8_APPLICABILITY",
+            standard="4750",
+            rule_name="Điều kiện áp dụng Bảng 8 (Tóm tắt HSBA)",
+            status=RuleStatus.VIOLATED if r_xml8_violations else RuleStatus.PASSED,
+            violations=r_xml8_violations
+        ))
 
     # =========================================================================
     # 7. CTN_XML14_APPOINTMENT_DATE: Ngày hẹn khám lại ở Bảng 14 > Ngày ra viện
     # =========================================================================
-    xml14_table = case.get_table("XML14")
-    r_xml14_violations = []
-    ngay_ra_str = str(xml1.get("NGAY_RA", "")).strip()
-    if xml14_table:
-        for idx, r in enumerate(xml14_table):
-            ngay_hen = str(r.get("NGAY_HEN_KL", "")).strip()
-            if ngay_hen and ngay_ra_str and len(ngay_hen) >= 8 and len(ngay_ra_str) >= 8:
-                if ngay_hen[:8] <= ngay_ra_str[:8]:
-                    r_xml14_violations.append(RuleViolation(
-                        standard="4750_CTN",
-                        rule_code="CTN_XML14_APPOINTMENT_DATE",
-                        rule_name="Ngày hẹn khám lại phải lớn hơn ngày ra viện",
-                        xml_table="XML14",
-                        field_name="NGAY_HEN_KL",
-                        actual_value=f"HEN={ngay_hen}, RA={ngay_ra_str}",
-                        expected_condition="NGAY_HEN_KL > NGAY_RA",
-                        message=f"Bảng 14: Ngày hẹn khám lại '{ngay_hen}' nhỏ hơn hoặc bằng ngày ra viện '{ngay_ra_str}'."
-                    ))
-    results.append(RuleResult(
-        rule_code="CTN_XML14_APPOINTMENT_DATE",
-        standard="4750",
-        rule_name="Ràng buộc thời điểm hẹn khám lại (Bảng 14)",
-        status=RuleStatus.VIOLATED if r_xml14_violations else RuleStatus.PASSED,
-        violations=r_xml14_violations
-    ))
+    if case.is_table_error("XML14"):
+        results.append(RuleResult(
+            rule_code="CTN_XML14_APPOINTMENT_DATE",
+            standard="4750",
+            rule_name="Ràng buộc thời điểm hẹn khám lại (Bảng 14)",
+            status=RuleStatus.INCOMPLETE_DATA,
+            reason="Bảng XML14_CV130 gặp sự cố truy vấn từ CSDL SQL Server, chưa đủ dữ liệu đánh giá."
+        ))
+    else:
+        xml14_table = case.get_table("XML14")
+        r_xml14_violations = []
+        ngay_ra_str = str(xml1.get("NGAY_RA", "")).strip()
+        if xml14_table:
+            for idx, r in enumerate(xml14_table):
+                ngay_hen = str(r.get("NGAY_HEN_KL", "")).strip()
+                if ngay_hen and ngay_ra_str and len(ngay_hen) >= 8 and len(ngay_ra_str) >= 8:
+                    if ngay_hen[:8] <= ngay_ra_str[:8]:
+                        r_xml14_violations.append(RuleViolation(
+                            standard="4750_CTN",
+                            rule_code="CTN_XML14_APPOINTMENT_DATE",
+                            rule_name="Ngày hẹn khám lại phải lớn hơn ngày ra viện",
+                            xml_table="XML14",
+                            field_name="NGAY_HEN_KL",
+                            actual_value=f"HEN={ngay_hen}, RA={ngay_ra_str}",
+                            expected_condition="NGAY_HEN_KL > NGAY_RA",
+                            message=f"Bảng 14: Ngày hẹn khám lại '{ngay_hen}' nhỏ hơn hoặc bằng ngày ra viện '{ngay_ra_str}'."
+                        ))
+        results.append(RuleResult(
+            rule_code="CTN_XML14_APPOINTMENT_DATE",
+            standard="4750",
+            rule_name="Ràng buộc thời điểm hẹn khám lại (Bảng 14)",
+            status=RuleStatus.VIOLATED if r_xml14_violations else RuleStatus.PASSED,
+            violations=r_xml14_violations
+        ))
 
     return results

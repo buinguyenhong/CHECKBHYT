@@ -10,12 +10,15 @@ Tài liệu này mô tả chi tiết yêu cầu kỹ thuật, kiến trúc độ
 > [!IMPORTANT]
 > **Yêu cầu cốt lõi:**
 > 1. Hoàn toàn độc lập với Nhánh A (đối soát `HoSoLoiChiTiet.xlsx`, bảng `records`, `error_definitions`). Không làm thay đổi kết quả hay trạng thái của Nhánh A.
-> 2. **Chế độ CHỈ ĐỌC (Read-Only):** Truy vấn dữ liệu từ CSDL `eHospital_ThienHanh_XML` bằng câu lệnh `SELECT ... WITH (NOLOCK)` theo từng lô `MA_LK`. Tuyệt đối **không gọi Stored Procedure tạo lại XML**, không thực thi bất kỳ lệnh `INSERT`, `UPDATE`, `DELETE` nào trên SQL Server viện.
-> 3. **Vùng lưu trữ SQLite riêng:** Sử dụng tệp `xml_validation_v2.db` với các bảng có tiền tố `val_*`, tách biệt hoàn toàn với `app_state.db`.
+> 2. **Chế độ CHỈ ĐỌC (Read-Only) & Parameterized Query:** Truy vấn dữ liệu từ CSDL `eHospital_ThienHanh_XML` bằng câu lệnh `SELECT ... WITH (NOLOCK) WHERE MA_LK IN (?, ?, ?)` với tham số hóa `tuple(chunk)` chuẩn ODBC. Chống SQL Injection và tương thích Python 3.10/3.11+. Tuyệt đối **không gọi Stored Procedure tạo lại XML**, không thực thi bất kỳ lệnh `INSERT`, `UPDATE`, `DELETE` nào trên SQL Server viện.
+> 3. **Quản lý trạng thái đọc từng bảng XML (`table_status`):** Ghi nhận trạng thái đọc riêng cho từng bảng (`SUCCESS`, `EMPTY`, `ERROR`). Bảng nào lỗi truy vấn thì quy tắc phụ thuộc trả về `INCOMPLETE_DATA`, triệt tiêu rủi ro báo đạt sai (False Negative).
+> 4. **Vùng lưu trữ SQLite riêng:** Sử dụng tệp `xml_validation_v2.db` với các bảng có tiền tố `val_*`, tách biệt hoàn toàn với `app_state.db`.
+> 5. **Catalog 123 quy tắc:** Bao gồm 116 quy tắc logic gốc (9324, 4210, 4750) và 7 nhóm quy tắc CTN 4750.
 
 *   **Tính độc lập:** Mô-đun nằm trong package `web_app/xml_validator_v2/` với Source Adapter, Rule Engine, Service và Router riêng.
-*   **Cơ chế kích hoạt:** Kích hoạt kiểm tra cho các hồ sơ **chưa gửi thành công lên cổng** từ đợt đối soát hiện tại hoặc theo khoảng ngày.
+*   **Cơ chế kích hoạt:** Kích hoạt kiểm tra cho các hồ sơ **chưa gửi thành công lên cổng** từ đợt đối soát hiện tại hoặc theo khoảng ngày (áp dụng bộ lọc `or_(Record.status != 'RESOLVED', Record.status.is_(None))`).
 *   **Cơ chế đầu ra:** Hiển thị trên giao diện Tab 9 mới, tra cứu chi tiết vi phạm từng hồ sơ, xuất báo cáo Excel (`report_exporter.py`).
+*   **Bảo vệ hủy tiến trình:** Quản lý `CURRENT_VALIDATION_PROGRESS` qua cơ chế in-place dictionary, bảo đảm trạng thái `CANCELLED` không bị ghi đè thành `COMPLETED`.
 
 ---
 

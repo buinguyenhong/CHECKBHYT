@@ -75,7 +75,8 @@ def run_validation_job(
     db.commit()
     db.refresh(val_run)
 
-    CURRENT_VALIDATION_PROGRESS = {
+    CURRENT_VALIDATION_PROGRESS.clear()
+    CURRENT_VALIDATION_PROGRESS.update({
         "run_id": val_run.id,
         "run_code": run_code,
         "status": "RUNNING",
@@ -89,7 +90,7 @@ def run_validation_job(
         "message": f"Bắt đầu kiểm tra {len(cases_meta)} hồ sơ...",
         "started_at": datetime.datetime.now().isoformat(),
         "is_cancelled": False
-    }
+    })
 
     adapter = xml_adapter or XmlSourceAdapter()
     engine = ValidationEngine()
@@ -117,7 +118,11 @@ def run_validation_job(
             CURRENT_VALIDATION_PROGRESS["message"] = f"Đang truy vấn dữ liệu XML từ SQL Server ({i+1}-{min(i+chunk_size, total)}/{total})..."
             
             # 1. Truy vấn XML an toàn theo lô (Read-only)
-            xml_dict = adapter.fetch_xml_batch(ma_lk_list)
+            fetch_res = adapter.fetch_xml_batch(ma_lk_list)
+            if isinstance(fetch_res, tuple) and len(fetch_res) == 2:
+                xml_dict, table_status = fetch_res
+            else:
+                xml_dict, table_status = fetch_res, {}
 
             # 2. Xử lý từng hồ sơ trong lô
             for case_info in chunk:
@@ -165,7 +170,8 @@ def run_validation_job(
                     xml13=xml13_data,
                     xml14=xml14_data,
                     xml15=xml15_data,
-                    raw_tables=case_xml_tables
+                    raw_tables=case_xml_tables,
+                    table_fetch_status=table_status
                 )
 
                 # Lưu snapshot vào CSDL
@@ -251,6 +257,14 @@ def run_validation_job(
             val_run.incomplete_cases = incomplete_total
             val_run.percent = pct
             db.commit()
+
+        if CURRENT_VALIDATION_PROGRESS["is_cancelled"]:
+            val_run.status = "CANCELLED"
+            val_run.log_message = f"Tiến trình đã bị người dùng hủy. Đã xử lý {CURRENT_VALIDATION_PROGRESS['processed_cases']}/{total} hồ sơ."
+            db.commit()
+            CURRENT_VALIDATION_PROGRESS["status"] = "CANCELLED"
+            CURRENT_VALIDATION_PROGRESS["message"] = val_run.log_message
+            return
 
         val_run.status = "COMPLETED"
         val_run.percent = 100

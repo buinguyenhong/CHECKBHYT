@@ -54,6 +54,12 @@ class CaseXmlData:
     xml14: List[Dict[str, Any]] = field(default_factory=list)
     xml15: List[Dict[str, Any]] = field(default_factory=list)
     raw_tables: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    table_fetch_status: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+    def is_table_error(self, name: str) -> bool:
+        name_clean = name.upper().split("_")[0]
+        st = self.table_fetch_status.get(name_clean, {})
+        return st.get("status") == "ERROR"
 
     def get_table(self, name: str) -> List[Dict[str, Any]]:
         name_clean = name.upper().split("_")[0]

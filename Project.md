@@ -1262,22 +1262,34 @@ Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bện
 - **Schema:** `dbo`
 - **Phạm vi 15 bảng XML:** Bao phủ toàn bộ từ `XML1_CV130` đến `XML15_CV130`.
 - **Khóa liên kết hồ sơ:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`.
-- **Cam kết an toàn tuyệt đối:**
-  - Chỉ phát câu lệnh `SELECT ... WITH (NOLOCK) WHERE MA_LK IN (...)` theo từng lô 50 `MA_LK`.
+### 22.2. Nguồn dữ liệu SQL Server và An toàn truy vấn
+- **Máy chủ SQL Server:** `thsrvsql01`
+- **CSDL XML:** `eHospital_ThienHanh_XML`
+- **Schema:** `dbo`
+- **Phạm vi 15 bảng XML:** Bao phủ toàn bộ từ `XML1_CV130` đến `XML15_CV130`.
+- **Khóa liên kết hồ sơ:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`.
+- **Cam kết an toàn tuyệt đối và Tham số hóa truy vấn (Parameterized Query):**
+  - Sử dụng Parameterized Query chuẩn ODBC: `SELECT * FROM dbo.{tbl} WITH (NOLOCK) WHERE MA_LK IN (?, ?, ?)` với `cur.execute(sql, tuple(chunk))`. Không dùng f-string nội suy giá trị trực tiếp, đảm bảo chống SQL Injection và tương thích hoàn toàn với Python 3.10, 3.11, 3.12, 3.13+.
   - Tuyệt đối không có lệnh `INSERT`, `UPDATE`, `DELETE`, `ALTER` hoặc gọi các Stored Procedure tạo XML.
   - Tên bảng được kiểm soát chặt chẽ bằng allowlist biểu thức chính quy.
+  - Quản lý trạng thái đọc độc lập của từng bảng XML (`SUCCESS`, `EMPTY`, `ERROR`). Nếu một bảng gặp sự cố truy vấn, lỗi được khoanh vùng trong bảng đó và đưa vào `CaseXmlData.table_fetch_status`. Các quy tắc thẩm định phụ thuộc bảng lỗi bắt buộc trả về `INCOMPLETE_DATA`, triệt tiêu hoàn toàn rủi ro báo đạt giả (False Negative).
 
 ### 22.3. Bộ quy tắc Đa chuẩn và Cơ chế Triệt tiêu Báo sạch sai (Anti-False-Negative)
-- **Hỗ trợ đa chuẩn:** Nhận diện và áp dụng quy tắc theo Quyết định 9324/QĐ-BHXH, Quyết định 4210/QĐ-BYT và Quyết định 4750/QĐ-BYT kèm đặc tả Cổng tiếp nhận (CTN 4750).
+- **Hỗ trợ đa chuẩn với Catalog 123 quy tắc:** Nhận diện và áp dụng quy tắc theo Quyết định 9324/QĐ-BHXH, Quyết định 4210/QĐ-BYT và Quyết định 4750/QĐ-BYT kèm đặc tả Cổng tiếp nhận (CTN 4750), gồm 116 quy tắc logic gốc và 7 nhóm quy tắc CTN 4750.
 - **Nguyên tắc phân định trạng thái trung thực:**
   - `HAS_ERRORS`: Phát hiện ít nhất 1 quy tắc bị vi phạm (kèm chi tiết giá trị thực tế và điều kiện kỳ vọng).
-  - `INCOMPLETE_DATA`: Dữ liệu chưa đủ điều kiện đánh giá toàn diện, hoặc hồ sơ không vi phạm các quy tắc đã code nhưng còn các quy tắc logic trong Catalog chưa có mã thực thi trong phiên bản hiện tại. Hệ thống thông báo rõ: *"Đã kiểm tra X quy tắc (không phát hiện lỗi); còn Y quy tắc chưa đủ điều kiện đánh giá"*.
+  - `INCOMPLETE_DATA`: Dữ liệu chưa đủ điều kiện đánh giá toàn diện, bảng dữ liệu phụ thuộc gặp lỗi truy vấn, hoặc hồ sơ không vi phạm các quy tắc đã code nhưng còn các quy tắc logic trong Catalog chưa có mã thực thi trong phiên bản hiện tại. Hệ thống thông báo rõ: *"Đã kiểm tra X quy tắc (không phát hiện lỗi); còn Y quy tắc chưa đủ điều kiện đánh giá"*.
   - `NO_ERRORS_FOUND`: Chỉ cấp nhãn ĐẠT HỢP LỆ khi 100% quy tắc áp dụng của chuẩn đó đều được kiểm tra và hoàn toàn không có vi phạm.
   - `MISSING_XML`: Không tìm thấy bản ghi XML của hồ sơ trên SQL Server.
   - `RULESET_UNDETERMINED`: Dữ liệu XML thiếu các trường đặc thù để nhận diện chuẩn áp dụng.
 
-### 22.4. Xuất Báo cáo Excel Chuyên dụng
+### 22.4. Tác nghiệp Chọn Hồ Sơ và Quản lý Tiến trình
+- **Bộ lọc ca chưa gửi chính xác (Xử lý 3-valued logic SQL):** Lọc ca chưa gửi từ bảng `records` sử dụng `Record.type_group.in_(["FAIL", "LOI"])` kết hợp `or_(Record.status != 'RESOLVED', Record.status.is_(None))` để không bao giờ bỏ sót các ca mới chưa gán status hoặc có status là NULL. Validate nghiêm ngặt định dạng ngày `doi_soat_date`.
+- **Bảo toàn trạng thái hủy tiến trình:** Quản lý tiến trình qua đối tượng `CURRENT_VALIDATION_PROGRESS` dùng `.clear()` và `.update()` in-place. Nếu người dùng bấm "Hủy", trạng thái `CANCELLED` được bảo toàn và ghi nhận vĩnh viễn vào CSDL, không bao giờ bị ghi đè thành `COMPLETED`.
+
+### 22.5. Xuất Báo cáo Excel Chuyên dụng
 - Module `report_exporter.py` hỗ trợ xuất báo cáo kiểm tra XML chuyên sâu ra tệp Excel định dạng OpenXML:
   - **Sheet 1 (Tổng Hợp Hồ Sơ):** Xuất toàn bộ danh sách hồ sơ kiểm tra theo đợt (`ValResult.run_id == run_id`), phân loại chuẩn, trạng thái validate, số lỗi, số đạt và tóm tắt kết quả.
   - **Sheet 2 (Chi Tiết Vi Phạm):** Danh sách chi tiết từng lỗi vi phạm của từng hồ sơ (chuẩn, mã lỗi, tên quy tắc, bảng XML, trường dữ liệu, giá trị thực tế, điều kiện kỳ vọng và nội dung giải thích).
+
 

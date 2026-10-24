@@ -56,6 +56,47 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-24 15:30 - Antigravity (Hoàn tất 7 Hạng mục Cải tiến Audit XML Validator V2: Tham số hóa ODBC, Quản lý Lỗi Bảng & Regression Test)
+
+### Mục tiêu
+- Xử lý dứt điểm các phát hiện P0, P1, P2 từ báo cáo Audit độc lập:
+  1. Chống lỗi cú pháp f-string trên Python 3.10/3.11 và triệt tiêu nguy cơ SQL Injection bằng Parameterized Query.
+  2. Bắt lỗi từng bảng XML độc lập (`table_status`), ngăn Rule Engine trả về PASSED khi bảng dữ liệu phụ thuộc bị lỗi truy vấn (trả về INCOMPLETE_DATA).
+  3. Cập nhật bộ lọc lấy ca chưa gửi xử lý đúng 3-valued logic SQL (`or_(Record.status != 'RESOLVED', Record.status.is_(None))`) và validate `doi_soat_date`.
+  4. Chuẩn hóa Catalog thành 123 quy tắc (116 quy tắc logic gốc + 7 nhóm quy tắc CTN 4750).
+  5. Cập nhật in-place dict `CURRENT_VALIDATION_PROGRESS` và bảo vệ trạng thái `CANCELLED` khi dừng giữa chừng / batch cuối.
+  6. Bổ sung Regression Test thực tế cho Nhánh A (`compare_service.process_comparison`) và kiểm thử an toàn.
+
+### Thay đổi
+- `web_app/xml_validator_v2/source_adapter.py`:
+  - Thay f-string chứa dấu `\` bằng Parameterized Query chuẩn ODBC: `WHERE MA_LK IN (?, ?, ?)` với `cur.execute(sql, tuple(chunk))`.
+  - Quản lý trạng thái đọc từng bảng XML (`SUCCESS`, `EMPTY`, `ERROR`), trả về tuple `(results, table_status)` từ `fetch_xml_batch`.
+- `web_app/xml_validator_v2/rule_models.py`:
+  - Thêm trường `table_fetch_status` và method `is_table_error(table_name)` vào `CaseXmlData`.
+- `web_app/xml_validator_v2/rules/rules_4750_ctn.py`:
+  - `CTN_XML8_APPLICABILITY` và `CTN_XML14_APPOINTMENT_DATE` trả về `RuleStatus.INCOMPLETE_DATA` khi bảng XML8/XML14 gặp lỗi truy vấn.
+- `web_app/xml_validator_v2/validation_service.py`:
+  - Nhận tuple `(xml_dict, table_status)` và truyền `table_fetch_status` vào `CaseXmlData`.
+  - Sử dụng `.clear()` và `.update()` cho `CURRENT_VALIDATION_PROGRESS` để giữ nguyên tham chiếu đối tượng trên toàn app.
+  - Bảo vệ trạng thái `CANCELLED` sau vòng lặp chunk, không để bị ghi đè thành `COMPLETED`.
+- `web_app/xml_validator_v2/router.py`:
+  - Sử dụng `or_(Record.status != 'RESOLVED', Record.status.is_(None))` trong bộ lọc ca chưa gửi.
+  - Bắt lỗi định dạng ngày `doi_soat_date` và ném `HTTPException(400)`.
+- `web_app/xml_validator_v2/catalog.py`:
+  - Cập nhật ghi chú 123 quy tắc kiểm tra XML.
+- `tests/test_safety_and_regression.py` & `tests/test_validation_integration.py`:
+  - Thêm `test_parameterized_query_syntax()`, `test_branch_a_regression_real_data()`, và `test_validator_cancellation_preservation()`.
+  - Cập nhật mock adapter trả về tuple `(res, table_status)`.
+
+### Nghiệp vụ ảnh hưởng
+- Không làm thay đổi hay ảnh hưởng đến bất kỳ luồng nghiệp vụ hiện hữu nào của Nhánh A.
+- Đảm bảo độ chính xác tuyệt đối khi thẩm định XML: không bỏ sót ca có status NULL, không kết luận PASSED sai khi bảng XML gặp sự cố mạng hoặc lỗi truy vấn SQL Server.
+
+### Kiểm tra
+- `python tests/test_safety_and_regression.py`: 6/6 tests PASSED.
+- `python tests/test_validation_integration.py`: PASSED (xuất Excel 7984 bytes).
+- `python tests/test_xml_v2.py`: PASSED.
+
 ## 2026-10-24 14:45 - Antigravity (Khắc Phục Sau Audit Độc Lập & Cập Nhật Hỗ Trợ Đầy Đủ 15 Bảng XML CSDL)
 
 ### Mục tiêu

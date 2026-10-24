@@ -239,25 +239,26 @@ def trigger_validation_run(
         # Lấy danh sách hồ sơ chưa gửi cổng từ đợt đối soát gần nhất trong bảng records (chỉ đọc)
         # BẮT BUỘC: chỉ lấy các ca chưa thành công (status != 'RESOLVED') thuộc đợt đối soát chỉ định hoặc gần nhất
         from models import Record
-        from sqlalchemy import func
+        from sqlalchemy import func, or_
 
         target_date_str = payload.get("doi_soat_date")
         target_date = None
         if target_date_str:
             try:
-                target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
-            except Exception:
-                pass
+                target_date = datetime.datetime.strptime(target_date_str.strip(), "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Ngày đối soát không đúng định dạng YYYY-MM-DD.")
 
+        unsent_filter = or_(Record.status != "RESOLVED", Record.status.is_(None))
         query = app_db.query(Record).filter(
             Record.type_group.in_(["FAIL", "LOI"]),
-            Record.status != "RESOLVED"
+            unsent_filter
         )
 
         if not target_date:
             latest_date = app_db.query(func.max(Record.ngay_doi_soat)).filter(
                 Record.type_group.in_(["FAIL", "LOI"]),
-                Record.status != "RESOLVED"
+                unsent_filter
             ).scalar()
             target_date = latest_date
 

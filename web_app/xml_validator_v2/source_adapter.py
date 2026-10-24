@@ -1,6 +1,6 @@
 import os
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import pandas as pd
 from services.his_service import get_conn, discard_conn, build_conn_str, SQL_QUERY_TIMEOUT_SECONDS, SQL_CONNECT_TIMEOUT_SECONDS
 
@@ -67,16 +67,19 @@ class XmlSourceAdapter:
             pass
         return conn
 
-    def fetch_xml_batch(self, ma_lk_list: List[str], chunk_size: int = 50) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+    def fetch_xml_batch(self, ma_lk_list: List[str], chunk_size: int = 50) -> Tuple[Dict[str, Dict[str, List[Dict[str, Any]]]], Dict[str, Dict[str, Any]]]:
         """
-        Truy vấn dữ liệu XML của tập MA_LK theo lô (batch).
-        Trả về dict: { ma_lk: { 'XML1': [rows], 'XML2': [rows], ... } }
+        Truy vấn dữ liệu XML của tập MA_LK theo lô (batch) bằng Parameterized Query an toàn.
+        Trả về tuple: (results, table_status)
+        - results: { ma_lk: { 'XML1': [rows], 'XML2': [rows], ... } }
+        - table_status: { 'XML1': {'status': 'SUCCESS'|'EMPTY'|'ERROR', 'rows_count': int, 'error': str}, ... }
         """
         clean_keys = [str(k).strip() for k in ma_lk_list if str(k).strip()]
         if not clean_keys:
-            return {}
+            return {}, {}
 
         results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {k: {} for k in clean_keys}
+        table_status: Dict[str, Dict[str, Any]] = {}
         conn = None
         try:
             conn = self.get_connection()
@@ -93,22 +96,31 @@ class XmlSourceAdapter:
             if not tables_to_query:
                 tables_to_query = DEFAULT_XML_TABLES
 
+            for tbl in tables_to_query:
+                tbl_short = tbl.split("_")[0].upper()
+                table_status[tbl_short] = {"status": "EMPTY", "rows_count": 0, "error": ""}
+
             for i in range(0, len(clean_keys), chunk_size):
                 chunk = clean_keys[i:i + chunk_size]
-                quoted_keys = ", ".join([f"'{k.replace('\'', '\'\'')}'" for k in chunk])
+                # Sử dụng Parameterized Query chuẩn của ODBC (?, ?, ?)
+                # Tương thích 100% với Python 3.10, 3.11, 3.12, 3.13+ và chống SQL Injection
+                placeholders = ", ".join(["?"] * len(chunk))
 
                 for tbl in tables_to_query:
-                    # Chuẩn hóa tên viết tắt: XML1_CV130 -> XML1
                     tbl_short = tbl.split("_")[0].upper()
                     
                     # CHỈ THỰC HIỆN CÂU LỆNH SELECT, WITH (NOLOCK) ĐỂ TRÁNH LOCK BẢNG NGHIỆP VỤ
-                    sql = f"SELECT * FROM dbo.{tbl} WITH (NOLOCK) WHERE MA_LK IN ({quoted_keys})"
+                    sql = f"SELECT * FROM dbo.{tbl} WITH (NOLOCK) WHERE MA_LK IN ({placeholders})"
                     cur = None
                     try:
                         cur = conn.cursor()
-                        cur.execute(sql)
+                        cur.execute(sql, tuple(chunk))
                         cols = [c[0] for c in cur.description] if cur.description else []
                         rows = cur.fetchall()
+                        if rows:
+                            table_status[tbl_short]["status"] = "SUCCESS"
+                            table_status[tbl_short]["rows_count"] += len(rows)
+
                         for row in rows:
                             row_dict = {}
                             for idx, col in enumerate(cols):
@@ -126,8 +138,11 @@ class XmlSourceAdapter:
                                     results[row_lk][tbl_short] = []
                                 results[row_lk][tbl_short].append(row_dict)
                     except Exception as q_err:
-                        # Bảng có thể chưa tồn tại hoặc rỗng, tiếp tục bảng khác
-                        print(f"[-] [XmlSourceAdapter] Không truy vấn được bảng {tbl}: {q_err}")
+                        # Bảng có thể chưa tồn tại hoặc rỗng, ghi nhận lỗi rõ ràng
+                        err_msg = str(q_err)
+                        print(f"[-] [XmlSourceAdapter] Không truy vấn được bảng {tbl}: {err_msg}")
+                        table_status[tbl_short]["status"] = "ERROR"
+                        table_status[tbl_short]["error"] = err_msg
                     finally:
                         if cur:
                             try:
@@ -142,4 +157,4 @@ class XmlSourceAdapter:
                 except Exception:
                     pass
 
-        return results
+        return results, table_status
