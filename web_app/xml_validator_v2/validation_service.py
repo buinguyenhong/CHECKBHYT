@@ -2,6 +2,7 @@ import os
 import json
 import time
 import datetime
+from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,18 @@ from .db import ValSessionLocal, init_val_db
 from .source_adapter import XmlSourceAdapter
 from .rule_models import CaseXmlData
 from .rule_engine import ValidationEngine
+
+def _json_serialize_xml_value(obj: Any) -> Any:
+    """Hỗ trợ serialize an toàn các kiểu dữ liệu từ CSDL (Decimal, date, datetime, bytes) sang JSON."""
+    if isinstance(obj, Decimal):
+        if obj % 1 == 0:
+            return int(obj)
+        return float(obj)
+    elif isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    elif isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="ignore")
+    return str(obj)
 
 # Biến theo dõi tiến trình trong bộ nhớ để phục vụ giao diện
 CURRENT_VALIDATION_PROGRESS = {
@@ -199,7 +212,7 @@ def run_validation_job(
                     ma_y_te=case_info.get("ma_y_te", ""),
                     ngay_ra_vien=case_info.get("ngay_ra_vien") if isinstance(case_info.get("ngay_ra_vien"), datetime.date) else None,
                     xml_tables_found=tbl_names_found,
-                    raw_snapshot_json=json.dumps(case_xml_tables, ensure_ascii=False)
+                    raw_snapshot_json=json.dumps(case_xml_tables, ensure_ascii=False, default=_json_serialize_xml_value)
                 )
                 db.add(snapshot)
 

@@ -1283,6 +1283,7 @@ Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bện
 
 ### 22.4. Tác nghiệp Chọn Hồ Sơ và Quản lý Tiến trình
 - **Bộ lọc ca chưa gửi chính xác (Xử lý 3-valued logic SQL):** Lọc ca chưa gửi từ bảng `records` sử dụng `Record.type_group.in_(["FAIL", "LOI"])` kết hợp `or_(Record.status != 'RESOLVED', Record.status.is_(None))` để không bao giờ bỏ sót các ca mới chưa gán status hoặc có status là NULL. Validate nghiêm ngặt định dạng ngày `doi_soat_date`.
+- **Tuần tự hóa an toàn Snapshot (Xử lý Decimal, Datetime, Bytes):** Dữ liệu các bảng XML truy vấn từ SQL Server chứa các trường `NUMERIC`/`DECIMAL`/`MONEY` (được thư viện `pyodbc` chuyển thành `Decimal`) và `datetime`. Khi lưu `raw_snapshot_json` vào `val_case_snapshots`, hệ thống sử dụng hàm định dạng `_json_serialize_xml_value` tự động ép `Decimal` sang số (`int`/`float`), `datetime`/`date` sang ISO string và giải mã `bytes`, loại bỏ triệt để ngoại lệ `TypeError: Object of type Decimal is not JSON serializable`.
 - **Bảo toàn trạng thái hủy tiến trình:** Quản lý tiến trình qua đối tượng `CURRENT_VALIDATION_PROGRESS` dùng `.clear()` và `.update()` in-place. Nếu người dùng bấm "Hủy", trạng thái `CANCELLED` được bảo toàn và ghi nhận vĩnh viễn vào CSDL, không bao giờ bị ghi đè thành `COMPLETED`.
 
 ### 22.5. Xuất Báo cáo Excel Chuyên dụng

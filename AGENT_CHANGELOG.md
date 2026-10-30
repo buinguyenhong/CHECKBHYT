@@ -56,6 +56,30 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-30 14:55 - Antigravity (Khắc phục Lỗi JSON Serialization Đối tượng Decimal / Datetime Khi Lưu Snapshot Tab 9 XML Validator V2)
+
+### Mục tiêu
+- Xử lý lỗi `0% - Lỗi thực thi: Object of type Decimal is not JSON serializable` khi bấm chạy kiểm tra XML tại Tab 9.
+- Đảm bảo việc tuần tự hóa (serialization) các đối tượng dữ liệu đọc từ SQL Server (`Decimal`, `datetime.date`, `datetime.datetime`, `bytes`) vào trường `raw_snapshot_json` của bảng `val_case_snapshots` diễn ra an toàn, không làm gián đoạn tiến trình kiểm tra ngầm.
+
+### Thay đổi
+- `web_app/xml_validator_v2/validation_service.py`:
+  - Thêm hàm serialize an toàn `_json_serialize_xml_value(obj: Any)`:
+    - Ép `Decimal` về `int` (nếu là số nguyên) hoặc `float`.
+    - Ép `date` / `datetime` về chuỗi chuẩn ISO format (`isoformat()`).
+    - Giải mã `bytes` sang chuỗi UTF-8.
+  - Cập nhật lệnh tạo `ValCaseSnapshot`: `raw_snapshot_json=json.dumps(case_xml_tables, ensure_ascii=False, default=_json_serialize_xml_value)`.
+- `tests/test_xml_v2.py`:
+  - Bổ sung hàm kiểm thử `test_json_snapshot_serialization_with_decimal_and_datetime()` xác thực tính toàn vẹn của dữ liệu sau khi serialize và deserialize đối với `Decimal`, `datetime.date`, `datetime.datetime` và `bytes`.
+
+### Nghiệp vụ ảnh hưởng
+- Tiến trình kiểm tra XML V2 (Tab 9) chạy trơn tru qua toàn bộ các ca bệnh mà không bị sụp đổ (FAILED) bởi kiểu dữ liệu tiền tệ, số lượng hay thời gian từ SQL Server.
+
+### Kiểm tra
+- `tests/test_xml_v2.py`: 9/9 tests PASSED (bao gồm `test_json_snapshot_serialization_with_decimal_and_datetime`).
+- `tests/test_safety_and_regression.py`: 9/9 tests PASSED.
+- `tests/test_validation_integration.py`: PASSED.
+
 ## 2026-10-30 10:10 - Antigravity (Bổ sung Đọc Trực Tiếp Openpyxl Kiểm Tra cell.value / cell.data_type / cell.number_format & Đối Chiếu Nguồn Tin Cậy HIS Cho MA_LK)
 
 ### Mục tiêu

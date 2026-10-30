@@ -7,6 +7,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "web_app"))
 from xml_validator_v2.rule_models import CaseXmlData, RuleStatus
 from xml_validator_v2.rule_engine import ValidationEngine
 from xml_validator_v2.rules import check_rules_9324, check_rules_4210, check_rules_4750
+from xml_validator_v2.validation_service import _json_serialize_xml_value
+import json
+import datetime
 
 def test_missing_xml():
     engine = ValidationEngine()
@@ -214,6 +217,27 @@ def test_projected_columns_and_extended_4750_rules():
     assert res_4750["39"].status == RuleStatus.VIOLATED
     assert res_4750["118"].status == RuleStatus.VIOLATED
 
+def test_json_snapshot_serialization_with_decimal_and_datetime():
+    raw_data = {
+        "XML1": [
+            {
+                "MA_LK": "26.012345",
+                "T_TONGCHI": Decimal("150000.50"),
+                "T_BHTT": Decimal("120000"),
+                "NGAY_VAO": datetime.datetime(2026, 10, 30, 8, 30, 0),
+                "NGAY_RA": datetime.date(2026, 10, 30),
+                "RAW_BYTES": b"BHYT_CHECK"
+            }
+        ]
+    }
+    dumped = json.dumps(raw_data, ensure_ascii=False, default=_json_serialize_xml_value)
+    loaded = json.loads(dumped)
+    assert loaded["XML1"][0]["T_TONGCHI"] == 150000.50
+    assert loaded["XML1"][0]["T_BHTT"] == 120000
+    assert loaded["XML1"][0]["NGAY_VAO"] == "2026-10-30T08:30:00"
+    assert loaded["XML1"][0]["NGAY_RA"] == "2026-10-30"
+    assert loaded["XML1"][0]["RAW_BYTES"] == "BHYT_CHECK"
+
 if __name__ == "__main__":
     test_missing_xml()
     print("test_missing_xml: PASSED")
@@ -231,5 +255,7 @@ if __name__ == "__main__":
     print("test_ctn_4750_rules: PASSED")
     test_projected_columns_and_extended_4750_rules()
     print("test_projected_columns_and_extended_4750_rules: PASSED")
+    test_json_snapshot_serialization_with_decimal_and_datetime()
+    print("test_json_snapshot_serialization_with_decimal_and_datetime: PASSED")
     print("ALL UNIT TESTS IN test_xml_v2.py PASSED!")
 
