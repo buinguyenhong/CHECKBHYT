@@ -656,7 +656,8 @@ class PortalAutomationService:
 
         for i, file_p in enumerate(files):
             try:
-                df = pd.read_excel(file_p, dtype=str)
+                from services.excel_service import read_excel_preserving_ma_lk
+                df = read_excel_preserving_ma_lk(file_p)
                 if not df.empty:
                     total_data_rows += len(df)
                     all_dfs.append(df)
@@ -1288,11 +1289,13 @@ class PortalAutomationService:
 
                     log(f"📂 Đang gộp 2 danh sách Excel (Đã đề nghị: {rows_da} dòng, Chưa đề nghị: {rows_chua} dòng)...")
                     try:
-                        df_da = pd.read_excel(temp_da_path, dtype=str)
+                        from services.excel_service import read_excel_preserving_ma_lk
+                        df_da = read_excel_preserving_ma_lk(temp_da_path)
                     except Exception:
                         df_da = pd.DataFrame()
                     try:
-                        df_chua = pd.read_excel(temp_chua_path, dtype=str)
+                        from services.excel_service import read_excel_preserving_ma_lk
+                        df_chua = read_excel_preserving_ma_lk(temp_chua_path)
                     except Exception:
                         df_chua = pd.DataFrame()
 

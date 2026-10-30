@@ -56,6 +56,32 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-30 10:10 - Antigravity (Bổ sung Đọc Trực Tiếp Openpyxl Kiểm Tra cell.value / cell.data_type / cell.number_format & Đối Chiếu Nguồn Tin Cậy HIS Cho MA_LK)
+
+### Mục tiêu
+- Triển khai cơ chế bảo vệ kép cho cột `MA_LK` / `Mã liên kết` khi đọc từ các tệp Excel (`HoSoLoiChiTiet.xlsx`, `listbh.xlsx`, các tệp lỗi con):
+  1. Đọc trực tiếp bằng `openpyxl` và kiểm tra bộ 3 thuộc tính `cell.value`, `cell.data_type`, `cell.number_format`: Nếu ô Excel đã bị lưu dưới dạng số (`data_type == 'n'`, ví dụ `26.03553`) nhưng có định dạng hiển thị thập phân cố định (`number_format == '0.000000'`), khôi phục chính xác chữ số `0` hiển thị ở cuối (`'26.035530'`).
+  2. Nếu ô lưu dạng số với định dạng `General` (không có căn cứ độ dài thập phân trong ô): Tuyệt đối không tự ý thêm số `0` lúc đọc; chỉ ánh xạ khôi phục khi đối chiếu có căn cứ xác thực duy nhất với tập `MA_LK` nguồn đáng tin cậy từ SQL Server HIS (`current_sql_keys` / `Record.ma_lk`).
+  3. Bổ sung unit test kiểm chứng cả 2 trường hợp: ô Excel lưu dạng chuỗi và ô Excel lưu dạng số (có/không có `number_format` hiển thị thêm số `0`, có/không có nguồn đối chiếu HIS).
+
+### Thay đổi
+- `web_app/services/excel_service.py`:
+  - Thêm hàm `extract_cell_text_openpyxl(cell)` kiểm tra trực tiếp `cell.value`, `cell.data_type`, `cell.number_format` bằng `Decimal.quantize()`.
+  - Thêm hàm `read_excel_preserving_ma_lk(file_source)` kết hợp `pandas` và `openpyxl` trên các cột khóa `MA_LK` / `Mã liên kết`.
+  - Thêm hàm `build_trusted_numeric_ma_lk_map(trusted_keys)` và `resolve_ma_lk_against_trusted_set(ma_lk, trusted_keys, numeric_map)` để đối chiếu an toàn với tập `MA_LK` của SQL Server HIS (tự động từ chối nếu không có căn cứ hoặc có từ 2 mã nhập nhằng trở lên).
+- `web_app/services/compare_service.py` & `web_app/main.py`:
+  - Tích hợp `resolve_ma_lk_against_trusted_set` đối chiếu với `current_sql_keys` (trong `process_comparison`) và `active_records` (trong `upload_loi`).
+- `web_app/services/portal_automation.py`, `portal_downloader/downloader_server.py`, `client_runner/client_agent.py`:
+  - Tích hợp hàm đọc kiểm tra `openpyxl` (`read_excel_preserving_ma_lk` / `_read_excel_preserving_ma_lk`) vào luồng gộp file lỗi Luồng C và gộp danh sách Luồng B.
+- `tests/test_safety_and_regression.py`:
+  - Bổ sung test `test_ma_lk_excel_string_and_numeric_formats()` kiểm tra đầy đủ: ô chuỗi (`data_type='s'`), ô số có `number_format='0.000000'`, ô số `General` không có căn cứ (không tự thêm `0`), ô số `General` đối chiếu khớp duy nhất với HIS (`'26.01122'` -> `'26.011220'`), và trường hợp nhập nhằng (ambiguous).
+
+### Nghiệp vụ ảnh hưởng
+- Đảm bảo khôi phục chính xác `MA_LK` ngay cả khi tệp Excel đầu vào đã bị lưu dưới dạng số kèm custom format hoặc bị Excel cắt số `0` khi người dùng mở/lưu thủ công trước khi upload, đồng thời tuân thủ nghiêm ngặt nguyên tắc không tự ý thêm số `0` nếu không có căn cứ xác thực.
+
+### Kiểm tra
+- `.\.venv\Scripts\python.exe tests/test_safety_and_regression.py`: 9/9 tests PASSED (bao gồm `test_ma_lk_excel_string_and_numeric_formats`).
+
 ## 2026-10-30 09:33 - Antigravity (Khắc phục Lỗi Mất Số 0 Ở Cuối MA_LK Khi Gộp & Đọc File Excel Tự Động HoSoLoiChiTiet.xlsx và listbh.xlsx)
 
 ### Mục tiêu

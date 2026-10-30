@@ -228,6 +228,70 @@ def test_chunk_error_isolation_and_no_overwrite():
     assert "XML4" in XML_TABLE_COLUMNS
     assert len(XML_TABLE_COLUMNS["XML4"]) < 15, "XML4 phải được thu gọn số cột để tối ưu RAM/IO!"
 
+def test_ma_lk_excel_string_and_numeric_formats():
+    """
+    Kiểm thử toàn diện việc đọc & đối chiếu cột MA_LK / Mã liên kết từ Excel:
+    1. Ô Excel lưu dạng chuỗi (data_type == 's', value='26.035530') -> bảo toàn '26.035530'.
+    2. Ô Excel lưu dạng số (data_type == 'n', value=26.03553) có number_format='0.000000' ->
+       openpyxl khôi phục đúng chữ số 0 hiển thị thành '26.035530' (trong khi dtype=str đơn thuần sẽ bị cụt).
+    3. Ô Excel lưu dạng số (data_type == 'n', value=26.01122, number_format='General'):
+       - Nếu không có căn cứ nguồn tin cậy (trusted_keys) -> KHÔNG tự ý thêm số 0 ('26.01122').
+       - Nếu nguồn tin cậy bị nhập nhằng ('26.011220' và '26.0112200') -> KHÔNG tự ý đoán ('26.01122').
+       - Nếu nguồn tin cậy SQL HIS có duy nhất mã '26.011220' -> khôi phục chuẩn xác về '26.011220'.
+    """
+    import openpyxl
+    from io import BytesIO
+    from services import excel_service
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["MA_GD", "MALOI", "MA_CSKCB", "MOTALOI", "MA_LK"])
+
+    # Dòng 2: Ô lưu dạng chuỗi (data_type='s')
+    ws.append(["GD1", "XML1", "66232", "Lỗi 1", "26.035530"])
+    ws.cell(row=2, column=5).data_type = "s"
+    ws.cell(row=2, column=5).number_format = "@"
+
+    # Dòng 3: Ô lưu dạng số (float 26.03597) nhưng có định dạng hiển thị 6 chữ số thập phân '0.000000'
+    ws.append(["GD2", "XML2", "66232", "Lỗi 2", 26.03597])
+    ws.cell(row=3, column=5).number_format = "0.000000"
+
+    # Dòng 4: Ô lưu dạng số (float 26.01122) với định dạng General (không có thông tin độ dài thập phân trong ô)
+    ws.append(["GD3", "XML3", "66232", "Lỗi 3", 26.01122])
+    ws.cell(row=4, column=5).number_format = "General"
+
+    # Dòng 5: Ô lưu dạng số (float 26.09999) không có trong nguồn HIS
+    ws.append(["GD4", "XML4", "66232", "Lỗi 4", 26.09999])
+    ws.cell(row=5, column=5).number_format = "General"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    # A. Đọc khi KHÔNG truyền trusted_keys:
+    df_no_trust = excel_service.load_hosoloichitiet(buf)
+    malk_list = df_no_trust["MA_LK"].tolist()
+    assert malk_list[0] == "26.035530", f"Expected string cell '26.035530', got {malk_list[0]}"
+    assert malk_list[1] == "26.035970", f"Expected formatted numeric cell '26.035970', got {malk_list[1]}"
+    assert malk_list[2] == "26.01122", f"Must NOT blindly pad zero without evidence, got {malk_list[2]}"
+    assert malk_list[3] == "26.09999", f"Must NOT blindly pad zero without evidence, got {malk_list[3]}"
+
+    # B. Đọc khi có trusted_keys đáng tin cậy từ SQL Server HIS:
+    buf.seek(0)
+    trusted_his_keys = {"26.035530", "26.035970", "26.011220", "TN.2608.0000123"}
+    df_with_trust = excel_service.load_hosoloichitiet(buf, trusted_keys=trusted_his_keys)
+    malk_trusted = df_with_trust["MA_LK"].tolist()
+    assert malk_trusted[0] == "26.035530"
+    assert malk_trusted[1] == "26.035970"
+    assert malk_trusted[2] == "26.011220", f"Should resolve '26.01122' -> '26.011220' via trusted HIS set, got {malk_trusted[2]}"
+    assert malk_trusted[3] == "26.09999", f"Unmatched numeric code must remain unchanged, got {malk_trusted[3]}"
+
+    # C. Kiểm tra trường hợp nhập nhằng (ambiguous): cả '26.011220' và '26.0112200' cùng tồn tại
+    ambiguous_keys = {"26.011220", "26.0112200"}
+    res_ambig = excel_service.resolve_ma_lk_against_trusted_set("26.01122", ambiguous_keys)
+    assert res_ambig == "26.01122", f"Ambiguous match must NOT guess, got {res_ambig}"
+
+
 if __name__ == "__main__":
     test_sql_safety_source_adapter()
     print("test_sql_safety_source_adapter: PASSED")
@@ -245,4 +309,6 @@ if __name__ == "__main__":
     print("test_rule_dependency_error_demotion: PASSED")
     test_chunk_error_isolation_and_no_overwrite()
     print("test_chunk_error_isolation_and_no_overwrite: PASSED")
+    test_ma_lk_excel_string_and_numeric_formats()
+    print("test_ma_lk_excel_string_and_numeric_formats: PASSED")
     print("ALL SAFETY & REGRESSION CHECKS PASSED!")

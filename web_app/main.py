@@ -1032,9 +1032,12 @@ async def upload_loi(
         if last_record and not df.empty:
             target_date = last_record.ngay_doi_soat
             # Chuyển df thành dictionary để tra cứu nhanh O(1)
+            active_records_pre = db.query(Record).filter(Record.ngay_doi_soat == target_date, Record.status != "RESOLVED").all()
+            trusted_keys_upload = {his_service.chuan_hoa_ma_lk(r.ma_lk).upper() for r in active_records_pre if r.ma_lk}
+            num_map_upload = excel_service.build_trusted_numeric_ma_lk_map(trusted_keys_upload)
             error_map = {}
             for _, row in df.iterrows():
-                lk = his_service.chuan_hoa_ma_lk(row["MA_LK"])
+                lk = excel_service.resolve_ma_lk_against_trusted_set(row["MA_LK"], trusted_keys_upload, num_map_upload)
                 if lk:
                     error_map[lk] = {
                         "maloi": str(row.get("MALOI", "")).strip(),

@@ -4,6 +4,7 @@ import re
 from sqlalchemy import func
 from models import Record, RecordLog, ErrorHistoryArchive
 from services.his_service import chuan_hoa_ma_lk
+from services.excel_service import build_trusted_numeric_ma_lk_map, resolve_ma_lk_against_trusted_set
 
 def sync_archive_error(db: Session, rec: Record, resolved: bool = False, resolved_by: str = "system", note: str = ""):
     """Đồng bộ hoặc ghi mới bản ghi lỗi vào bảng lưu trữ vĩnh viễn error_history_archive."""
@@ -213,13 +214,20 @@ def process_comparison(
     # 1. Chuyển tập hợp danh sách đã gửi thành set để tìm kiếm nhanh O(1)
     sent_keys = set()
     if not df_listbh.empty:
-        sent_keys = set(df_listbh["MA_LK"].dropna().astype(str).map(lambda x: chuan_hoa_ma_lk(x).upper()))
+        sent_num_map = build_trusted_numeric_ma_lk_map(current_sql_keys)
+        sent_keys = set(
+            df_listbh["MA_LK"].dropna().astype(str).map(
+                lambda x: resolve_ma_lk_against_trusted_set(x, current_sql_keys, sent_num_map)
+            )
+        )
 
     # 2. Xây dựng bản đồ lỗi (ma_lk -> DANH SÁCH các dòng lỗi chi tiết đã lọc trùng)
     error_map = {}
     if not df_hsloi.empty:
+        err_num_map = build_trusted_numeric_ma_lk_map(current_sql_keys)
         for _, row in df_hsloi.iterrows():
-            lk = chuan_hoa_ma_lk(row["MA_LK"]).upper()
+            pass
+            lk = resolve_ma_lk_against_trusted_set(row["MA_LK"], current_sql_keys, err_num_map)
             if lk:
                 maloi = str(row.get("MALOI", "")).strip().upper()
                 motaloi = clean_error_desc(str(row.get("MOTALOI", "")))

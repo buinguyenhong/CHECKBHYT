@@ -518,6 +518,47 @@ def download_direct_record(page, ma_gd: str, stt: int, save_dir: str, max_retrie
                 add_log(f"❌ [STT {stt}] Thất bại sau {max_retries} lần thử: {ma_gd}")
                 return None
 
+def _read_excel_preserving_ma_lk(file_path: str) -> pd.DataFrame:
+    df = pd.read_excel(file_path, dtype=str)
+    if df.empty:
+        return df
+    try:
+        import openpyxl
+        from decimal import Decimal
+        wb = openpyxl.load_workbook(file_path, data_only=True)
+        ws = wb.active
+        headers = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
+        for idx, h_cell in enumerate(headers):
+            h_name = str(h_cell.value or "").strip()
+            if h_name.lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"} and h_name in df.columns:
+                vals = []
+                for row in ws.iter_rows(min_row=2, min_col=idx + 1, max_col=idx + 1, values_only=False):
+                    c = row[0]
+                    v = c.value
+                    if v is None:
+                        vals.append("")
+                    elif c.data_type in ("s", "str", "inlineStr") or isinstance(v, str):
+                        vals.append(str(v).strip())
+                    elif c.data_type == "n" or isinstance(v, (int, float)):
+                        fmt = str(getattr(c, "number_format", "") or "").split(";")[0].strip()
+                        m = re.search(r"[0#]\.([0#]+)", fmt) if fmt.lower() not in ("", "general", "@") else None
+                        if m and len(m.group(1).rstrip("#")) > 0:
+                            dec_len = len(m.group(1).rstrip("#"))
+                            vals.append(str(Decimal(str(v)).quantize(Decimal("1." + ("0" * dec_len)))))
+                        elif isinstance(v, float) and v.is_integer():
+                            vals.append(str(int(v)))
+                        else:
+                            vals.append(str(v).strip())
+                    else:
+                        vals.append(str(v).strip())
+                if len(vals) >= len(df):
+                    df[h_name] = vals[:len(df)]
+        wb.close()
+    except Exception:
+        pass
+    return df
+
+
 def merge_excel_files(download_dir: str, output_file_path: str) -> Dict[str, Any]:
     files = [
         os.path.join(download_dir, f)
@@ -536,7 +577,7 @@ def merge_excel_files(download_dir: str, output_file_path: str) -> Dict[str, Any
 
     for i, file_p in enumerate(files):
         try:
-            df = pd.read_excel(file_p, dtype=str)
+            df = _read_excel_preserving_ma_lk(file_p)
             if not df.empty:
                 total_data_rows += len(df)
                 all_dfs.append(df)
@@ -1032,9 +1073,9 @@ def run_flow_b(params: dict) -> dict:
                 rows_chua = select_status_and_download("Chưa đề nghị thanh toán", temp_chua_path)
 
                 add_log(f"📂 Đang gộp 2 danh sách Excel (Đã đề nghị: {rows_da} dòng, Chưa đề nghị: {rows_chua} dòng)...")
-                try: df_da = pd.read_excel(temp_da_path, dtype=str)
+                try: df_da = _read_excel_preserving_ma_lk(temp_da_path)
                 except Exception: df_da = pd.DataFrame()
-                try: df_chua = pd.read_excel(temp_chua_path, dtype=str)
+                try: df_chua = _read_excel_preserving_ma_lk(temp_chua_path)
                 except Exception: df_chua = pd.DataFrame()
 
                 df_merged = pd.concat([df_da, df_chua], ignore_index=True)

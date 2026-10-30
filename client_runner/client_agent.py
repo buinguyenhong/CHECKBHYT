@@ -60,6 +60,47 @@ def parse_date_info(date_val):
         "iso": d_obj.strftime("%Y-%m-%d")    # 2026-08-01
     }
 
+def _read_excel_preserving_ma_lk(file_path: str) -> pd.DataFrame:
+    df = pd.read_excel(file_path, dtype=str)
+    if df.empty:
+        return df
+    try:
+        import openpyxl
+        from decimal import Decimal
+        wb = openpyxl.load_workbook(file_path, data_only=True)
+        ws = wb.active
+        headers = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
+        for idx, h_cell in enumerate(headers):
+            h_name = str(h_cell.value or "").strip()
+            if h_name.lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"} and h_name in df.columns:
+                vals = []
+                for row in ws.iter_rows(min_row=2, min_col=idx + 1, max_col=idx + 1, values_only=False):
+                    c = row[0]
+                    v = c.value
+                    if v is None:
+                        vals.append("")
+                    elif c.data_type in ("s", "str", "inlineStr") or isinstance(v, str):
+                        vals.append(str(v).strip())
+                    elif c.data_type == "n" or isinstance(v, (int, float)):
+                        fmt = str(getattr(c, "number_format", "") or "").split(";")[0].strip()
+                        m = re.search(r"[0#]\.([0#]+)", fmt) if fmt.lower() not in ("", "general", "@") else None
+                        if m and len(m.group(1).rstrip("#")) > 0:
+                            dec_len = len(m.group(1).rstrip("#"))
+                            vals.append(str(Decimal(str(v)).quantize(Decimal("1." + ("0" * dec_len)))))
+                        elif isinstance(v, float) and v.is_integer():
+                            vals.append(str(int(v)))
+                        else:
+                            vals.append(str(v).strip())
+                    else:
+                        vals.append(str(v).strip())
+                if len(vals) >= len(df):
+                    df[h_name] = vals[:len(df)]
+        wb.close()
+    except Exception:
+        pass
+    return df
+
+
 ACTIVE_CLIENT_GUI = None
 
 
@@ -932,11 +973,11 @@ class ClientRPAGui:
 
                         self.log(f"📂 Đang gộp 2 danh sách Excel ({rows_da} dòng đã đề nghị + {rows_chua} dòng chưa đề nghị)...")
                         try:
-                            df_da = pd.read_excel(tmp_da, dtype=str)
+                            df_da = _read_excel_preserving_ma_lk(tmp_da)
                         except Exception:
                             df_da = pd.DataFrame()
                         try:
-                            df_chua = pd.read_excel(tmp_chua, dtype=str)
+                            df_chua = _read_excel_preserving_ma_lk(tmp_chua)
                         except Exception:
                             df_chua = pd.DataFrame()
 
@@ -1224,7 +1265,7 @@ class ClientRPAGui:
             for f in files:
                 try:
                     if os.path.getsize(f) > 0:
-                        df_item = pd.read_excel(f, dtype=str)
+                        df_item = _read_excel_preserving_ma_lk(f)
                         if not df_item.empty:
                             col_map = {}
                             for c in df_item.columns:

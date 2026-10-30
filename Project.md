@@ -1180,7 +1180,7 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
    - Sau khi click dòng: Đợi popup `#PopupNhanChiTietLoiHS_PW-0` và loading indicator bên trong nạp xong.
    - Tìm và click nút "Xuất Excel" bên trong popup với `expect_download`.
    - Đóng popup an toàn (`PopupNhanChiTietLoiHS.Hide()`) và đợi mask ẩn hẳn trước khi sang dòng tiếp theo.
-5. **Gom file bảo toàn chuỗi `MA_LK`, Thông báo hoàn tất & Đối soát C:** Đọc toàn bộ file Excel con với `pd.read_excel(..., dtype=str)` và gom thành `HoSoLoiChiTiet.xlsx` kèm khóa định dạng Text (`number_format = '@'`) để bảo toàn tuyệt đối chữ số `0` ở cuối của các mã `MA_LK` nội trú (ví dụ `26.011220`), tự động bật Modal Popup thông báo kết quả gom file kèm nút tải nhanh và kích hoạt đối soát CSDL HIS.
+5. **Gom file bảo toàn chuỗi `MA_LK` bằng `openpyxl` & Đối chiếu Nguồn Tin Cậy HIS (`trusted_keys`):** Đọc trực tiếp ô `MA_LK` / `Mã liên kết` bằng `openpyxl` (kiểm tra `cell.value`, `cell.data_type`, `cell.number_format` để khôi phục cả các ô lưu kiểu số có định dạng hiển thị thập phân như `0.000000`), gom thành `HoSoLoiChiTiet.xlsx` kèm khóa định dạng Text (`number_format = '@'`) và đối chiếu có căn cứ với tập `MA_LK` nguồn từ SQL Server HIS (`resolve_ma_lk_against_trusted_set` — không bao giờ tự ý thêm số `0` nếu không có căn cứ hoặc bị nhập nhằng).
 
 ### 19.5. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
 - Khi chạy Đối soát C: nếu một ca bệnh (`MA_LK`) vừa có trong danh sách đã gửi (`listbh`) nhưng lại xuất hiện trong file lỗi chi tiết (`HoSoLoiChiTiet.xlsx`):
