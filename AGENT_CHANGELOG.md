@@ -56,6 +56,83 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-10-30 09:33 - Antigravity (Khắc phục Lỗi Mất Số 0 Ở Cuối MA_LK Khi Gộp & Đọc File Excel Tự Động HoSoLoiChiTiet.xlsx và listbh.xlsx)
+
+### Mục tiêu
+- Xử lý triệt để lỗi một số mã liên kết nội trú (`MA_LK` dạng `26.011220`, `26.035530`, `26.035970`, `26.036060`) bị mất chữ số `0` ở cuối thành `26.01122`, `26.03553` sau khi tải tự động và gộp thành `HoSoLoiChiTiet.xlsx`.
+- Kiểm tra và phòng ngừa rủi ro tương tự đối với tệp `listbh.xlsx` (đặc biệt khi chạy chế độ "Tải gộp Chưa đề nghị" hoặc khi đọc file chỉ chứa ca nội trú).
+
+### Thay đổi
+- `web_app/services/portal_automation.py`:
+  - Trong `merge_excel_files` (Luồng C) và `run_flow_b` (Luồng B tải gộp): Bổ sung `dtype=str` vào `pd.read_excel(..., dtype=str)` để ngăn `pandas` tự động ép cột `MA_LK` / `Mã liên kết` của các tệp con nội trú sang kiểu số thực `float64`.
+  - Khi ghi ra `HoSoLoiChiTiet.xlsx` và `listbh.xlsx` (chế độ gộp), sử dụng `pd.ExcelWriter(..., engine="openpyxl")` và khóa `cell.number_format = "@"` (Text) cho toàn bộ các ô chuỗi để Microsoft Excel không tự đổi thành số.
+- `portal_downloader/downloader_server.py`:
+  - Đồng bộ `pd.read_excel(..., dtype=str)` và định dạng `cell.number_format = "@"` tại `merge_excel_files` và `run_flow_b`.
+- `client_runner/client_agent.py`:
+  - Đồng bộ `pd.read_excel(..., dtype=str)` và định dạng `cell.number_format = "@"` tại `_run_flow_b_worker` và `_run_flow_c_worker`.
+- `web_app/services/excel_service.py` & `main.py`:
+  - Cập nhật `load_listbh()` và `load_hosoloichitiet()` sử dụng `pd.read_excel(..., dtype=str)` kèm `.fillna("")` cho `MALOI`, `MOTALOI`.
+- Khôi phục ngay tệp `web_app/uploaded_files/HoSoLoiChiTiet.xlsx` hiện có trên máy chủ bằng cách chạy lại hàm gộp từ 157 tệp gốc trong `web_app/uploaded_files/temp_errors/`.
+
+### Nghiệp vụ ảnh hưởng
+- Bảo toàn 100% giá trị gốc của `MA_LK` / `Mã liên kết` (bao gồm các mã nội trú có chữ số `0` ở cuối như `26.011220`, `26.035530`, `26.035970`, `26.036060`), đảm bảo đối soát khớp chính xác tuyệt đối với `MA_LK` từ SQL Server HIS.
+
+### Kiểm tra
+- Chạy lại `portal_service.merge_excel_files` trên 157 tệp thực tế trong `temp_errors/`: Số ô kiểu float giảm từ 39 xuống **0 ô**, toàn bộ các mã có số `0` ở cuối (`'26.035530'`, `'26.035970'`, `'26.036060'`) được khôi phục nguyên vẹn với `data_type='s'` và `number_format='@'`.
+- `.\.venv\Scripts\python.exe tests/test_safety_and_regression.py`: 8/8 tests PASSED.
+
+### Lưu ý cho phiên sau
+- Không còn hạng mục tồn đọng.
+
+## 2026-10-30 08:00 - Antigravity (Khắc phục Lỗi P0 Column Projection, Nâng Độ Phủ Lên 113/123 Quy Tắc, Sửa Tuổi Rule 112 & Chuẩn Hóa Giao Diện Tab 9)
+
+### Mục tiêu
+- Hoàn thiện 4 hạng mục trọng tâm của Nhánh B — Hệ thống Kiểm tra XML Độc lập V2 tại Tab 9 theo phê duyệt của người dùng:
+  1. **Sửa lỗi P0 trong Column Projection (`source_adapter.py`):** Bổ sung các cột bắt buộc bị thiếu trong `XML_TABLE_COLUMNS` (`DIA_CHI`, `TINH_TRANG_RV`, `MUC_HUONG`, `MA_KHU_VUC`, `T_VANCHUYEN`, `T_GIUONG`, `PHAM_VI`, `TYLE_TT_BH`, `TYLE_TT_DV`, `THANH_TIEN_BV`, `THANH_TIEN_BH`, `T_NGOAIDS`, `NGAY_TH_YL`,...) để triệt tiêu lỗi báo sai (False Positive) ở quy tắc `CTN_REQ_XML1` khi chạy trên SQL Server thực tế.
+  2. **Mở rộng độ phủ quy tắc thực thi (từ 53/123 lên 113/123 quy tắc, >91%):** Cài đặt toàn bộ các quy tắc kiểm tra định dạng ngày tháng, thời gian logic, chi phí tài chính XML1/XML2/XML3 có thể đánh giá trực tiếp trên dữ liệu XML cho cả 3 chuẩn (9324: 12/12, 4210: 43/50, 4750: 51/54, CTN 4750: 7/7); đồng thời sửa công thức tính tuổi Rule 112/113 theo năm của `NGAY_VAO` và sửa lỗi `CTN_REQ_XML2` / `CTN_REQ_XML3` trả về rỗng khi hồ sơ không có thuốc/DVKT.
+  3. **Chuẩn hóa giao diện Tab 9 (`admin.html`) & API Test Kết Nối (`router.py`):** Thêm nút "🔌 Test kết nối CSDL XML" và API `POST /api/admin/xml-v2/test-connection`, sửa nhãn đếm số quy tắc trong dropdown `#xmlCatalogStdFilter`, và dọn dẹp 3 lời gọi hàm JS V1 cũ không còn tồn tại.
+  4. **Mở rộng kiểm thử & Đồng bộ 4 tài liệu kiến thức bắt buộc:** Bổ sung unit test kiểm tra khớp cột `XML_TABLE_COLUMNS` với `CTN_REQ_XML1..3` và đồng bộ `Project.md`, `INSTALL_WEB.md`, `xml_validation_tool_spec.md`, `AGENT_CHANGELOG.md`.
+
+### Thay đổi
+- `web_app/xml_validator_v2/source_adapter.py`:
+  - Bổ sung đầy đủ các cột nghiệp vụ vào `XML_TABLE_COLUMNS["XML1"]`, `XML_TABLE_COLUMNS["XML2"]`, `XML_TABLE_COLUMNS["XML3"]`.
+  - Bổ sung phương thức `test_connection(self) -> Tuple[bool, str]` kiểm tra kết nối Read-Only và đếm số bản ghi trên `dbo.XML1_CV130`.
+- `web_app/xml_validator_v2/rule_models.py`:
+  - Thêm hàm helper `is_valid_date_str(s)` (`YYYYMMDD`) và `is_valid_datetime_str(s)` (`YYYYMMDDHHMM` / `YYYYMMDD`).
+- `web_app/xml_validator_v2/rules/rules_9324.py`:
+  - Bổ sung quy tắc 9 (`NGAY_RA` hợp lệ), 10 (`SO_NGAY_DTri >= 0`), và 12 (đối chiếu `T_BHTT` khi có `MUC_HUONG`, hoặc trả về `INCOMPLETE_DATA` trung thực khi bảng XML1 chuẩn 9324 không có `MUC_HUONG`). Đạt 12/12 quy tắc.
+- `web_app/xml_validator_v2/rules/rules_4210.py`:
+  - Mở rộng từ 17 lên 43/50 quy tắc thực thi (bổ sung quy tắc 1, 9, 10, 14, 15, 19..24, 27, 34, 35, 39..55).
+- `web_app/xml_validator_v2/rules/rules_4750.py`:
+  - Mở rộng từ 20 lên 51/54 quy tắc thực thi (bổ sung quy tắc 1, 9, 10, 14, 15, 19..24, 27, 34, 35, 39, 40, 43, 44, 47..55, 108..111, 113, 115, 118, 119).
+  - Sửa công thức tính tuổi ở Rule 112 và 113: lấy năm của `NGAY_VAO[:4]` trừ năm của `NGAY_SINH[:4]` thay vì dùng `datetime.now().year`.
+- `web_app/xml_validator_v2/rules/rules_4750_ctn.py`:
+  - Hỗ trợ fallback `MA_LOAI_RV` cho `TINH_TRANG_RV` tại `CTN_REQ_XML1`.
+  - Đảm bảo `CTN_REQ_XML2` và `CTN_REQ_XML3` luôn trả về `RuleStatus.PASSED` khi `case.xml2` / `case.xml3` rỗng (bệnh nhân không phát sinh thuốc hoặc DVKT), tránh bị hạ nhầm xuống `INCOMPLETE_DATA`.
+- `web_app/xml_validator_v2/catalog.py`:
+  - Cập nhật `RULE_REQUIRED_TABLES_MAP` cho toàn bộ các quy tắc mới bổ sung (`12`, `39`..`56`, `105`, `106`, `115`, `118`, `119`).
+- `web_app/xml_validator_v2/router.py` & `web_app/templates/admin.html`:
+  - Thêm endpoint `POST /api/admin/xml-v2/test-connection` và nút "🔌 Test kết nối CSDL XML" (`testXmlDbConnection()`).
+  - Sửa nhãn bộ lọc chuẩn thành `Chuẩn 9324 (12 quy tắc)` và `Chuẩn 4210 (50 quy tắc)`.
+  - Xóa 3 lời gọi hàm JS V1 cũ (`checkXmlWatcherStatus`, `loadXmlConfig`, `setupXmlDragDrop`).
+- `tests/test_xml_v2.py`:
+  - Thêm test case `test_projected_columns_and_extended_4750_rules()` kiểm chứng trực tiếp dữ liệu chỉ chứa đúng các cột trong `XML_TABLE_COLUMNS` và kiểm tra tính tuổi Rule 112 theo năm `NGAY_VAO`.
+- `Project.md`, `INSTALL_WEB.md`, `xml_validation_tool_spec.md`:
+  - Đồng bộ kiến trúc thư mục `web_app/xml_validator_v2/`, danh sách REST API `/api/admin/xml-v2/*`, Column Projection và độ phủ 113/123 quy tắc.
+
+### Nghiệp vụ ảnh hưởng
+- Triệt tiêu hoàn toàn nguy cơ báo lỗi giả (False Positive) ở quy tắc `CTN_REQ_XML1` (`DIA_CHI`, `TINH_TRANG_RV`) khi chạy với Column Projection trên SQL Server.
+- Các hồ sơ chuẩn 4750 và 9324 hợp lệ, không phát sinh thuốc/DVKT (`xml2=[]`, `xml3=[]`) không còn bị hạ nhầm ở `CTN_REQ_XML2` / `CTN_REQ_XML3`.
+- Độ phủ quy tắc thực tế của Nhánh B tăng từ 43.1% (53/123) lên **91.9% (113/123)**; chỉ giữ lại 10 quy tắc thực sự cần bảng danh mục quốc gia ngoài XML ở trạng thái `INCOMPLETE_DATA`.
+
+### Kiểm tra
+- `.\.venv\Scripts\python.exe tests/test_xml_v2.py`: 8/8 unit tests PASSED.
+- `.\.venv\Scripts\python.exe tests/test_safety_and_regression.py`: 8/8 safety & regression tests PASSED.
+- `.\.venv\Scripts\python.exe tests/test_validation_integration.py`: Integration & Excel export tests PASSED.
+
+### Lưu ý cho phiên sau
+- Nếu bệnh viện bổ sung bảng danh mục dùng chung (ICD-10, danh mục thuốc/DVKT/hành chính của Bộ Y tế) vào CSDL nội bộ trong tương lai, có thể nối tiếp 10 quy tắc tra cứu danh mục còn lại (Rules 2, 3, 28, 29, 30, 32, 33, 41, 42, 45, 46, 105, 106).
+
 ## 2026-10-24 16:20 - Antigravity (Áp dụng Ma Trận Phụ Thuộc Bảng XML Xuyên Suốt, Trạng Thái Bảng Theo Từng Hồ Sơ, Column Projection & Đồng Bộ 123 Quy Tắc)
 
 ### Mục tiêu

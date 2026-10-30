@@ -656,7 +656,7 @@ class PortalAutomationService:
 
         for i, file_p in enumerate(files):
             try:
-                df = pd.read_excel(file_p)
+                df = pd.read_excel(file_p, dtype=str)
                 if not df.empty:
                     total_data_rows += len(df)
                     all_dfs.append(df)
@@ -688,7 +688,16 @@ class PortalAutomationService:
         duplicates_removed = total_data_rows - unique_data_rows
 
         log(f"💾 Đang ghi file Excel tổng hợp ra: {output_file_path}...")
-        unique_df.to_excel(output_file_path, index=False)
+        try:
+            with pd.ExcelWriter(output_file_path, engine="openpyxl") as writer:
+                unique_df.to_excel(writer, index=False, sheet_name="Sheet1")
+                ws = writer.sheets["Sheet1"]
+                for row in ws.iter_rows(min_row=2, values_only=False):
+                    for cell in row:
+                        if isinstance(cell.value, str):
+                            cell.number_format = "@"
+        except Exception:
+            unique_df.to_excel(output_file_path, index=False)
 
         log("🎉 GỘP HOÀN TẤT:")
         log(f"   - Tổng số file xử lý: {len(files)} file")
@@ -1241,7 +1250,7 @@ class PortalAutomationService:
 
                     c_rows = 0
                     try:
-                        df_check = pd.read_excel(dest_file_path)
+                        df_check = pd.read_excel(dest_file_path, dtype=str)
                         c_rows = len(df_check)
                     except Exception as de:
                         log(f"Kiểm tra file '{status_text}': {de}")
@@ -1279,16 +1288,25 @@ class PortalAutomationService:
 
                     log(f"📂 Đang gộp 2 danh sách Excel (Đã đề nghị: {rows_da} dòng, Chưa đề nghị: {rows_chua} dòng)...")
                     try:
-                        df_da = pd.read_excel(temp_da_path)
+                        df_da = pd.read_excel(temp_da_path, dtype=str)
                     except Exception:
                         df_da = pd.DataFrame()
                     try:
-                        df_chua = pd.read_excel(temp_chua_path)
+                        df_chua = pd.read_excel(temp_chua_path, dtype=str)
                     except Exception:
                         df_chua = pd.DataFrame()
 
                     df_merged = pd.concat([df_da, df_chua], ignore_index=True)
-                    df_merged.to_excel(final_dest_path, index=False)
+                    try:
+                        with pd.ExcelWriter(final_dest_path, engine="openpyxl") as writer:
+                            df_merged.to_excel(writer, index=False, sheet_name="Sheet1")
+                            ws = writer.sheets["Sheet1"]
+                            for row in ws.iter_rows(min_row=2, values_only=False):
+                                for cell in row:
+                                    if isinstance(cell.value, str):
+                                        cell.number_format = "@"
+                    except Exception:
+                        df_merged.to_excel(final_dest_path, index=False)
                     total_rows = len(df_merged)
 
                     detail_msg = f"Tải và gộp thành công {total_rows} bản ghi Tháng {target_month} (Đã đề nghị: {rows_da}, Chưa đề nghị: {rows_chua})."

@@ -14,21 +14,35 @@ DEFAULT_XML_TABLES = [
 # Danh mục các cột cần thiết cho từng bảng XML nhằm tối ưu hiệu năng I/O và RAM (Column Projection)
 XML_TABLE_COLUMNS: Dict[str, List[str]] = {
     "XML1": [
-        "MA_LK", "MA_BN", "HO_TEN", "SO_CCCD", "NGAY_SINH", "GIOI_TINH", "MA_THE", "MA_DKBD", "MA_CSKCB",
-        "GT_THE_TU", "GT_THE_DEN", "NGAY_VAO", "NGAY_RA", "NGAY_TTOAN", "MA_LYDO_VVIEN", "LY_DO_VV",
+        "MA_LK", "MA_BN", "HO_TEN", "SO_CCCD", "NGAY_SINH", "GIOI_TINH", "DIA_CHI",
+        "MA_THE", "MA_DKBD", "MA_CSKCB", "GT_THE_TU", "GT_THE_DEN",
+        "MA_THE_KHAC", "MA_DKBD_KHAC", "GT_THE_TU_KHAC", "GT_THE_DEN_KHAC",
+        "NGAY_VAO", "NGAY_RA", "NGAY_TTOAN", "MA_LYDO_VVIEN", "LY_DO_VV", "MA_DOITUONG_KCB",
         "MA_LOAI_KCB", "MA_BENH_CHINH", "MA_BENH_KT", "MA_BENH_YHCT", "CHAN_DOAN_VAO", "CHAN_DOAN_RV",
-        "PP_DIEUTRI", "KET_QUA_DTRI", "MA_LOAI_RV", "CAN_NANG", "NAM_QT", "THANG_QT",
-        "T_TONGCHI", "T_TONGCHI_BV", "TONG_CHI", "T_BNTT", "T_BNCCT", "T_BHTT", "T_NGUONKHAC", "T_NGOAIDM",
-        "TIEN_GIUONG", "MA_TAI_NAN", "MA_THE_TAM"
+        "PP_DIEUTRI", "KET_QUA_DTRI", "TINH_TRANG_RV", "MA_LOAI_RV", "CAN_NANG", "NAM_QT", "THANG_QT",
+        "MUC_HUONG", "MA_KHU_VUC", "NGAY_MIEN_CCT", "NAM_NAM_LIEN_TUC",
+        "T_TONGCHI", "T_TONGCHI_BV", "TONG_CHI", "T_BNTT", "T_BNCCT", "T_BHTT",
+        "T_NGUONKHAC", "T_NGOAIDM", "T_NGOAIDS", "TIEN_NGOAI_DS",
+        "TIEN_GIUONG", "T_GIUONG", "T_VANCHUYEN", "T_VAN_CHUYEN",
+        "MA_TAI_NAN", "MA_THE_TAM"
     ],
     "XML2": [
         "MA_LK", "STT", "MA_THUOC", "MA_NHOM", "TEN_THUOC", "DON_VI_TINH", "HAM_LUONG", "DUONG_DUNG",
-        "SO_LUONG", "DON_GIA", "TYLE_TT", "TYLE", "THANH_TIEN", "T_BHTT", "T_BNTT", "T_BNCCT", "T_NGOAIDM",
-        "MA_KHOA", "MA_BAC_SI", "NGAY_YL", "TT_THAU"
+        "PHAM_VI", "SO_LUONG", "DON_GIA", "TYLE_TT", "TYLE_TT_BH", "TYLE", "MUC_HUONG",
+        "THANH_TIEN", "THANH_TIEN_BV", "THANH_TIEN_BH",
+        "T_BHTT", "T_BNTT", "T_BNCCT", "T_NGUONKHAC",
+        "T_NGUONKHAC_NSNN", "T_NGUONKHAC_VTNN", "T_NGUONKHAC_VTTN", "T_NGUONKHAC_CL",
+        "T_NGOAIDM", "T_NGOAIDS",
+        "MA_KHOA", "MA_BAC_SI", "MA_DICH_VU", "NGAY_YL", "NGAY_TH_YL", "TT_THAU"
     ],
     "XML3": [
-        "MA_LK", "STT", "MA_DICH_VU", "MA_VAT_TU", "MA_NHOM", "TEN_DICH_VU", "DON_VI_TINH",
-        "SO_LUONG", "DON_GIA", "TYLE_TT", "TYLE", "THANH_TIEN", "T_BHTT", "T_BNTT", "T_BNCCT", "T_NGOAIDM",
+        "MA_LK", "STT", "MA_DICH_VU", "MA_VAT_TU", "MA_NHOM", "GOI_VTYT", "TEN_DICH_VU", "DON_VI_TINH",
+        "PHAM_VI", "SO_LUONG", "DON_GIA", "DON_GIA_BV", "DON_GIA_BH", "DON_GIA_DV",
+        "TYLE_TT", "TYLE_TT_DV", "TYLE_TT_BH", "TYLE", "MUC_HUONG",
+        "THANH_TIEN", "THANH_TIEN_BV", "THANH_TIEN_BH",
+        "T_BHTT", "T_BNTT", "T_BNCCT", "T_NGUONKHAC",
+        "T_NGUONKHAC_NSNN", "T_NGUONKHAC_VTNN", "T_NGUONKHAC_VTTN", "T_NGUONKHAC_CL",
+        "T_NGOAIDM", "T_NGOAIDS",
         "MA_KHOA", "MA_GIUONG", "MA_BAC_SI", "NGUOI_THUC_HIEN", "NGAY_YL", "NGAY_TH_YL", "NGAY_KQ", "MA_PTTT", "TT_THAU"
     ],
     "XML4": [
@@ -126,6 +140,32 @@ class XmlSourceAdapter:
         except Exception:
             pass
         return conn
+
+    def test_connection(self) -> Tuple[bool, str]:
+        """Kiểm tra kết nối Read-Only tới SQL Server XML và đếm số bảng XML tồn tại."""
+        conn = None
+        cur = None
+        try:
+            conn = self.get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME LIKE 'XML%'")
+            found_tables = [str(r[0]) for r in cur.fetchall()]
+            srv = self.cfg.get("server", "thsrvsql01")
+            db_name = self.cfg.get("database", "eHospital_ThienHanh_XML")
+            return True, f"Kết nối thành công tới {srv} / {db_name}! Phát hiện {len(found_tables)} bảng XML."
+        except Exception as e:
+            return False, f"Lỗi kết nối CSDL XML: {str(e)}"
+        finally:
+            if cur:
+                try:
+                    cur.close()
+                except Exception:
+                    pass
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def fetch_xml_batch(
         self,

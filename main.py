@@ -419,7 +419,7 @@ def parse_datetime_to_date(series: pd.Series) -> pd.Series:
 # listbh processing
 # =========================
 def load_listbh(path: str, key_col: str, date_col: str) -> pd.DataFrame:
-    df = pd.read_excel(path)
+    df = pd.read_excel(path, dtype=str)
     if key_col not in df.columns:
         raise ValueError(f"listbh thiếu cột '{key_col}'")
     df[key_col] = df[key_col].apply(chuan_hoa_ma_lk)
@@ -567,7 +567,7 @@ WHERE ba.SoBenhAn IN (
 # Error file processing
 # =========================
 def load_hosoloichitiet(path: str) -> pd.DataFrame:
-    df = pd.read_excel(path)
+    df = pd.read_excel(path, dtype=str)
     if "MA_LK" not in df.columns:
         raise ValueError("HoSoLoiChiTiet.xlsx phải có cột 'MA_LK'")
     if "MALOI" not in df.columns:

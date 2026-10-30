@@ -1164,7 +1164,7 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
    - **Chế độ tải gộp (Tùy chọn - Tích chọn "Tải gộp Chưa đề nghị"):**
      - Đợt 1: Tải danh sách **"Đã đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_da_de_nghi.xlsx`.
      - Đợt 2: Tải tiếp danh sách **"Chưa đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_chua_de_nghi.xlsx`.
-     - Gộp dữ liệu: Sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` gộp nối tiếp toàn bộ dòng và giữ nguyên 100% cấu trúc các cột gốc của Cổng BHYT thành một file duy nhất `listbh.xlsx` (không drop trùng lặp).
+     - Gộp dữ liệu: Đọc bằng `pd.read_excel(..., dtype=str)`, sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` gộp nối tiếp toàn bộ dòng và ghi ra `listbh.xlsx` kèm định dạng ô Text (`number_format = '@'`), giữ nguyên 100% cấu trúc cột và chữ số `0` ở đầu/cuối của `Mã liên kết` / `Mã BN` (không drop trùng lặp).
 3. **Đồng bộ toàn diện trên 3 nền tảng:**
    - **WebApp Server (`/portal-automation`):** Giao diện thêm ô nhập Tháng và Checkbox "Tải gộp Chưa đề nghị", truyền tham số qua API `/api/automation/v2/flow-b`.
    - **Công cụ Tải tại chỗ (`portal_downloader`):** Bổ sung ô nhập Tháng và Checkbox Tải gộp trên giao diện `downloader_server.py`.
@@ -1180,7 +1180,7 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
    - Sau khi click dòng: Đợi popup `#PopupNhanChiTietLoiHS_PW-0` và loading indicator bên trong nạp xong.
    - Tìm và click nút "Xuất Excel" bên trong popup với `expect_download`.
    - Đóng popup an toàn (`PopupNhanChiTietLoiHS.Hide()`) và đợi mask ẩn hẳn trước khi sang dòng tiếp theo.
-5. **Gom file, Thông báo hoàn tất & Đối soát C:** Gom tất cả file Excel con thành `HoSoLoiChiTiet.xlsx`, tự động bật Modal Popup thông báo kết quả gom file kèm nút tải nhanh và kích hoạt đối soát CSDL HIS.
+5. **Gom file bảo toàn chuỗi `MA_LK`, Thông báo hoàn tất & Đối soát C:** Đọc toàn bộ file Excel con với `pd.read_excel(..., dtype=str)` và gom thành `HoSoLoiChiTiet.xlsx` kèm khóa định dạng Text (`number_format = '@'`) để bảo toàn tuyệt đối chữ số `0` ở cuối của các mã `MA_LK` nội trú (ví dụ `26.011220`), tự động bật Modal Popup thông báo kết quả gom file kèm nút tải nhanh và kích hoạt đối soát CSDL HIS.
 
 ### 19.5. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
 - Khi chạy Đối soát C: nếu một ca bệnh (`MA_LK`) vừa có trong danh sách đã gửi (`listbh`) nhưng lại xuất hiện trong file lỗi chi tiết (`HoSoLoiChiTiet.xlsx`):
@@ -1256,7 +1256,6 @@ Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bện
 - **Nhánh A (Luồng đối soát và xử lý lỗi truyền thống):** Đối soát giữa danh sách đề nghị thanh toán từ SQL HIS (`df_sql`), danh sách đã gửi cổng (`df_listbh`) và tệp lỗi chi tiết (`df_hsloi` / `HoSoLoiChiTiet.xlsx`). Lưu trữ và tác nghiệp trên CSDL `app_state.db` (các bảng `records`, `error_definitions`, `error_history_archive`).
 - **Nhánh B (Validate XML V2 độc lập):** Đọc trực tiếp các bảng XML có sẵn trên SQL Server theo khóa `MA_LK` của các hồ sơ chưa gửi cổng thành công (`FAIL` và `LOI` có `status != 'RESOLVED'`), thực thi bộ quy tắc nghiệp vụ đa chuẩn (9324, 4210, 4750) và lưu trữ trên CSDL SQLite riêng biệt `web_app/xml_validation_v2.db`. Thất bại hay hủy tiến trình ở Nhánh B không bao giờ làm gián đoạn hay ảnh hưởng đến dữ liệu Nhánh A.
 
-### 22.2. Nguồn dữ liệu SQL Server và An toàn truy vấn
 ### 22.2. Nguồn dữ liệu SQL Server, Column Projection và An toàn truy vấn
 - **Máy chủ SQL Server:** `thsrvsql01`
 - **CSDL XML:** `eHospital_ThienHanh_XML`
@@ -1264,14 +1263,14 @@ Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bện
 - **Phạm vi 15 bảng XML:** Bao phủ toàn bộ từ `XML1_CV130` đến `XML15_CV130`.
 - **Khóa liên kết hồ sơ:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`.
 - **Cam kết an toàn tuyệt đối, Column Projection và Tham số hóa truy vấn:**
-  - **Tối ưu Column Projection:** Thay vì `SELECT *` tốn dung lượng mạng và bộ nhớ RAM trên các bảng quy mô cực lớn (XML4 ~16 triệu dòng, XML3 ~6.4 triệu dòng), hệ thống xác định rõ danh mục cột cần thiết (`XML_TABLE_COLUMNS`) cho 15 bảng XML. Có cơ chế fallback tự động về `SELECT *` nếu schema SQL Server cũ thiếu trường.
+  - **Tối ưu Column Projection:** Thay vì `SELECT *` tốn dung lượng mạng và bộ nhớ RAM trên các bảng quy mô cực lớn (XML4 ~16 triệu dòng, XML3 ~6.4 triệu dòng), hệ thống xác định rõ danh mục cột cần thiết (`XML_TABLE_COLUMNS`) cho 15 bảng XML (bao gồm đầy đủ các cột bắt buộc và tài chính như `DIA_CHI`, `TINH_TRANG_RV`, `MUC_HUONG`, `MA_KHU_VUC`, `T_VANCHUYEN`, `T_GIUONG`, `PHAM_VI`, `TYLE_TT_BH`, `TYLE_TT_DV`, `THANH_TIEN_BV`, `THANH_TIEN_BH`, `T_NGOAIDS`, `NGAY_TH_YL`,...). Có cơ chế fallback tự động về `SELECT *` nếu schema SQL Server cũ thiếu trường, kèm phương thức `test_connection()` và API `POST /api/admin/xml-v2/test-connection` để kiểm tra kết nối trực tiếp trên giao diện Tab 9.
   - **Tùy chọn Lock Hint:** Hỗ trợ cấu hình `use_nolock: bool` (mặc định True để tránh leo thang khóa S-Lock làm ảnh hưởng đến bác sĩ/nhân viên thu ngân viện).
   - **Tham số hóa ODBC:** Sử dụng Parameterized Query chuẩn ODBC: `SELECT cols FROM dbo.{tbl} {lock_hint} WHERE MA_LK IN (?, ?, ?)` với `cur.execute(sql, tuple(chunk))`, loại bỏ hoàn toàn nguy cơ SQL Injection và tương thích 100% Python 3.10+.
   - Tuyệt đối không có lệnh `INSERT`, `UPDATE`, `DELETE`, `ALTER` hoặc gọi các Stored Procedure tạo XML.
   - **Trạng thái đọc theo từng hồ sơ (`case_table_status`):** Ghi nhận trạng thái đọc riêng biệt cho từng bệnh nhân trong từng chunk. Phân biệt rõ bảng rỗng hợp lệ (`EMPTY` do bệnh nhân không có thuốc/DVKT) với lỗi truy vấn (`ERROR`). Lỗi của một chunk không bao giờ bị ghi đè hay xóa dấu vết bởi chunk thành công sau đó.
 
 ### 22.3. Bộ quy tắc Đa chuẩn, Ma Trận Phụ Thuộc Bảng và Triệt tiêu Báo sạch sai (Anti-False-Negative)
-- **Hỗ trợ đa chuẩn với Catalog 123 quy tắc:** Nhận diện và áp dụng quy tắc theo Quyết định 9324/QĐ-BHXH, Quyết định 4210/QĐ-BYT và Quyết định 4750/QĐ-BYT kèm đặc tả Cổng tiếp nhận (CTN 4750), gồm 116 quy tắc logic gốc và 7 nhóm quy tắc CTN 4750.
+- **Hỗ trợ đa chuẩn với Catalog 123 quy tắc (113/123 quy tắc thực thi trực tiếp trên XML, đạt >91%):** Nhận diện và áp dụng quy tắc theo Quyết định 9324/QĐ-BHXH (12/12 quy tắc), Quyết định 4210/QĐ-BYT (43/50 quy tắc), Quyết định 4750/QĐ-BYT (51/54 quy tắc) và 7/7 nhóm quy tắc đặc tả Cổng tiếp nhận (CTN 4750). Các quy tắc còn lại yêu cầu đối chiếu danh mục dùng chung quốc gia ngoài bảng XML (ICD-10, danh mục thuốc/DVKT/hành chính Bộ Y tế) được giữ trung thực ở trạng thái `UNIMPLEMENTED` (`INCOMPLETE_DATA`).
 - **Ma trận phụ thuộc bảng XML xuyên suốt (`RULE_REQUIRED_TABLES_MAP`):**
   - Mọi quy tắc trước khi trả về `PASSED` đều phải đối chiếu với danh sách bảng phụ thuộc bắt buộc.
   - Nếu bất kỳ bảng phụ thuộc nào (ví dụ XML2/XML3 đối với quy tắc tính tiền, hoặc XML6..XML15 đối với quy tắc đối chiếu chéo nhân thân) bị lỗi truy vấn (`case.is_table_error()`), quy tắc đó bắt buộc bị hạ xuống `RuleStatus.INCOMPLETE_DATA`, triệt tiêu hoàn toàn rủi ro kết luận hợp lệ giả (False Negative).

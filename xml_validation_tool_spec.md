@@ -126,33 +126,48 @@ Trích xuất toàn diện từ 2 tài liệu chính thức (`GDH_Danh sách cá
 
 ---
 
-## 💻 5. Cấu trúc thư mục mã nguồn đề xuất của công cụ độc lập
+## 💻 5. Cấu trúc thư mục thực tế của công cụ Kiểm tra XML Độc lập V2 (`web_app/xml_validator_v2/`)
 
-Agent lập trình nên tổ chức cấu trúc dự án độc lập như sau:
+Mô-đun kiểm tra XML V2 (Nhánh B) được tổ chức trong gói độc lập `web_app/xml_validator_v2/`:
 
 ```text
-xml-validator-module/
+web_app/xml_validator_v2/
 │
-├── config.json             # Cấu hình đường dẫn thư mục Input/Output, cổng chạy service
-├── main.py                 # Điểm khởi chạy chính (Quét thư mục hoặc chạy API Web Server)
-├── watcher.py              # Sử dụng thư viện 'watchdog' giám sát thư mục Input tự động
-├── xml_parser.py           # Phân tích cú pháp XML, nhóm file XML1-XML13 theo mã MA_LK
-├── rule_engine.py          # Chứa toàn bộ logic kiểm tra của 26 quy tắc ở trên
-├── report_generator.py     # Xuất kết quả phân tích lỗi ra file Excel (TongHopLoi.xlsx) và JSON
-└── requirements.txt        # Các thư viện phụ thuộc (lxml, pandas, openpyxl, watchdog)
+├── __init__.py
+├── models.py               # ORM SQLite riêng biệt (web_app/xml_validation_v2.db): ValRun, ValResult, ValViolation, ValRuleCatalog
+├── catalog.py              # Danh mục 123 quy tắc đa chuẩn (9324: 12, 4210: 50, 4750: 54, CTN 4750: 7) & RULE_REQUIRED_TABLES_MAP
+├── rule_models.py          # Mô hình dữ liệu CaseXmlData, RuleResult, RuleStatus và các hàm helper kiểm tra kiểu/ngày giờ
+├── rule_engine.py          # Bộ máy thực thi quy tắc đa chuẩn (Anti-False-Negative, kiểm tra phụ thuộc bảng, tổng hợp trạng thái)
+├── source_adapter.py       # Kết nối Read-Only SQL Server (eHospital_ThienHanh_XML), Column Projection 15 bảng XML1..XML15, test_connection()
+├── validation_service.py   # Điều phối luồng lọc hồ sơ chưa gửi (FAIL/LOI != RESOLVED), chạy batch và quản lý tiến trình
+├── report_exporter.py      # Xuất báo cáo Excel chuyên sâu 2 Sheet (Tổng Hợp Hồ Sơ & Chi Tiết Vi Phạm)
+├── router.py               # Các REST API endpoints tại prefix /api/admin/xml-v2/*
+└── rules/
+    ├── __init__.py
+    ├── rules_9324.py       # Bộ quy tắc Quyết định 9324/QĐ-BHXH (12/12 quy tắc)
+    ├── rules_4210.py       # Bộ quy tắc Quyết định 4210/QĐ-BYT (43/50 quy tắc thực thi trực tiếp trên XML)
+    ├── rules_4750.py       # Bộ quy tắc Quyết định 4750/QĐ-BYT (51/54 quy tắc thực thi trực tiếp trên XML)
+    └── rules_4750_ctn.py   # 7 nhóm quy tắc đặc tả Cổng tiếp nhận 4750 (CTN_REQ_XML1..3, CTN_DATE_FMT, CTN_THE_BHYT, CTN_MA_CSKCB, CTN_FIN_MATCH)
 ```
 
 ---
 
-## 🔌 6. Hướng dẫn tích hợp cho Web-App chính
+## 🔌 6. Kiến trúc tích hợp REST API trên Web-App chính (Tab 9 - Kiểm tra XML)
 
-Mô-đun độc lập này cung cấp 2 phương thức tích hợp cho Web-App chính của bạn:
+Mô-đun `xml_validator_v2` tích hợp trực tiếp vào FastAPI (`web_app/main.py`) qua Router `/api/admin/xml-v2`:
 
-1.  **Tích hợp dựa trên sự kiện File (File-based Integration):**
-    *   Web-app chính cấu hình xuất các tệp XML cần xử lý vào thư mục `Input/`.
-    *   Mô-đun Python watcher phát hiện file, phân tích tự động trong nền (background) và tạo ra tệp kết quả `ket_qua.json` trong thư mục `Output/`.
-    *   Web-app chính thiết lập cơ chế giám sát thư mục `Output/` hoặc nhận webhook/tín hiệu từ Python để đọc tệp `ket_qua.json` này và hiển thị giao diện báo cáo lỗi cho người dùng cuối.
-2.  **Tích hợp qua HTTP REST API (API-based Integration):**
-    *   Mô-đun Python chạy một API Web Server siêu nhẹ (ví dụ dùng `FastAPI` hoặc `Flask` chạy trên cổng `localhost:8000`).
-    *   Web-app chính gửi yêu cầu POST: `POST http://localhost:8000/validate` với tham số là đường dẫn thư mục chứa tệp XML.
-    *   Mô-đun Python xử lý đồng bộ hoặc bất đồng bộ và trả về kết quả cấu trúc lỗi dưới dạng JSON trực tiếp cho Web-app chính xử lý.
+1. **Quản lý cấu hình & Kiểm tra kết nối SQL Server XML:**
+   * `GET /api/admin/xml-v2/config`: Lấy thông tin cấu hình kết nối CSDL XML (`thsrvsql01` / `eHospital_ThienHanh_XML`).
+   * `POST /api/admin/xml-v2/config`: Lưu cấu hình CSDL XML vào tệp cấu hình riêng (`xml_v2_db_config.json`).
+   * `POST /api/admin/xml-v2/test-connection`: Kiểm tra kết nối Read-Only trực tiếp tới SQL Server và đếm số bản ghi mẫu trên `dbo.XML1_CV130`.
+2. **Thực thi Kiểm tra XML & Giám sát tiến trình:**
+   * `POST /api/admin/xml-v2/run-unsent`: Tự động lọc các hồ sơ chưa gửi thành công (`FAIL` và `LOI` có `status != 'RESOLVED'`) theo ngày đối soát hoặc khoảng ngày ra viện và khởi chạy tiến trình kiểm tra ngầm.
+   * `POST /api/admin/xml-v2/run-by-malk`: Kiểm tra trực tiếp theo danh sách mã `MA_LK` chỉ định.
+   * `GET /api/admin/xml-v2/progress`: Lấy tiến trình thời gian thực của đợt kiểm tra đang chạy.
+   * `POST /api/admin/xml-v2/cancel`: Hủy tiến trình kiểm tra đang chạy (bảo toàn trạng thái `CANCELLED`).
+3. **Tra cứu Kết quả, Danh mục Quy tắc & Xuất báo cáo Excel:**
+   * `GET /api/admin/xml-v2/runs`: Lịch sử các đợt kiểm tra XML.
+   * `GET /api/admin/xml-v2/results`: Danh sách kết quả kiểm tra theo đợt (lọc theo trạng thái, chuẩn áp dụng, từ khóa).
+   * `GET /api/admin/xml-v2/case/{result_id}`: Xem chi tiết các vi phạm và dữ liệu XML thô (15 bảng) của từng hồ sơ.
+   * `GET /api/admin/xml-v2/catalog`: Tra cứu toàn bộ 123 quy tắc kiểm tra đa chuẩn.
+   * `GET /api/admin/xml-v2/export-excel/{run_id}`: Xuất báo cáo Excel 2 Sheet (`BaoCao_ValidateXML_Dot{run_id}.xlsx`).

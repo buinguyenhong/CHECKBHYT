@@ -1724,8 +1724,8 @@
             <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
                 <select id="xmlCatalogStdFilter" class="form-control" style="width: 220px;" onchange="renderXmlCatalogTable()">
                     <option value="ALL">Tất cả chuẩn (123 quy tắc)</option>
-                    <option value="9324">Chuẩn 9324 (45 quy tắc)</option>
-                    <option value="4210">Chuẩn 4210 (17 quy tắc)</option>
+                    <option value="9324">Chuẩn 9324 (12 quy tắc)</option>
+                    <option value="4210">Chuẩn 4210 (50 quy tắc)</option>
                     <option value="4750">Chuẩn 4750 (61 quy tắc: 54 Logic + 7 CTN)</option>
                     <option value="CTN">Nhóm quy tắc CTN 4750 (7 nhóm)</option>
                 </select>
@@ -1799,6 +1799,7 @@
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px;">
+                <button class="btn btn-success" onclick="testXmlDbConnection()">🔌 Test kết nối CSDL XML</button>
                 <button class="btn btn-secondary" onclick="closeXmlConfigModal()">Hủy</button>
                 <button class="btn btn-primary" onclick="saveXmlDbConfig()">Lưu cấu hình</button>
             </div>
@@ -4651,6 +4652,32 @@
         document.getElementById('modalXmlDbConfig').style.display = 'none';
     }
 
+    async function testXmlDbConnection() {
+        const payload = {
+            driver: document.getElementById('cfgXmlDriver').value.trim(),
+            server: document.getElementById('cfgXmlServer').value.trim(),
+            database: document.getElementById('cfgXmlDatabase').value.trim(),
+            auth: document.getElementById('cfgXmlAuth').value,
+            user: document.getElementById('cfgXmlUser').value.trim(),
+            password: document.getElementById('cfgXmlPassword').value
+        };
+        try {
+            const res = await fetch('/api/admin/xml-v2/test-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                alert("✅ " + (data.message || "Kết nối CSDL XML thành công!"));
+            } else {
+                alert("❌ " + (data.detail || data.message || "Không thể kết nối CSDL XML."));
+            }
+        } catch (e) {
+            alert("❌ Lỗi mạng khi kiểm tra kết nối CSDL XML.");
+        }
+    }
+
     async function saveXmlDbConfig() {
         const payload = {
             driver: document.getElementById('cfgXmlDriver').value.trim(),
@@ -4704,9 +4731,9 @@
     loadConfig();
     toggleUserDept();
     checkSyncStatusOnLoad();
-    checkXmlWatcherStatus();
-    loadXmlConfig();
-    setupXmlDragDrop();
+
+
+
     checkClientEnvironment();
     setInterval(checkClientEnvironment, 5000);
 </script>

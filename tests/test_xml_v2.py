@@ -157,3 +157,79 @@ def test_ctn_4750_rules():
     assert "CTN_CROSS_CONSISTENCY" in v_codes  # Họ tên XML7 khác XML1
     assert "CTN_XML14_APPOINTMENT_DATE" in v_codes  # Ngày hẹn <= ngày ra
 
+def test_projected_columns_and_extended_4750_rules():
+    from xml_validator_v2.source_adapter import XML_TABLE_COLUMNS
+    from xml_validator_v2.rules import check_rules_4750, check_rules_4750_ctn
+
+    # 1. Xác minh DIA_CHI và TINH_TRANG_RV bắt buộc có trong XML_TABLE_COLUMNS["XML1"]
+    assert "DIA_CHI" in XML_TABLE_COLUMNS["XML1"], "Thiếu cột DIA_CHI trong XML_TABLE_COLUMNS['XML1']"
+    assert "TINH_TRANG_RV" in XML_TABLE_COLUMNS["XML1"], "Thiếu cột TINH_TRANG_RV trong XML_TABLE_COLUMNS['XML1']"
+
+    # 2. Xác minh CTN_REQ_XML2 và CTN_REQ_XML3 trả về PASSED khi bệnh nhân không có thuốc/DVKT
+    xml1_clean = {
+        "MA_LK": "LK_CLEAN_4750",
+        "MA_CSKCB": "66232",
+        "MA_DKBD": "66232",
+        "MA_BN": "BN001",
+        "HO_TEN": "NGUYEN VAN SACH",
+        "NGAY_SINH": "19850510",
+        "GIOI_TINH": "1",
+        "DIA_CHI": "TP Buon Ma Thuot, Dak Lak",
+        "NGAY_VAO": "202610200800",
+        "NGAY_RA": "202610200930",
+        "MA_LOAI_KCB": "01",
+        "MA_BENH_CHINH": "J00",
+        "KET_QUA_DTRI": "1",
+        "MA_LOAI_RV": "1",  # Fallback cho TINH_TRANG_RV
+        "SO_CCCD": "066085001234",
+        "MA_THE": "DN4662320123456",
+        "T_TONGCHI_BV": 100000,
+        "T_BHTT": 80000,
+        "T_BNCCT": 20000,
+        "T_BNTT": 0,
+        "T_NGUONKHAC": 0
+    }
+    case_clean = CaseXmlData(ma_lk="LK_CLEAN_4750", xml1=xml1_clean, xml2=[], xml3=[])
+    ctn_res = {r.rule_code: r for r in check_rules_4750_ctn(case_clean)}
+    assert ctn_res["CTN_REQ_XML1"].status == RuleStatus.PASSED, f"Violations: {ctn_res['CTN_REQ_XML1'].violations}"
+    assert ctn_res["CTN_REQ_XML2"].status == RuleStatus.PASSED
+    assert ctn_res["CTN_REQ_XML3"].status == RuleStatus.PASSED
+
+    # 3. Kiểm tra các quy tắc 4750 mở rộng (Rule 15, 110, 112 theo NGAY_VAO, 113, 116, 118)
+    xml1_ext_err = xml1_clean.copy()
+    xml1_ext_err["MA_THE"] = "HT2982320123456"  # HT + mã tỉnh 98 (sai Rule 110 vì 98 phải là CA5)
+    xml1_ext_err["NGAY_SINH"] = "20000101"      # Năm vào 2026 - 2000 = 26 tuổi (< 33 tuổi -> sai Rule 112)
+    xml1_ext_err["T_VANCHUYEN"] = 200000        # Có tiền vận chuyển nhưng T_NGOAIDS = 0 -> sai Rule 116
+    xml2_ext_err = [{
+        "MA_THUOC": "40.123", "MA_NHOM": "99",  # Sai nhóm thuốc XML2 (Rule 39)
+        "SO_LUONG": 1, "DON_GIA": 10000, "TYLE_TT_BH": 100, "THANH_TIEN_BV": 10000,
+        "T_BHTT": 8000, "T_BNCCT": 2000, "T_BNTT": 0, "T_NGUONKHAC": 0,
+        "NGAY_YL": "202602302599"               # Ngày giờ không tồn tại (Rule 118)
+    }]
+    case_ext = CaseXmlData(ma_lk="LK_EXT_ERR", xml1=xml1_ext_err, xml2=xml2_ext_err, xml3=[])
+    res_4750 = {r.rule_code: r for r in check_rules_4750(case_ext)}
+    assert res_4750["110"].status == RuleStatus.VIOLATED
+    assert res_4750["112"].status == RuleStatus.VIOLATED
+    assert res_4750["116"].status == RuleStatus.VIOLATED
+    assert res_4750["39"].status == RuleStatus.VIOLATED
+    assert res_4750["118"].status == RuleStatus.VIOLATED
+
+if __name__ == "__main__":
+    test_missing_xml()
+    print("test_missing_xml: PASSED")
+    test_ruleset_undetermined()
+    print("test_ruleset_undetermined: PASSED")
+    test_rules_9324_valid_and_errors()
+    print("test_rules_9324_valid_and_errors: PASSED")
+    test_rules_4210_arithmetic_and_format()
+    print("test_rules_4210_arithmetic_and_format: PASSED")
+    test_rules_4750_specific_rules()
+    print("test_rules_4750_specific_rules: PASSED")
+    test_validation_engine_status_has_errors()
+    print("test_validation_engine_status_has_errors: PASSED")
+    test_ctn_4750_rules()
+    print("test_ctn_4750_rules: PASSED")
+    test_projected_columns_and_extended_4750_rules()
+    print("test_projected_columns_and_extended_4750_rules: PASSED")
+    print("ALL UNIT TESTS IN test_xml_v2.py PASSED!")
+

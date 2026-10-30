@@ -32,7 +32,10 @@ def check_rules_4750_ctn(case: CaseXmlData) -> List[RuleResult]:
     ]
     missing_xml1_violations = []
     for f_code, f_label in mandatory_fields_xml1:
-        val = str(xml1.get(f_code, "")).strip()
+        raw_val = xml1.get(f_code, "")
+        if (not raw_val or str(raw_val).strip() == "") and f_code == "TINH_TRANG_RV":
+            raw_val = xml1.get("MA_LOAI_RV", "")
+        val = str(raw_val if raw_val is not None else "").strip()
         if not val or val.lower() in ["none", "nan", "null"]:
             missing_xml1_violations.append(RuleViolation(
                 standard="4750_CTN",
@@ -56,58 +59,72 @@ def check_rules_4750_ctn(case: CaseXmlData) -> List[RuleResult]:
     # =========================================================================
     # 2. CTN_MANDATORY_XML2: Kiểm tra các trường bắt buộc Bảng 2 (Thuốc)
     # =========================================================================
-    if case.xml2:
-        missing_xml2_violations = []
-        req_xml2_fields = ["MA_THUOC", "TEN_THUOC", "HAM_LUONG", "DON_VI_TINH", "SO_LUONG", "DON_GIA", "TYLE_TT", "THANH_TIEN", "MA_KHOA"]
-        for idx, row in enumerate(case.xml2):
-            for f_code in req_xml2_fields:
-                val = str(row.get(f_code, "")).strip()
-                if not val or val.lower() in ["none", "nan", "null"]:
-                    missing_xml2_violations.append(RuleViolation(
-                        standard="4750_CTN",
-                        rule_code=f"CTN_REQ_XML2_{f_code}",
-                        rule_name=f"Trường bắt buộc XML2.{f_code} không được rỗng",
-                        xml_table="XML2",
-                        field_name=f_code,
-                        actual_value="",
-                        expected_condition="Bắt buộc có dữ liệu",
-                        message=f"Dòng thuốc #{idx+1} ({row.get('MA_THUOC', '')}): Trường '{f_code}' để trống."
-                    ))
-        results.append(RuleResult(
-            rule_code="CTN_REQ_XML2",
-            standard="4750",
-            rule_name="Kiểm tra trường bắt buộc Bảng 2 (Thuốc)",
-            status=RuleStatus.VIOLATED if missing_xml2_violations else RuleStatus.PASSED,
-            violations=missing_xml2_violations[:10]  # Giới hạn tối đa 10 lỗi mẫu nếu danh sách quá dài
-        ))
+    missing_xml2_violations = []
+    req_xml2_fields = ["MA_THUOC", "TEN_THUOC", "HAM_LUONG", "DON_VI_TINH", "SO_LUONG", "DON_GIA", "TYLE_TT", "THANH_TIEN", "MA_KHOA"]
+    for idx, row in enumerate(case.xml2 or []):
+        for f_code in req_xml2_fields:
+            raw_v = row.get(f_code, "")
+            if (not raw_v or str(raw_v).strip() == "") and f_code == "TYLE_TT":
+                raw_v = row.get("TYLE_TT_BH", row.get("TYLE", ""))
+            if (not raw_v or str(raw_v).strip() == "") and f_code == "THANH_TIEN":
+                raw_v = row.get("THANH_TIEN_BV", "")
+            val = str(raw_v if raw_v is not None else "").strip()
+            if not val or val.lower() in ["none", "nan", "null"]:
+                missing_xml2_violations.append(RuleViolation(
+                    standard="4750_CTN",
+                    rule_code=f"CTN_REQ_XML2_{f_code}",
+                    rule_name=f"Trường bắt buộc XML2.{f_code} không được rỗng",
+                    xml_table="XML2",
+                    field_name=f_code,
+                    actual_value="",
+                    expected_condition="Bắt buộc có dữ liệu",
+                    message=f"Dòng thuốc #{idx+1} ({row.get('MA_THUOC', '')}): Trường '{f_code}' để trống."
+                ))
+    results.append(RuleResult(
+        rule_code="CTN_REQ_XML2",
+        standard="4750",
+        rule_name="Kiểm tra trường bắt buộc Bảng 2 (Thuốc)",
+        status=RuleStatus.VIOLATED if missing_xml2_violations else RuleStatus.PASSED,
+        violations=missing_xml2_violations[:10]  # Giới hạn tối đa 10 lỗi mẫu nếu danh sách quá dài
+    ))
 
     # =========================================================================
     # 3. CTN_MANDATORY_XML3: Kiểm tra các trường bắt buộc Bảng 3 (DVKT, VTYT)
     # =========================================================================
-    if case.xml3:
-        missing_xml3_violations = []
-        req_xml3_fields = ["MA_DICH_VU", "TEN_DICH_VU", "SO_LUONG", "DON_GIA", "TYLE_TT", "THANH_TIEN", "MA_KHOA"]
-        for idx, row in enumerate(case.xml3):
-            for f_code in req_xml3_fields:
-                val = str(row.get(f_code, "")).strip()
-                if not val or val.lower() in ["none", "nan", "null"]:
-                    missing_xml3_violations.append(RuleViolation(
-                        standard="4750_CTN",
-                        rule_code=f"CTN_REQ_XML3_{f_code}",
-                        rule_name=f"Trường bắt buộc XML3.{f_code} không được rỗng",
-                        xml_table="XML3",
-                        field_name=f_code,
-                        actual_value="",
-                        expected_condition="Bắt buộc có dữ liệu",
-                        message=f"Dòng DVKT #{idx+1} ({row.get('MA_DICH_VU', '')}): Trường '{f_code}' để trống."
-                    ))
-        results.append(RuleResult(
-            rule_code="CTN_REQ_XML3",
-            standard="4750",
-            rule_name="Kiểm tra trường bắt buộc Bảng 3 (DVKT, VTYT)",
-            status=RuleStatus.VIOLATED if missing_xml3_violations else RuleStatus.PASSED,
-            violations=missing_xml3_violations[:10]
-        ))
+    missing_xml3_violations = []
+    req_xml3_fields = ["MA_DICH_VU", "TEN_DICH_VU", "SO_LUONG", "DON_GIA", "TYLE_TT", "THANH_TIEN", "MA_KHOA"]
+    for idx, row in enumerate(case.xml3 or []):
+        for f_code in req_xml3_fields:
+            raw_v = row.get(f_code, "")
+            if (not raw_v or str(raw_v).strip() == "") and f_code == "MA_DICH_VU":
+                raw_v = row.get("MA_VAT_TU", "")
+            if (not raw_v or str(raw_v).strip() == "") and f_code == "TEN_DICH_VU":
+                raw_v = row.get("TEN_VAT_TU", "")
+            if (not raw_v or str(raw_v).strip() == "") and f_code == "DON_GIA":
+                raw_v = row.get("DON_GIA_BV", row.get("DON_GIA_BH", ""))
+            if (not raw_v or str(raw_v).strip() == "") and f_code == "TYLE_TT":
+                raw_v = row.get("TYLE_TT_DV", row.get("TYLE_TT_BH", row.get("TYLE", "")))
+            if (not raw_v or str(raw_v).strip() == "") and f_code == "THANH_TIEN":
+                raw_v = row.get("THANH_TIEN_BV", "")
+            val = str(raw_v if raw_v is not None else "").strip()
+            if not val or val.lower() in ["none", "nan", "null"]:
+                missing_xml3_violations.append(RuleViolation(
+                    standard="4750_CTN",
+                    rule_code=f"CTN_REQ_XML3_{f_code}",
+                    rule_name=f"Trường bắt buộc XML3.{f_code} không được rỗng",
+                    xml_table="XML3",
+                    field_name=f_code,
+                    actual_value="",
+                    expected_condition="Bắt buộc có dữ liệu",
+                    message=f"Dòng DVKT #{idx+1} ({row.get('MA_DICH_VU', '')}): Trường '{f_code}' để trống."
+                ))
+    results.append(RuleResult(
+        rule_code="CTN_REQ_XML3",
+        standard="4750",
+        rule_name="Kiểm tra trường bắt buộc Bảng 3 (DVKT, VTYT)",
+        status=RuleStatus.VIOLATED if missing_xml3_violations else RuleStatus.PASSED,
+        violations=missing_xml3_violations[:10]
+    ))
 
     # =========================================================================
     # 4. CTN_CCCD_FORMAT: Định dạng số căn cước công dân / CMND

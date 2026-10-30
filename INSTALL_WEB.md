@@ -85,7 +85,7 @@ Khoi dong may chu uvicorn...
     *   Bác sĩ lâm sàng của khoa đó sẽ đăng nhập bằng tài khoản này để xem và sửa lỗi.
 4.  **Vận hành Tab 9: Kiểm tra XML Độc Lập (Validate XML V2)**:
     *   Vào **Tab 9: Kiểm tra XML**.
-    *   Bấm **"⚙️ Cấu hình CSDL XML"** để xác nhận kết nối tới máy chủ CSDL XML (mặc định server `thsrvsql01`, database `eHospital_ThienHanh_XML`, bao phủ 15 bảng từ `XML1_CV130` đến `XML15_CV130`).
+    *   Bấm **"⚙️ Cấu hình CSDL XML"** để xác nhận kết nối tới máy chủ CSDL XML (mặc định server `thsrvsql01`, database `eHospital_ThienHanh_XML`, bao phủ 15 bảng từ `XML1_CV130` đến `XML15_CV130`), có thể bấm **"🔌 Test kết nối CSDL XML"** ngay trong hộp thoại để xác thực kết nối Read-Only và kiểm tra số bản ghi mẫu trên `XML1_CV130`.
     *   Bấm **"▶️ Kiểm tra XML ca chưa gửi cổng"** để hệ thống tự động lọc các ca chưa gửi thành công (`status != 'RESOLVED'`), truy vấn dữ liệu XML an toàn theo lô (`SELECT ... WITH (NOLOCK)`) và thực thi bộ quy tắc nghiệp vụ.
     *   Theo dõi tiến trình thời gian thực, xem chi tiết lỗi vi phạm và xuất báo cáo Excel (`BaoCao_ValidateXML_*.xlsx`) với đầy đủ 2 Sheet tổng hợp hồ sơ và chi tiết vi phạm.
     *   Hệ thống chạy hoàn toàn ở chế độ Read-Only, snapshot và kết quả lưu riêng tại tệp `web_app/xml_validation_v2.db`.

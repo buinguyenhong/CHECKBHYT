@@ -212,8 +212,26 @@ def update_xml_config(new_cfg: dict, user: User = Depends(require_admin)):
             curr[k] = new_cfg[k]
     if new_cfg.get("password") and new_cfg["password"] != "******":
         curr["password"] = new_cfg["password"]
+    if "use_nolock" in new_cfg and new_cfg["use_nolock"] is not None:
+        curr["use_nolock"] = bool(new_cfg["use_nolock"])
     save_xml_db_config(curr)
     return {"status": "success", "message": "Đã lưu cấu hình kết nối CSDL XML."}
+
+@router.post("/test-connection")
+def test_xml_db_connection(payload: Optional[dict] = None, user: User = Depends(require_admin)):
+    """Kiểm tra kết nối Read-Only tới SQL Server XML"""
+    cfg = load_xml_db_config()
+    if payload:
+        for k in ["driver", "server", "database", "auth", "user"]:
+            if k in payload and payload[k] is not None and str(payload[k]).strip() != "":
+                cfg[k] = payload[k]
+        if payload.get("password") and payload["password"] != "******":
+            cfg["password"] = payload["password"]
+    adapter = XmlSourceAdapter(cfg)
+    ok, msg = adapter.test_connection()
+    if ok:
+        return {"status": "success", "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
 
 @router.post("/run")
 def trigger_validation_run(

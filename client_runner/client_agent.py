@@ -908,7 +908,7 @@ class ClientRPAGui:
 
                         c_count = 0
                         try:
-                            df_c = pd.read_excel(save_dest)
+                            df_c = pd.read_excel(save_dest, dtype=str)
                             c_count = len(df_c)
                         except Exception: pass
                         self.log(f"Tải thành công '{status_text}': {c_count} bản ghi ✅")
@@ -932,17 +932,26 @@ class ClientRPAGui:
 
                         self.log(f"📂 Đang gộp 2 danh sách Excel ({rows_da} dòng đã đề nghị + {rows_chua} dòng chưa đề nghị)...")
                         try:
-                            df_da = pd.read_excel(tmp_da)
+                            df_da = pd.read_excel(tmp_da, dtype=str)
                         except Exception:
                             df_da = pd.DataFrame()
                         try:
-                            df_chua = pd.read_excel(tmp_chua)
+                            df_chua = pd.read_excel(tmp_chua, dtype=str)
                         except Exception:
                             df_chua = pd.DataFrame()
 
                         df_merged = pd.concat([df_da, df_chua], ignore_index=True)
                         row_count = len(df_merged)
-                        df_merged.to_excel(dest_final, index=False)
+                        try:
+                            with pd.ExcelWriter(dest_final, engine="openpyxl") as writer:
+                                df_merged.to_excel(writer, index=False, sheet_name="Sheet1")
+                                ws = writer.sheets["Sheet1"]
+                                for row in ws.iter_rows(min_row=2, values_only=False):
+                                    for cell in row:
+                                        if isinstance(cell.value, str):
+                                            cell.number_format = "@"
+                        except Exception:
+                            df_merged.to_excel(dest_final, index=False)
                         self.log(f"Gộp file hoàn tất -> {dest_final} ({row_count} dòng dữ liệu) ✅")
 
                     context.storage_state(path=SESSION_FILE)
@@ -1215,7 +1224,7 @@ class ClientRPAGui:
             for f in files:
                 try:
                     if os.path.getsize(f) > 0:
-                        df_item = pd.read_excel(f)
+                        df_item = pd.read_excel(f, dtype=str)
                         if not df_item.empty:
                             col_map = {}
                             for c in df_item.columns:
@@ -1235,7 +1244,16 @@ class ClientRPAGui:
 
             if all_dfs:
                 comb = pd.concat(all_dfs, ignore_index=True).drop_duplicates()
-                comb.to_excel(merged_file, index=False)
+                try:
+                    with pd.ExcelWriter(merged_file, engine="openpyxl") as writer:
+                        comb.to_excel(writer, index=False, sheet_name="Sheet1")
+                        ws = writer.sheets["Sheet1"]
+                        for row in ws.iter_rows(min_row=2, values_only=False):
+                            for cell in row:
+                                if isinstance(cell.value, str):
+                                    cell.number_format = "@"
+                except Exception:
+                    comb.to_excel(merged_file, index=False)
                 self.log(f"Tổng hợp thành công {len(comb)} dòng lỗi chi tiết vào {merged_file} ✅")
             else:
                 self.log("Không có gói lỗi nào được tải về trong khoảng ngày này.")

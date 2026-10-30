@@ -90,3 +90,33 @@ def to_decimal(val: Any, default: Decimal = Decimal("0.0")) -> Decimal:
 
 def round_money(val: Decimal) -> Decimal:
     return val.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+def is_valid_date_str(s: str) -> bool:
+    """Kiểm tra chuỗi ngày định dạng YYYYMMDD (ví dụ chặn 20170135)."""
+    import datetime
+    s = str(s or "").strip()
+    if len(s) != 8 or not s.isdigit():
+        return False
+    try:
+        datetime.datetime.strptime(s, "%Y%m%d")
+        return True
+    except ValueError:
+        return False
+
+def is_valid_datetime_str(s: str) -> bool:
+    """Kiểm tra chuỗi ngày giờ định dạng YYYYMMDDHHMM hoặc YYYYMMDDHHMMSS (ví dụ chặn 201701302555)."""
+    import datetime
+    s = str(s or "").strip()
+    if len(s) == 12 and s.isdigit():
+        try:
+            datetime.datetime.strptime(s, "%Y%m%d%H%M")
+            return True
+        except ValueError:
+            return False
+    if len(s) == 14 and s.isdigit():
+        try:
+            datetime.datetime.strptime(s, "%Y%m%d%H%M%S")
+            return True
+        except ValueError:
+            return False
+    return False

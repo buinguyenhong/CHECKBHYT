@@ -7,7 +7,7 @@ def load_listbh(file_source: Union[str, BytesIO], key_col: str = "Mã liên kế
     """
     Đọc file listbh.xlsx từ file path hoặc luồng byte, chuẩn hoá cột
     """
-    df = pd.read_excel(file_source)
+    df = pd.read_excel(file_source, dtype=str)
     
     found_key = None
     candidates_key = [key_col, "Mã liên kết", "MA_LK", "MÃ LIÊN KẾT", "Mã Liên Kết", "MÃ_LK", "Ma_LK", "Mã LK", "SO_SERI"]
@@ -52,7 +52,7 @@ def load_hosoloichitiet(file_source: Union[str, BytesIO]) -> pd.DataFrame:
     """
     Đọc file lỗi HoSoLoiChiTiet.xlsx từ file path hoặc luồng byte
     """
-    df = pd.read_excel(file_source)
+    df = pd.read_excel(file_source, dtype=str)
     found_key = None
     for c in ["MA_LK", "Mã liên kết", "MÃ LIÊN KẾT", "MÃ_LK", "Ma_LK"]:
         if c in df.columns:
@@ -90,6 +90,8 @@ def load_hosoloichitiet(file_source: Union[str, BytesIO]) -> pd.DataFrame:
     elif "MOTALOI" not in df.columns:
         df["MOTALOI"] = ""
 
+    df["MALOI"] = df["MALOI"].fillna("")
+    df["MOTALOI"] = df["MOTALOI"].fillna("")
     df["MA_LK"] = df["MA_LK"].apply(chuan_hoa_ma_lk)
 
     found_date = None

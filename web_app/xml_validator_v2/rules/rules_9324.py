@@ -166,6 +166,38 @@ def check_rules_9324(case: CaseXmlData) -> List[RuleResult]:
     ))
 
     # ----------------------------------------------------
+    # Rule 9: Sai thông tin CSKCB ban đầu (MA_DKBD)
+    # Rule 10: Sai thông tin CSKCB (MA_CSKCB)
+    # ----------------------------------------------------
+    r9_violations = []
+    if not ma_dkbd or len(ma_dkbd) != 5:
+        r9_violations.append(RuleViolation(
+            standard="9324", rule_code="9", rule_name="Mã lỗi 9: Sai thông tin CSKCB ban đầu",
+            xml_table="XML1", field_name="MA_DKBD", actual_value=ma_dkbd,
+            expected_condition="Mã ĐKBĐ gồm 5 ký tự hợp lệ",
+            message=f"Mã ĐKBĐ '{ma_dkbd}' trống hoặc không đúng định dạng 5 ký tự."
+        ))
+    results.append(RuleResult(
+        rule_code="9", standard="9324", rule_name="Sai thông tin CSKCB ban đầu",
+        status=RuleStatus.VIOLATED if r9_violations else RuleStatus.PASSED,
+        violations=r9_violations
+    ))
+
+    r10_violations = []
+    if not ma_cskcb or len(ma_cskcb) != 5:
+        r10_violations.append(RuleViolation(
+            standard="9324", rule_code="10", rule_name="Mã lỗi 10: Sai thông tin CSKCB",
+            xml_table="XML1", field_name="MA_CSKCB", actual_value=ma_cskcb,
+            expected_condition="Mã CSKCB gồm 5 ký tự hợp lệ",
+            message=f"Mã CSKCB '{ma_cskcb}' trống hoặc không đúng định dạng 5 ký tự."
+        ))
+    results.append(RuleResult(
+        rule_code="10", standard="9324", rule_name="Sai thông tin CSKCB",
+        status=RuleStatus.VIOLATED if r10_violations else RuleStatus.PASSED,
+        violations=r10_violations
+    ))
+
+    # ----------------------------------------------------
     # Rule 11: Hồ sơ không phát sinh chi phí Đề nghị thanh toán (T_BHTT trống hoặc = 0)
     # ----------------------------------------------------
     r11_violations = []
@@ -182,6 +214,48 @@ def check_rules_9324(case: CaseXmlData) -> List[RuleResult]:
         status=RuleStatus.VIOLATED if r11_violations else RuleStatus.PASSED,
         violations=r11_violations
     ))
+
+    # ----------------------------------------------------
+    # Rule 12: Sai T_BHTT tính lại từ mức hưởng
+    # ----------------------------------------------------
+    muc_huong_raw = xml1.get("MUC_HUONG")
+    if muc_huong_raw is None or str(muc_huong_raw).strip() == "":
+        results.append(RuleResult(
+            rule_code="12", standard="9324", rule_name="Sai T_BHTT tính lại từ mức hưởng",
+            status=RuleStatus.INCOMPLETE_DATA,
+            reason="Thiếu trường MUC_HUONG trên XML1 để tính lại T_BHTT chi tiết."
+        ))
+    else:
+        mh = to_decimal(muc_huong_raw, Decimal("0"))
+        recalc_bhtt = Decimal("0")
+        for r in xml2:
+            sl = to_decimal(r.get("SO_LUONG", 0))
+            dg = to_decimal(r.get("DON_GIA", 0))
+            tl = to_decimal(r.get("TYLE_TT", r.get("TYLE", 100)))
+            recalc_bhtt += sl * dg * (tl / Decimal("100")) * (mh / Decimal("100"))
+        for r in xml3:
+            sl = to_decimal(r.get("SO_LUONG", 0))
+            dg = to_decimal(r.get("DON_GIA", 0))
+            tl = to_decimal(r.get("TYLE_TT", r.get("TYLE", 100)))
+            nhom = str(r.get("MA_NHOM", "")).strip()
+            if nhom == "12":
+                recalc_bhtt += sl * dg * (tl / Decimal("100"))
+            else:
+                recalc_bhtt += sl * dg * (tl / Decimal("100")) * (mh / Decimal("100"))
+        recalc_bhtt = round_money(recalc_bhtt)
+        r12_violations = []
+        if abs(t_bhtt - recalc_bhtt) > Decimal("2.0"):
+            r12_violations.append(RuleViolation(
+                standard="9324", rule_code="12", rule_name="Sai T_BHTT tính lại từ mức hưởng",
+                xml_table="XML1", field_name="T_BHTT", actual_value=str(t_bhtt),
+                expected_condition=f"T_BHTT tính lại theo MUC_HUONG ({mh}%) = {recalc_bhtt}",
+                message=f"T_BHTT XML1 ({t_bhtt}) lệch so với T_BHTT tính lại từ mức hưởng ({recalc_bhtt})."
+            ))
+        results.append(RuleResult(
+            rule_code="12", standard="9324", rule_name="Sai T_BHTT tính lại từ mức hưởng",
+            status=RuleStatus.VIOLATED if r12_violations else RuleStatus.PASSED,
+            violations=r12_violations
+        ))
 
     # ----------------------------------------------------
     # Rule 14: Stent động mạch vành phủ thuốc
