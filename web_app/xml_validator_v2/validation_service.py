@@ -176,11 +176,14 @@ def run_validation_job(
                 xml14_data = case_xml_tables.get("XML14", [])
                 xml15_data = case_xml_tables.get("XML15", [])
 
+                resolved_ho_ten = case_info.get("ho_ten", "") or (str(xml1_data.get("HO_TEN", "") or "") if xml1_data else "")
+                resolved_ma_the = case_info.get("ma_the", "") or (str(xml1_data.get("MA_THE") or xml1_data.get("MA_THE_BHYT") or "") if xml1_data else "")
+
                 case_xml_obj = CaseXmlData(
                     ma_lk=lk,
-                    ho_ten=case_info.get("ho_ten", ""),
+                    ho_ten=resolved_ho_ten,
                     loai_ca=case_info.get("loai_ca", ""),
-                    ma_the=case_info.get("ma_the", ""),
+                    ma_the=resolved_ma_the,
                     ngay_ra_vien=str(case_info.get("ngay_ra_vien", "")),
                     xml1=xml1_data,
                     xml2=xml2_data,
@@ -206,8 +209,8 @@ def run_validation_job(
                 snapshot = ValCaseSnapshot(
                     run_id=val_run.id,
                     ma_lk=lk,
-                    ho_ten=case_info.get("ho_ten", ""),
-                    ma_the=case_info.get("ma_the", ""),
+                    ho_ten=resolved_ho_ten,
+                    ma_the=resolved_ma_the,
                     loai_ca=case_info.get("loai_ca", ""),
                     ma_y_te=case_info.get("ma_y_te", ""),
                     ngay_ra_vien=case_info.get("ngay_ra_vien") if isinstance(case_info.get("ngay_ra_vien"), datetime.date) else None,
@@ -223,8 +226,8 @@ def run_validation_job(
                 res_model = ValResult(
                     run_id=val_run.id,
                     ma_lk=lk,
-                    ho_ten=case_info.get("ho_ten", ""),
-                    ma_the=case_info.get("ma_the", ""),
+                    ho_ten=resolved_ho_ten,
+                    ma_the=resolved_ma_the,
                     loai_ca=case_info.get("loai_ca", ""),
                     ma_y_te=case_info.get("ma_y_te", ""),
                     ngay_ra_vien=case_info.get("ngay_ra_vien") if isinstance(case_info.get("ngay_ra_vien"), datetime.date) else None,

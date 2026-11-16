@@ -308,8 +308,18 @@ class ClientRPAGui:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
                     self.server_url.set(cfg.get("server_url", "http://127.0.0.1:8000"))
-                    self.from_date.set(cfg.get("from_date", self.from_date.get()))
-                    self.to_date.set(cfg.get("to_date", self.to_date.get()))
+                    today = datetime.date.today()
+                    cur_ym_prefix = today.strftime("%Y-%m-")
+                    saved_from = str(cfg.get("from_date", "") or "").strip()
+                    saved_to = str(cfg.get("to_date", "") or "").strip()
+                    if saved_from.startswith(cur_ym_prefix):
+                        self.from_date.set(saved_from)
+                    else:
+                        self.from_date.set(today.replace(day=1).strftime("%Y-%m-%d"))
+                    if saved_to.startswith(cur_ym_prefix):
+                        self.to_date.set(saved_to)
+                    else:
+                        self.to_date.set(today.strftime("%Y-%m-%d"))
                     self.portal_cskcb.set(cfg.get("portal_cskcb", "66232"))
                     self.portal_user.set(cfg.get("portal_user", "066091019320"))
                     self.portal_pass.set(cfg.get("portal_pass", "Nguyenhong123@"))

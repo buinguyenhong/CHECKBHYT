@@ -19,7 +19,30 @@ def check_rules_4750(case: CaseXmlData) -> List[RuleResult]:
     # ----------------------------------------------------
     # Rule 1: Sai lý do vào viện (Sai đối tượng KCB)
     # ----------------------------------------------------
-    ly_do_vv = str(xml1.get("MA_LYDO_VVIEN", xml1.get("LY_DO_VV", "1")) or "1").strip()
+    raw_lydo = str(xml1.get("MA_LYDO_VVIEN", "") or "").strip()
+    if not raw_lydo:
+        raw_vnt = str(xml1.get("MA_LY_DO_VNT", "") or "").strip()
+        raw_dt = str(xml1.get("MA_DOITUONG_KCB", "") or "").strip()
+        raw_text = str(xml1.get("LY_DO_VV", "") or "").strip()
+        if raw_text in ["1", "2", "3", "4"]:
+            raw_lydo = raw_text
+        elif raw_vnt in ["1", "2", "3", "4"]:
+            raw_lydo = raw_vnt
+        elif raw_dt and raw_dt[0] in ["1", "2", "3", "4"] and not raw_text:
+            raw_lydo = raw_dt[0]
+        elif raw_text:
+            low_txt = raw_text.lower()
+            if "cấp cứu" in low_txt or "cap cuu" in low_txt:
+                raw_lydo = "2"
+            elif "trái tuyến" in low_txt or "trai tuyen" in low_txt:
+                raw_lydo = "3"
+            elif "thông tuyến" in low_txt or "thong tuyen" in low_txt:
+                raw_lydo = "4"
+            elif "đúng tuyến" in low_txt or "dung tuyen" in low_txt:
+                raw_lydo = "1"
+            else:
+                raw_lydo = raw_text
+    ly_do_vv = raw_lydo or "1"
     ma_dkbd = str(xml1.get("MA_DKBD", "")).strip().upper()
     ma_cskcb = str(xml1.get("MA_CSKCB", "")).strip().upper()
 
@@ -44,7 +67,12 @@ def check_rules_4750(case: CaseXmlData) -> List[RuleResult]:
     # ----------------------------------------------------
     # Rule 8 & Rule 17: Sai thông tin thẻ / Mã thẻ không hợp lệ
     # ----------------------------------------------------
-    ma_the = str(xml1.get("MA_THE", xml1.get("SO_THE", ""))).strip().upper()
+    ma_the = str(
+        xml1.get("MA_THE")
+        or xml1.get("MA_THE_BHYT")
+        or xml1.get("SO_THE")
+        or ""
+    ).strip().upper()
     r8_violations = []
     r17_violations = []
     if not ma_the or len(ma_the) < 15:
@@ -404,7 +432,11 @@ def check_rules_4750(case: CaseXmlData) -> List[RuleResult]:
     # ----------------------------------------------------
     # Rule 34: T_TONGCHI_BV trong XML1 khác tổng T_BNTT + T_BNCCT + T_BHTT + T_NGUONKHAC
     # ----------------------------------------------------
-    t_tongchi_bv = to_decimal(xml1.get("T_TONGCHI_BV", xml1.get("T_TONGCHI", xml1.get("TONG_CHI", 0))))
+    t_tongchi_bv = to_decimal(
+        xml1.get("T_TONGCHI_BV")
+        if xml1.get("T_TONGCHI_BV") not in (None, "")
+        else xml1.get("T_TONGCHI_BH", xml1.get("T_TONGCHI", xml1.get("TONG_CHI", 0)))
+    )
     t_bntt = to_decimal(xml1.get("T_BNTT", 0))
     t_bncct = to_decimal(xml1.get("T_BNCCT", 0))
     t_bhtt = to_decimal(xml1.get("T_BHTT", 0))
@@ -495,7 +527,7 @@ def check_rules_4750(case: CaseXmlData) -> List[RuleResult]:
         sl = to_decimal(r.get("SO_LUONG", 0))
         dg = to_decimal(r.get("DON_GIA", 0))
         tl = to_decimal(r.get("TYLE_TT_BH", r.get("TYLE_TT", r.get("TYLE", 100))))
-        tt_bv = to_decimal(r.get("THANH_TIEN_BV", r.get("THANH_TIEN", 0)))
+        tt_bv = to_decimal(r.get("THANH_TIEN_BV", r.get("THANH_TIEN_BH", r.get("THANH_TIEN", 0))))
         tt_expected_full = round_money(sl * dg)
         tt_expected_tl = round_money(sl * dg * (tl / Decimal("100")))
         if abs(tt_bv - tt_expected_full) > Decimal("1.0") and abs(tt_bv - tt_expected_tl) > Decimal("1.0"):
@@ -577,7 +609,7 @@ def check_rules_4750(case: CaseXmlData) -> List[RuleResult]:
         sl = to_decimal(r.get("SO_LUONG", 0))
         dg = to_decimal(r.get("DON_GIA_BV", r.get("DON_GIA_DV", r.get("DON_GIA", 0))))
         tl = to_decimal(r.get("TYLE_TT_DV", r.get("TYLE_TT", r.get("TYLE", 100))))
-        tt_bv = to_decimal(r.get("THANH_TIEN_BV", r.get("THANH_TIEN", 0)))
+        tt_bv = to_decimal(r.get("THANH_TIEN_BV", r.get("THANH_TIEN_BH", r.get("THANH_TIEN", 0))))
         tt_expected_full = round_money(sl * dg)
         tt_expected_tl = round_money(sl * dg * (tl / Decimal("100")))
         if abs(tt_bv - tt_expected_full) > Decimal("1.0") and abs(tt_bv - tt_expected_tl) > Decimal("1.0"):
@@ -747,7 +779,7 @@ def check_rules_4750(case: CaseXmlData) -> List[RuleResult]:
         for r in xml3:
             ma_nhom = str(r.get("MA_NHOM", "")).strip()
             if ma_nhom in ["14", "15"]:
-                tien_giuong += to_decimal(r.get("THANH_TIEN_BV", r.get("THANH_TIEN", 0)))
+                tien_giuong += to_decimal(r.get("THANH_TIEN_BV", r.get("THANH_TIEN_BH", r.get("THANH_TIEN", 0))))
         if tien_giuong > Decimal("0"):
             r115_violations.append(RuleViolation(
                 standard="4750", rule_code="115", rule_name="Hồ sơ khám bệnh có tiền giường",

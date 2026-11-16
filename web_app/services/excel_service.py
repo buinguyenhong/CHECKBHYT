@@ -1,9 +1,12 @@
+import os
 import re
+import glob
+import datetime
 from decimal import Decimal, InvalidOperation
 import openpyxl
 import pandas as pd
 from io import BytesIO
-from typing import Union, Optional, Set, Dict, Iterable
+from typing import Union, Optional, Set, Dict, Iterable, List, Tuple
 from services.his_service import chuan_hoa_ma_lk, parse_datetime_to_date
 
 MA_LK_CANDIDATE_HEADERS = {
@@ -151,17 +154,12 @@ def resolve_ma_lk_against_trusted_set(
     return lk
 
 
-def load_listbh(
-    file_source: Union[str, BytesIO],
+def _find_listbh_columns(
+    df: pd.DataFrame,
     key_col: str = "Mã liên kết",
-    date_col: str = "Ngày ra",
-    trusted_keys: Optional[Set[str]] = None
-) -> pd.DataFrame:
-    """
-    Đọc file listbh.xlsx từ file path hoặc luồng byte, chuẩn hoá cột và bảo toàn MA_LK
-    """
-    df = read_excel_preserving_ma_lk(file_source)
-    
+    date_col: str = "Ngày ra"
+) -> Tuple[Optional[str], Optional[str]]:
+    """Tìm tên cột khóa chính MA_LK và cột ngày ra trong DataFrame listbh."""
     found_key = None
     candidates_key = [key_col, "Mã liên kết", "MA_LK", "MÃ LIÊN KẾT", "Mã Liên Kết", "MÃ_LK", "Ma_LK", "Mã LK", "SO_SERI"]
     for c in candidates_key:
@@ -174,13 +172,6 @@ def load_listbh(
             if c in col_map:
                 found_key = col_map[c]
                 break
-    if not found_key:
-        raise ValueError(f"Tệp danh sách BHYT thiếu cột khóa chính 'Mã liên kết' / 'MA_LK'. Các cột hiện có: {list(df.columns)}")
-        
-    df[found_key] = df[found_key].apply(chuan_hoa_ma_lk)
-    if trusted_keys:
-        num_map = build_trusted_numeric_ma_lk_map(trusted_keys)
-        df[found_key] = df[found_key].apply(lambda x: resolve_ma_lk_against_trusted_set(x, trusted_keys, num_map))
 
     found_date = None
     candidates_date = [date_col, "Ngày ra", "NGÀY RA", "NgayRa", "NGAY_RA", "Ngày ra viện", "NGÀY RA VIỆN", "Ngay_Ra"]
@@ -194,6 +185,42 @@ def load_listbh(
             if c in col_map:
                 found_date = col_map[c]
                 break
+
+    return found_key, found_date
+
+
+def _write_df_preserving_text_excel(df: pd.DataFrame, out_path: str) -> None:
+    """Ghi DataFrame ra file Excel với định dạng Text (@) cho các ô chuỗi để bảo toàn số 0 ở cuối MA_LK."""
+    try:
+        with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Sheet1")
+            ws = writer.sheets["Sheet1"]
+            for row in ws.iter_rows(min_row=2, values_only=False):
+                for cell in row:
+                    if isinstance(cell.value, str):
+                        cell.number_format = "@"
+    except Exception:
+        df.to_excel(out_path, index=False)
+
+
+def load_listbh(
+    file_source: Union[str, BytesIO],
+    key_col: str = "Mã liên kết",
+    date_col: str = "Ngày ra",
+    trusted_keys: Optional[Set[str]] = None
+) -> pd.DataFrame:
+    """
+    Đọc file listbh.xlsx từ file path hoặc luồng byte, chuẩn hoá cột và bảo toàn MA_LK
+    """
+    df = read_excel_preserving_ma_lk(file_source)
+    found_key, found_date = _find_listbh_columns(df, key_col=key_col, date_col=date_col)
+    if not found_key:
+        raise ValueError(f"Tệp danh sách BHYT thiếu cột khóa chính 'Mã liên kết' / 'MA_LK'. Các cột hiện có: {list(df.columns)}")
+
+    df[found_key] = df[found_key].apply(chuan_hoa_ma_lk)
+    if trusted_keys:
+        num_map = build_trusted_numeric_ma_lk_map(trusted_keys)
+        df[found_key] = df[found_key].apply(lambda x: resolve_ma_lk_against_trusted_set(x, trusted_keys, num_map))
 
     if found_date:
         df["_ngay"] = parse_datetime_to_date(df[found_date])
@@ -281,3 +308,156 @@ def filter_listbh_by_date(df: pd.DataFrame, tu_ngay, den_ngay) -> pd.DataFrame:
     # Đảm bảo tu_ngay và den_ngay là đối tượng date
     mask = (df["_ngay"] >= tu_ngay) & (df["_ngay"] <= den_ngay)
     return df.loc[mask].copy()
+
+
+def archive_listbh_by_months(
+    file_source: Union[str, BytesIO, bytes],
+    upload_dir: str = "uploaded_files",
+    explicit_month: Optional[int] = None,
+    explicit_year: Optional[int] = None
+) -> List[str]:
+    """
+    Phân tách và lưu trữ tệp listbh theo từng tháng (listbh_YYYY_MM.xlsx),
+    trộn thêm dữ liệu mới mà không làm mất dữ liệu các tháng cũ; đồng thời
+    cập nhật tệp tổng hợp listbh.xlsx từ các tháng gần nhất (tối đa 3 tháng).
+    """
+    os.makedirs(upload_dir, exist_ok=True)
+    df = read_excel_preserving_ma_lk(file_source)
+    if df.empty:
+        return []
+
+    found_key, found_date = _find_listbh_columns(df)
+    if not found_key:
+        return []
+
+    today = datetime.date.today()
+    fallback_year = int(explicit_year) if explicit_year else today.year
+    fallback_month = int(explicit_month) if explicit_month else today.month
+
+    if found_date:
+        parsed_dates = parse_datetime_to_date(df[found_date])
+    else:
+        parsed_dates = pd.Series([None] * len(df), index=df.index)
+
+    ym_list = []
+    for d in parsed_dates:
+        if isinstance(d, datetime.datetime):
+            ym_list.append((d.year, d.month))
+        elif isinstance(d, datetime.date):
+            ym_list.append((d.year, d.month))
+        else:
+            ym_list.append((fallback_year, fallback_month))
+
+    df_work = df.copy()
+    df_work["_ym"] = ym_list
+
+    # Nếu không chỉ định explicit_month (upload thủ công), gộp các dòng giao thoa (cuối tháng trước < 20% và không có đầu tháng <= 15) vào tháng chính
+    if explicit_month is None:
+        counts_by_ym = df_work["_ym"].value_counts().to_dict()
+        if counts_by_ym:
+            max_cnt = max(counts_by_ym.values())
+            dominant_ym = max(counts_by_ym.items(), key=lambda kv: kv[1])[0]
+            min_day_by_ym: Dict[Tuple[int, int], int] = {}
+            for d_val, ym_val in zip(parsed_dates, ym_list):
+                if isinstance(d_val, (datetime.date, datetime.datetime)):
+                    day_num = d_val.day
+                    if ym_val not in min_day_by_ym or day_num < min_day_by_ym[ym_val]:
+                        min_day_by_ym[ym_val] = day_num
+
+            genuine_yms = set()
+            for ym_val, cnt in counts_by_ym.items():
+                if min_day_by_ym.get(ym_val, 31) <= 15 or cnt >= 0.2 * max_cnt:
+                    genuine_yms.add(ym_val)
+            if genuine_yms:
+                df_work["_ym"] = [ym if ym in genuine_yms else dominant_ym for ym in ym_list]
+    else:
+        # Khi tải theo tháng chỉ định (Luồng B), toàn bộ danh sách thuộc kỳ quyết toán tháng đó
+        df_work["_ym"] = [(fallback_year, fallback_month)] * len(df_work)
+
+    saved_paths: List[str] = []
+
+    for (yr, mo), grp in df_work.groupby("_ym"):
+        month_df = grp.drop(columns=["_ym"]).copy()
+        month_path = os.path.join(upload_dir, f"listbh_{yr:04d}_{mo:02d}.xlsx")
+        if os.path.exists(month_path):
+            try:
+                old_df = read_excel_preserving_ma_lk(month_path)
+                if not old_df.empty:
+                    old_key, _ = _find_listbh_columns(old_df)
+                    if old_key and old_key != found_key:
+                        old_df = old_df.rename(columns={old_key: found_key})
+                    combined = pd.concat([old_df, month_df], ignore_index=True)
+                    combined["_norm_key"] = combined[found_key].apply(lambda x: chuan_hoa_ma_lk(x).upper())
+                    combined = combined[combined["_norm_key"].str.len() > 0]
+                    combined = combined.drop_duplicates(subset=["_norm_key"], keep="last").drop(columns=["_norm_key"])
+                    month_df = combined
+            except Exception:
+                pass
+        _write_df_preserving_text_excel(month_df, month_path)
+        saved_paths.append(month_path)
+
+    # Cập nhật tệp listbh.xlsx tổng hợp từ tối đa 3 tháng gần nhất để tương thích với các báo cáo đọc listbh.xlsx trực tiếp
+    month_files = sorted(glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")))
+    recent_files = month_files[-3:] if len(month_files) > 3 else month_files
+    if recent_files:
+        dfs_recent = []
+        for mf in recent_files:
+            try:
+                mdf = read_excel_preserving_ma_lk(mf)
+                if not mdf.empty:
+                    mk, _ = _find_listbh_columns(mdf)
+                    if mk and mk != found_key:
+                        mdf = mdf.rename(columns={mk: found_key})
+                    dfs_recent.append(mdf)
+            except Exception:
+                pass
+        if dfs_recent:
+            merged_recent = pd.concat(dfs_recent, ignore_index=True)
+            merged_recent["_norm_key"] = merged_recent[found_key].apply(lambda x: chuan_hoa_ma_lk(x).upper())
+            merged_recent = merged_recent[merged_recent["_norm_key"].str.len() > 0]
+            merged_recent = merged_recent.drop_duplicates(subset=["_norm_key"], keep="last").drop(columns=["_norm_key"])
+            master_path = os.path.join(upload_dir, "listbh.xlsx")
+            _write_df_preserving_text_excel(merged_recent, master_path)
+
+    return saved_paths
+
+
+def load_combined_listbh_for_range(
+    upload_dir: str = "uploaded_files",
+    tu_date: Optional[datetime.date] = None,
+    den_date: Optional[datetime.date] = None,
+    trusted_keys: Optional[Set[str]] = None
+) -> pd.DataFrame:
+    """
+    Nạp kết hợp toàn bộ danh sách đã gửi BHYT từ các tệp listbh_YYYY_MM.xlsx và listbh.xlsx
+    trong upload_dir để đảm bảo không bỏ sót các ca chuyển tháng hoặc đối soát liên tháng.
+    """
+    candidate_paths: List[str] = []
+    if os.path.exists(upload_dir):
+        master_path = os.path.join(upload_dir, "listbh.xlsx")
+        if os.path.exists(master_path):
+            candidate_paths.append(master_path)
+        for p in sorted(glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx"))):
+            if p not in candidate_paths:
+                candidate_paths.append(p)
+
+    if not candidate_paths:
+        return pd.DataFrame(columns=["MA_LK", "_ngay"])
+
+    dfs: List[pd.DataFrame] = []
+    for p in candidate_paths:
+        try:
+            df_part = load_listbh(p, trusted_keys=trusted_keys)
+            if not df_part.empty:
+                dfs.append(df_part)
+        except Exception:
+            pass
+
+    if not dfs:
+        return pd.DataFrame(columns=["MA_LK", "_ngay"])
+
+    merged = pd.concat(dfs, ignore_index=True)
+    merged["MA_LK"] = merged["MA_LK"].apply(lambda x: chuan_hoa_ma_lk(x).upper())
+    merged = merged[merged["MA_LK"].str.len() > 0]
+    merged = merged.drop_duplicates(subset=["MA_LK"], keep="last").reset_index(drop=True)
+    return merged

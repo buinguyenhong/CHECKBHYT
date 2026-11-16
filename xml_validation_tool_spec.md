@@ -55,7 +55,7 @@ sequenceDiagram
 ## 📋 3. Nguồn dữ liệu XML từ CSDL Bệnh Viện (CV 130)
 
 Hệ thống truy vấn trực tiếp từ CSDL `eHospital_ThienHanh_XML` trên SQL Server `thsrvsql01` theo mã nghiệp vụ `MA_LK`:
-*   **Các cột khóa liên kết ghi nhận trong metadata:** `BenhAn_Id`, `TiepNhan_Id`, `BenhNhan_Id`, `XacNhanChiPhi_Id`, `MA_LK`. Toàn bộ 15 bảng XML con đều mang khóa ngoại nghiệp vụ là `MA_LK`.
+*   **Các cột khóa liên kết ghi nhận trong metadata:** `BenhAn_Id`, `TiepNhan_Id`, `BenhNhan_Id`, `XacNhanChiPhi_Id`, `MA_LK`. Toàn bộ 15 bảng XML con đều mang khóa ngoại nghiệp vụ là `MA_LK`. Đối với các hồ sơ cấp cứu nội trú có hậu tố `_CC`, `XmlSourceAdapter` tự động chuyển đổi sang `/CC` bằng `to_sql_ma_lk()` trước khi truy vấn SQL Server và ánh xạ 2 chiều về khóa gốc ban đầu (tuyệt đối không tìm kiếm kiểu cắt bỏ hậu tố).
 *   **Danh sách đủ 15 bảng XML theo Quyết định 4750 / CV 130:**
     *   **XML1_CV130 (Bảng 1):** Chỉ tiêu tổng hợp khám bệnh, chữa bệnh (Hành chính, loại KCB, tổng chi, viện phí, BHTT chi trả).
     *   **XML2_CV130 (Bảng 2):** Chỉ tiêu chi tiết thuốc thanh toán BHYT (Số lượng, đơn giá, tỷ lệ thanh toán, thành tiền).
@@ -158,16 +158,17 @@ Mô-đun `xml_validator_v2` tích hợp trực tiếp vào FastAPI (`web_app/mai
 
 1. **Quản lý cấu hình & Kiểm tra kết nối SQL Server XML:**
    * `GET /api/admin/xml-v2/config`: Lấy thông tin cấu hình kết nối CSDL XML (`thsrvsql01` / `eHospital_ThienHanh_XML`).
-   * `POST /api/admin/xml-v2/config`: Lưu cấu hình CSDL XML vào tệp cấu hình riêng (`xml_v2_db_config.json`).
-   * `POST /api/admin/xml-v2/test-connection`: Kiểm tra kết nối Read-Only trực tiếp tới SQL Server và đếm số bản ghi mẫu trên `dbo.XML1_CV130`.
+   * `POST /api/admin/xml-v2/config`: Lưu cấu hình CSDL XML vào tệp cấu hình riêng (`xml_db_config.json`).
+   * `POST /api/admin/xml-v2/test-connection`: Kiểm tra kết nối Read-Only trực tiếp tới SQL Server và đếm số bảng XML tồn tại qua `INFORMATION_SCHEMA.TABLES`.
 2. **Thực thi Kiểm tra XML & Giám sát tiến trình:**
-   * `POST /api/admin/xml-v2/run-unsent`: Tự động lọc các hồ sơ chưa gửi thành công (`FAIL` và `LOI` có `status != 'RESOLVED'`) theo ngày đối soát hoặc khoảng ngày ra viện và khởi chạy tiến trình kiểm tra ngầm.
-   * `POST /api/admin/xml-v2/run-by-malk`: Kiểm tra trực tiếp theo danh sách mã `MA_LK` chỉ định.
+   * `POST /api/admin/xml-v2/run`: Hỗ trợ 2 chế độ:
+     * `use_current_unsent = true`: Tự động lọc các hồ sơ chưa gửi thành công (`FAIL` và `LOI` có `status != 'RESOLVED'`) theo `doi_soat_date` chỉ định hoặc đợt đối soát gần nhất và khởi chạy tiến trình kiểm tra ngầm.
+     * `use_current_unsent = false` (truyền mảng `cases`): Kiểm tra trực tiếp theo danh sách hồ sơ/`MA_LK` gửi từ client.
    * `GET /api/admin/xml-v2/progress`: Lấy tiến trình thời gian thực của đợt kiểm tra đang chạy.
    * `POST /api/admin/xml-v2/cancel`: Hủy tiến trình kiểm tra đang chạy (bảo toàn trạng thái `CANCELLED`).
 3. **Tra cứu Kết quả, Danh mục Quy tắc & Xuất báo cáo Excel:**
    * `GET /api/admin/xml-v2/runs`: Lịch sử các đợt kiểm tra XML.
-   * `GET /api/admin/xml-v2/results`: Danh sách kết quả kiểm tra theo đợt (lọc theo trạng thái, chuẩn áp dụng, từ khóa).
-   * `GET /api/admin/xml-v2/case/{result_id}`: Xem chi tiết các vi phạm và dữ liệu XML thô (15 bảng) của từng hồ sơ.
+   * `GET /api/admin/xml-v2/results`: Danh sách kết quả kiểm tra theo `run_id` (lọc theo `status_filter`, tìm kiếm `search`, phân trang `page`/`page_size`).
+   * `GET /api/admin/xml-v2/case-detail`: Xem chi tiết các vi phạm và danh sách bảng XML tìm thấy của từng hồ sơ theo tham số `run_id` và `ma_lk`.
    * `GET /api/admin/xml-v2/catalog`: Tra cứu toàn bộ 123 quy tắc kiểm tra đa chuẩn.
-   * `GET /api/admin/xml-v2/export-excel/{run_id}`: Xuất báo cáo Excel 2 Sheet (`BaoCao_ValidateXML_Dot{run_id}.xlsx`).
+   * `GET /api/admin/xml-v2/export-excel`: Xuất báo cáo Excel 2 Sheet (`BaoCao_ValidateXML_{run_code}.xlsx`) theo tham số `run_id`.

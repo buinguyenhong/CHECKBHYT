@@ -15,13 +15,13 @@ DEFAULT_XML_TABLES = [
 XML_TABLE_COLUMNS: Dict[str, List[str]] = {
     "XML1": [
         "MA_LK", "MA_BN", "HO_TEN", "SO_CCCD", "NGAY_SINH", "GIOI_TINH", "DIA_CHI",
-        "MA_THE", "MA_DKBD", "MA_CSKCB", "GT_THE_TU", "GT_THE_DEN",
+        "MA_THE", "MA_THE_BHYT", "MA_DKBD", "MA_CSKCB", "GT_THE_TU", "GT_THE_DEN",
         "MA_THE_KHAC", "MA_DKBD_KHAC", "GT_THE_TU_KHAC", "GT_THE_DEN_KHAC",
-        "NGAY_VAO", "NGAY_RA", "NGAY_TTOAN", "MA_LYDO_VVIEN", "LY_DO_VV", "MA_DOITUONG_KCB",
+        "NGAY_VAO", "NGAY_RA", "NGAY_TTOAN", "MA_LYDO_VVIEN", "MA_LY_DO_VNT", "LY_DO_VV", "MA_DOITUONG_KCB",
         "MA_LOAI_KCB", "MA_BENH_CHINH", "MA_BENH_KT", "MA_BENH_YHCT", "CHAN_DOAN_VAO", "CHAN_DOAN_RV",
         "PP_DIEUTRI", "KET_QUA_DTRI", "TINH_TRANG_RV", "MA_LOAI_RV", "CAN_NANG", "NAM_QT", "THANG_QT",
         "MUC_HUONG", "MA_KHU_VUC", "NGAY_MIEN_CCT", "NAM_NAM_LIEN_TUC",
-        "T_TONGCHI", "T_TONGCHI_BV", "TONG_CHI", "T_BNTT", "T_BNCCT", "T_BHTT",
+        "T_TONGCHI", "T_TONGCHI_BV", "T_TONGCHI_BH", "TONG_CHI", "T_BNTT", "T_BNCCT", "T_BHTT",
         "T_NGUONKHAC", "T_NGOAIDM", "T_NGOAIDS", "TIEN_NGOAI_DS",
         "TIEN_GIUONG", "T_GIUONG", "T_VANCHUYEN", "T_VAN_CHUYEN",
         "MA_TAI_NAN", "MA_THE_TAM"
@@ -52,13 +52,13 @@ XML_TABLE_COLUMNS: Dict[str, List[str]] = {
         "MA_LK", "STT", "DIEN_BIEN_LS", "GIAI_DOAN_BENH", "HOI_CHAN", "PHAU_THUAT", "NGAY_YL", "NGUOI_THUC_HIEN"
     ],
     "XML6": [
-        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "MA_DKBD", "MA_CSKCB", "MA_NOI_DEN", "NGAY_VAO", "NGAY_RA", "LY_DO_CT"
+        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "MA_THE_BHYT", "MA_DKBD", "MA_CSKCB", "MA_NOI_DEN", "NGAY_VAO", "NGAY_RA", "LY_DO_CT"
     ],
     "XML7": [
-        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "CHAN_DOAN_RV", "PP_DIEUTRI", "NGAY_VAO", "NGAY_RA", "NGOAITRU_TUNGAY", "MA_BS"
+        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "MA_THE_BHYT", "CHAN_DOAN_RV", "PP_DIEUTRI", "NGAY_VAO", "NGAY_RA", "NGOAITRU_TUNGAY", "MA_BS"
     ],
     "XML8": [
-        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "MA_TTDV", "TOMTAT_KQ", "PP_DIEUTRI", "CHAN_DOAN_RV", "NGAY_VAO", "NGAY_RA"
+        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "MA_THE_BHYT", "MA_TTDV", "TOMTAT_KQ", "PP_DIEUTRI", "CHAN_DOAN_RV", "NGAY_VAO", "NGAY_RA"
     ],
     "XML9": [
         "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_TTDV", "MA_THE_NND", "SO_CCCD_NND"
@@ -67,7 +67,7 @@ XML_TABLE_COLUMNS: Dict[str, List[str]] = {
         "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "NGAY_TU_VONG"
     ],
     "XML11": [
-        "MA_LK", "HO_TEN", "MA_THE", "TU_NGAY", "DEN_NGAY"
+        "MA_LK", "HO_TEN", "MA_THE", "MA_THE_BHYT", "TU_NGAY", "DEN_NGAY"
     ],
     "XML12": [
         "MA_LK", "HO_TEN", "NGAY_SINH"
@@ -76,7 +76,7 @@ XML_TABLE_COLUMNS: Dict[str, List[str]] = {
         "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "SO_CCCD", "NGAY_GD"
     ],
     "XML14": [
-        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "NGAY_HEN_KL", "MA_CSKCB"
+        "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "MA_THE", "MA_THE_BHYT", "NGAY_HEN_KL", "MA_CSKCB"
     ],
     "XML15": [
         "MA_LK", "HO_TEN", "NGAY_SINH", "GIOI_TINH", "PHAN_LOAI_LAO"
@@ -110,6 +110,18 @@ def load_xml_db_config() -> dict:
 def save_xml_db_config(cfg: dict):
     with open(XML_CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+def to_sql_ma_lk(ma_lk: str) -> str:
+    """
+    Chuyển đổi mã liên kết có hậu tố _CC sang định dạng lưu trong CSDL SQL Server (/CC).
+    Tuyệt đối không cắt bỏ hậu tố.
+    """
+    s = str(ma_lk or "").strip()
+    if s.endswith("_CC"):
+        return s[:-3] + "/CC"
+    if s.endswith("_cc"):
+        return s[:-3] + "/CC"
+    return s.replace("_CC", "/CC").replace("_cc", "/CC")
 
 class XmlSourceAdapter:
     """
@@ -212,7 +224,15 @@ class XmlSourceAdapter:
                     case_table_status[k][tbl_short] = "EMPTY"
 
             for i in range(0, len(clean_keys), chunk_size):
-                chunk = clean_keys[i:i + chunk_size]
+                orig_chunk = clean_keys[i:i + chunk_size]
+                chunk: List[str] = []
+                sql_to_orig_map: Dict[str, List[str]] = {}
+                for orig_k in orig_chunk:
+                    sql_k = to_sql_ma_lk(orig_k)
+                    if sql_k not in chunk:
+                        chunk.append(sql_k)
+                    sql_to_orig_map.setdefault(sql_k, []).append(orig_k)
+                    sql_to_orig_map.setdefault(sql_k.upper(), []).append(orig_k)
                 placeholders = ", ".join(["?"] * len(chunk))
 
                 for tbl in tables_to_query:
@@ -237,7 +257,7 @@ class XmlSourceAdapter:
                         rows = cur.fetchall()
 
                         # Đếm số dòng xuất hiện của từng MA_LK trong chunk cho bảng này
-                        chunk_case_rows: Dict[str, int] = {k: 0 for k in chunk}
+                        chunk_case_rows: Dict[str, int] = {k: 0 for k in orig_chunk}
 
                         if rows:
                             # Cập nhật batch_table_status: chỉ chuyển sang SUCCESS nếu chưa bị ERROR ở chunk trước
@@ -256,14 +276,25 @@ class XmlSourceAdapter:
                                     row_dict[col] = val
                                 
                                 row_lk = str(row_dict.get("MA_LK", "")).strip()
-                                if row_lk in results:
-                                    if tbl_short not in results[row_lk]:
-                                        results[row_lk][tbl_short] = []
-                                    results[row_lk][tbl_short].append(row_dict)
-                                    chunk_case_rows[row_lk] = chunk_case_rows.get(row_lk, 0) + 1
+                                row_lk_sql = to_sql_ma_lk(row_lk)
+                                matched_origs = (
+                                    sql_to_orig_map.get(row_lk)
+                                    or sql_to_orig_map.get(row_lk.upper())
+                                    or sql_to_orig_map.get(row_lk_sql)
+                                    or sql_to_orig_map.get(row_lk_sql.upper())
+                                    or []
+                                )
+                                seen_origs = set()
+                                for orig_k in matched_origs:
+                                    if orig_k not in seen_origs and orig_k in results:
+                                        seen_origs.add(orig_k)
+                                        if tbl_short not in results[orig_k]:
+                                            results[orig_k][tbl_short] = []
+                                        results[orig_k][tbl_short].append(row_dict)
+                                        chunk_case_rows[orig_k] = chunk_case_rows.get(orig_k, 0) + 1
 
                         # Cập nhật trạng thái cụ thể cho từng MA_LK trong chunk:
-                        for lk in chunk:
+                        for lk in orig_chunk:
                             if chunk_case_rows.get(lk, 0) > 0:
                                 case_table_status[lk][tbl_short] = "SUCCESS"
                             else:
@@ -277,7 +308,7 @@ class XmlSourceAdapter:
                         batch_table_status[tbl_short]["error"] = err_msg
 
                         # Đánh dấu lỗi cho toàn bộ hồ sơ trong chunk gặp sự cố
-                        for lk in chunk:
+                        for lk in orig_chunk:
                             case_table_status[lk][tbl_short] = "ERROR"
 
                     finally:

@@ -87,6 +87,37 @@ def backfill_archive_from_records(db: Session):
         db.rollback()
 
 
+def _compute_covered_months(df_listbh: pd.DataFrame) -> set:
+    """
+    Xác định các tháng thực sự được bao phủ bởi df_listbh dựa trên phân bố ngày ra (_ngay).
+    Tránh trường hợp một vài ca nội trú xuất viện cuối tháng trước (ngày > 15, tỷ lệ < 20%)
+    làm hệ thống hiểu nhầm cả tháng trước cũng đã có listbh đầy đủ.
+    """
+    if df_listbh is None or df_listbh.empty or "_ngay" not in df_listbh.columns:
+        return set()
+
+    counts: dict = {}
+    min_day: dict = {}
+    for d_val in df_listbh["_ngay"].dropna():
+        dt = d_val.date() if isinstance(d_val, datetime.datetime) else (d_val if isinstance(d_val, datetime.date) else None)
+        if not dt:
+            continue
+        ym = (dt.year, dt.month)
+        counts[ym] = counts.get(ym, 0) + 1
+        if ym not in min_day or dt.day < min_day[ym]:
+            min_day[ym] = dt.day
+
+    if not counts:
+        return set()
+
+    max_cnt = max(counts.values())
+    covered = set()
+    for ym, cnt in counts.items():
+        if min_day.get(ym, 31) <= 15 or cnt >= 0.2 * max_cnt:
+            covered.add(ym)
+    return covered
+
+
 def clean_error_desc(text: str) -> str:
     """Chuẩn hóa chuỗi mô tả lỗi: xóa khoảng trắng thừa, newline, tab và chuyển thành chuỗi sạch."""
     if not text:
@@ -213,7 +244,7 @@ def process_comparison(
 
     # 1. Chuyển tập hợp danh sách đã gửi thành set để tìm kiếm nhanh O(1)
     sent_keys = set()
-    if not df_listbh.empty:
+    if df_listbh is not None and not df_listbh.empty:
         sent_num_map = build_trusted_numeric_ma_lk_map(current_sql_keys)
         sent_keys = set(
             df_listbh["MA_LK"].dropna().astype(str).map(
@@ -221,9 +252,42 @@ def process_comparison(
             )
         )
 
+    # 1.1. Tự động gạch nợ (RESOLVED) các ca FAIL / LOI tồn đọng của tháng cũ nếu đã xuất hiện trong listbh kỳ mới
+    if df_listbh is not None and not df_listbh.empty:
+        pending_old_records = db.query(Record).filter(
+            Record.status != "RESOLVED"
+        ).all()
+        if pending_old_records:
+            pending_keys = {chuan_hoa_ma_lk(r.ma_lk).upper() for r in pending_old_records if r.ma_lk}
+            pending_num_map = build_trusted_numeric_ma_lk_map(pending_keys)
+            sent_keys_for_old = set(
+                df_listbh["MA_LK"].dropna().astype(str).map(
+                    lambda x: resolve_ma_lk_against_trusted_set(x, pending_keys, pending_num_map)
+                )
+            ) | sent_keys
+            for rec in pending_old_records:
+                rec_lk = chuan_hoa_ma_lk(rec.ma_lk).upper()
+                if rec_lk in sent_keys_for_old and rec_lk not in current_sql_keys:
+                    rec.status = "RESOLVED"
+                    rec.his_unlock_status = "NORMAL"
+                    d_cu_str = rec.ngay_doi_soat.strftime('%d/%m/%Y') if rec.ngay_doi_soat else "trước đó"
+                    d_moi_str = ngay_doi_soat.strftime('%d/%m/%Y')
+                    log_text = (
+                        f"Hệ thống tự động duyệt (gửi bù kỳ sau): Ca bệnh (đợt {d_cu_str}) "
+                        f"đã xuất hiện trong danh sách BHYT đã gửi (đối soát ngày {d_moi_str})."
+                    )
+                    db.add(RecordLog(
+                        record_id=rec.id,
+                        username="system",
+                        action="CHANGE_STATUS",
+                        note=log_text
+                    ))
+                    sync_archive_error(db, rec, resolved=True, resolved_by="system", note=log_text)
+            db.commit()
+
     # 2. Xây dựng bản đồ lỗi (ma_lk -> DANH SÁCH các dòng lỗi chi tiết đã lọc trùng)
     error_map = {}
-    if not df_hsloi.empty:
+    if df_hsloi is not None and not df_hsloi.empty:
         err_num_map = build_trusted_numeric_ma_lk_map(current_sql_keys)
         for _, row in df_hsloi.iterrows():
             pass
@@ -245,7 +309,7 @@ def process_comparison(
                     })
 
     # 2.1. Tự động xử lý & dọn dẹp các ca LOI không còn trong SQL HIS thuộc cùng khoảng ngày đối soát
-    if (include_errors or not df_hsloi.empty) and sql_dates and min_d and max_d:
+    if (include_errors or (df_hsloi is not None and not df_hsloi.empty)) and sql_dates and min_d and max_d:
         obsolete_loi = db.query(Record).filter(
             Record.type_group == "LOI",
             Record.status != "RESOLVED",
@@ -313,6 +377,10 @@ def process_comparison(
         "XML1", "XML2", "XML3", "XML4", "XML5", "XML7", "XML8", "XML9", "XML11", "XML13"
     ]
 
+    covered_months = _compute_covered_months(df_listbh)
+    ref_end_date = max_d or ngay_doi_soat
+    ref_ym = (ref_end_date.year, ref_end_date.month)
+
     # 3. Quét từng hồ sơ trong CSDL HIS
     for _, row in df_sql.iterrows():
         ma_lk = chuan_hoa_ma_lk(row["MA_LK"]).upper()
@@ -378,12 +446,15 @@ def process_comparison(
         else:
             # Chưa gửi thành công:
             if not has_error:
-                # Nếu không có tệp listbh đầu vào, ta chưa đánh dấu FAIL lúc này, tránh sai lệch.
-                if df_listbh is None:
+                # Nếu không có tệp listbh đầu vào hoặc listbh rỗng, không đánh dấu FAIL, tránh sai lệch hàng loạt.
+                if df_listbh is None or df_listbh.empty:
                     continue
+                # Bảo vệ tháng cũ: chỉ đánh dấu FAIL khi tháng ra viện của hồ sơ nằm trong phạm vi tháng của listbh
+                if covered_months and isinstance(ngay_ra_vien, datetime.date):
+                    if (ngay_ra_vien.year, ngay_ra_vien.month) not in covered_months:
+                        continue
                 # Không có lỗi chi tiết -> Bản ghi hành chính thuộc nhóm FAIL (IT xử lý)
                 type_group = "FAIL"
-                stats["fail"] += 1
                 
                 # Biến cờ đánh dấu nếu ca này từng có lỗi cũ được sửa
                 had_previous_active_errors = False
@@ -420,6 +491,17 @@ def process_comparison(
                 note_val = f"đã sửa lỗi cũ (đợt {dates_str})" if had_previous_active_errors else ""
                 
                 if existing_record:
+                    # Khóa bảo vệ ca đã RESOLVED thuộc tháng cũ (không tự động mở lại thành FAIL)
+                    is_old_resolved = (
+                        existing_record.status == "RESOLVED"
+                        and not had_previous_active_errors
+                        and isinstance(ngay_ra_vien, datetime.date)
+                        and (ngay_ra_vien.year, ngay_ra_vien.month) < ref_ym
+                    )
+                    if is_old_resolved:
+                        continue
+
+                    stats["fail"] += 1
                     existing_record.ho_ten = ho_ten
                     existing_record.ma_the = ma_the
                     existing_record.ten_khoa = ten_khoa
@@ -446,6 +528,7 @@ def process_comparison(
                         )
                         db.add(log)
                 else:
+                    stats["fail"] += 1
                     new_rec = Record(
                         ma_lk=ma_lk,
                         ho_ten=ho_ten,

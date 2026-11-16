@@ -70,6 +70,46 @@ def normalize_date_to_iso(d_str: str) -> str:
         return f"{clean[0:4]}-{clean[4:6]}-{clean[6:8]}"
     return ""
 
+
+def _load_listbh_for_sync_range(upload_dir: str, tu_date: datetime.date, den_date: datetime.date):
+    """
+    Nạp dữ liệu listbh kết hợp từ các tệp theo tháng (listbh_YYYY_MM.xlsx) và listbh.xlsx.
+    Trả về tuple (df_for_compare, df_in_range, log_msg).
+    """
+    df_raw = excel_service.load_combined_listbh_for_range(upload_dir, tu_date, den_date)
+    if df_raw.empty:
+        return pd.DataFrame(), pd.DataFrame(), "Thông báo: Không tìm thấy tệp listbh.xlsx. Chạy đối soát không có listbh (không đánh dấu ca FAIL)."
+
+    has_valid_dates = "_ngay" in df_raw.columns and df_raw["_ngay"].dropna().shape[0] > 0
+    df_in_range = excel_service.filter_listbh_by_date(df_raw, tu_date, den_date)
+
+    if df_in_range.empty:
+        if not has_valid_dates:
+            return df_raw, df_raw, f"Đọc listbh thành công ({len(df_raw)} ca, không có cột ngày lọc)."
+        return (
+            pd.DataFrame(),
+            pd.DataFrame(),
+            "Thông báo: Tệp listbh.xlsx không chứa dữ liệu trong khoảng ngày đối soát. Chạy đối soát không có listbh (không đánh dấu ca FAIL mới)."
+        )
+
+    return df_raw, df_in_range, f"Đọc listbh đa tháng thành công. Tổng kho: {len(df_raw)} ca (trong khoảng ngày: {len(df_in_range)} ca)."
+
+
+def _save_and_archive_listbh(contents: bytes, upload_dir: str):
+    """Lưu trữ phân tách listbh theo từng tháng mà không ghi đè mất dữ liệu các tháng cũ."""
+    import glob as _glob
+    os.makedirs(upload_dir, exist_ok=True)
+    master_path = os.path.join(upload_dir, "listbh.xlsx")
+    if os.path.exists(master_path) and not _glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")):
+        try:
+            excel_service.archive_listbh_by_months(master_path, upload_dir)
+        except Exception:
+            pass
+    saved = excel_service.archive_listbh_by_months(contents, upload_dir)
+    if not saved:
+        with open(master_path, "wb") as f:
+            f.write(contents)
+
 # ==========================================
 # GLOBAL STATE FOR ASYNC SYNC PROGRESS
 # ==========================================
@@ -156,17 +196,8 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         
         SYNC_PROGRESS["progress"] = 55
         SYNC_PROGRESS["status"] = "Đang đọc danh sách BHYT..."
-        listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
-        if os.path.exists(listbh_path):
-            df_listbh_raw = excel_service.load_listbh(listbh_path)
-            df_listbh = excel_service.filter_listbh_by_date(df_listbh_raw, tu_date, den_date)
-            if df_listbh.empty:
-                SYNC_PROGRESS["logs"].append("Thông báo: Tệp listbh.xlsx không chứa dữ liệu trong khoảng ngày đối soát. Chạy đối soát không có listbh (không đánh dấu ca FAIL).")
-            else:
-                SYNC_PROGRESS["logs"].append(f"Đọc listbh.xlsx thành công. Có {len(df_listbh)} ca trong ngày đối soát.")
-        else:
-            df_listbh = pd.DataFrame()
-            SYNC_PROGRESS["logs"].append("Thông báo: Không tìm thấy file listbh.xlsx. Chạy đối soát không có listbh (không đánh dấu ca FAIL).")
+        df_listbh, df_listbh_kpi, lb_msg = _load_listbh_for_sync_range(UPLOAD_DIR, tu_date, den_date)
+        SYNC_PROGRESS["logs"].append(lb_msg)
             
         if SYNC_PROGRESS.get("should_stop"):
             raise ValueError("Tiến trình bị dừng bởi người dùng.")
@@ -195,7 +226,7 @@ def run_sync_in_background(from_date: str, to_date: str, include_errors: bool = 
         
         ngay_doi_soat = datetime.date.today()
         stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat, include_errors=include_errors)
-        save_last_kpis(db, stats, df_listbh, ngay_doi_soat)
+        save_last_kpis(db, stats, df_listbh_kpi, ngay_doi_soat)
         
         if SYNC_PROGRESS.get("should_stop"):
             raise ValueError("Tiến trình bị dừng bởi người dùng.")
@@ -1000,10 +1031,8 @@ async def upload_listbh(
         contents = await file.read()
         df = excel_service.load_listbh(BytesIO(contents))
         
-        # Lưu file tạm cục bộ để dùng đối soát sau
-        save_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
-        with open(save_path, "wb") as f:
-            f.write(contents)
+        # Lưu trữ theo tháng và bảo toàn dữ liệu các tháng trước
+        _save_and_archive_listbh(contents, UPLOAD_DIR)
             
         return {"status": "success", "rows": len(df), "filename": file.filename}
     except Exception as e:
@@ -1303,8 +1332,11 @@ async def upload_and_reconcile_from_tool(
     dest_path = os.path.join(UPLOAD_DIR, target_filename)
 
     content = await file.read()
-    with open(dest_path, "wb") as f:
-        f.write(content)
+    if flow_upper == "B":
+        _save_and_archive_listbh(content, UPLOAD_DIR)
+    else:
+        with open(dest_path, "wb") as f:
+            f.write(content)
 
     today = datetime.date.today()
     first_day_of_month = today.replace(day=1)
@@ -1480,13 +1512,8 @@ def compare_records(
         tu_date = datetime.datetime.strptime(from_date, "%Y%m%d").date()
         den_date = datetime.datetime.strptime(to_date, "%Y%m%d").date()
 
-        # 2. Đọc file listbh Excel tạm đã upload và lọc theo khoảng ngày
-        listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
-        if os.path.exists(listbh_path):
-            df_listbh_raw = excel_service.load_listbh(listbh_path)
-            df_listbh = excel_service.filter_listbh_by_date(df_listbh_raw, tu_date, den_date)
-        else:
-            df_listbh = pd.DataFrame()
+        # 2. Đọc danh sách listbh kết hợp các tháng và lọc kiểm tra khoảng ngày
+        df_listbh, df_listbh_kpi, _ = _load_listbh_for_sync_range(UPLOAD_DIR, tu_date, den_date)
 
         # 3. Đọc file lỗi Excel tạm đã upload nếu người dùng chủ động bật
         if include_errors:
@@ -1501,7 +1528,7 @@ def compare_records(
         # 4. Thực hiện đối soát thông minh
         ngay_doi_soat = datetime.date.today()
         stats = compare_service.process_comparison(db, df_sql, df_listbh, df_hsloi, ngay_doi_soat, include_errors=include_errors)
-        save_last_kpis(db, stats, df_listbh, ngay_doi_soat)
+        save_last_kpis(db, stats, df_listbh_kpi, ngay_doi_soat)
         
         return stats
     except Exception as e:
@@ -2143,6 +2170,50 @@ def run_bulk_fail_reset(
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý hàng loạt: {str(e)}")
 
 
+@app.post("/api/records/admin/fail/resolve-month")
+def resolve_fail_by_month(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """IT chốt sổ / đóng toàn bộ các ca FAIL tồn đọng thuộc một tháng cũ cụ thể (định dạng YYYY-MM)."""
+    month_str = str(data.get("month", "") or "").strip()
+    note = str(data.get("note", "") or "").strip() or f"IT chốt sổ đóng ca FAIL tồn đọng tháng {month_str}"
+    try:
+        year, mon = map(int, month_str.split("-"))
+        month_start = datetime.date(year, mon, 1)
+        month_end = datetime.date(year + 1, 1, 1) if mon == 12 else datetime.date(year, mon + 1, 1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Định dạng tháng không hợp lệ (cần YYYY-MM).")
+
+    records = db.query(Record).filter(
+        Record.type_group == "FAIL",
+        Record.status != "RESOLVED",
+        Record.ngay_ra_vien >= month_start,
+        Record.ngay_ra_vien < month_end
+    ).all()
+
+    if not records:
+        return {"status": "success", "resolved_count": 0, "message": f"Không có ca FAIL tồn đọng nào trong tháng {mon:02d}/{year}."}
+
+    for r in records:
+        r.status = "RESOLVED"
+        r.his_unlock_status = "NORMAL"
+        r.note = f"{r.note} | {note}".strip(" | ") if r.note else note
+        db.add(RecordLog(
+            record_id=r.id,
+            username=user.username,
+            action="CHANGE_STATUS",
+            note=note
+        ))
+    db.commit()
+    return {
+        "status": "success",
+        "resolved_count": len(records),
+        "message": f"Đã chốt sổ đóng {len(records)} ca FAIL của tháng {mon:02d}/{year}."
+    }
+
+
 @app.get("/api/records/kpi")
 def get_global_kpis(
     user: User = Depends(get_current_user),
@@ -2541,17 +2612,15 @@ def export_monthly_summary(
     db: Session = Depends(get_db)
 ):
     """Xuất file Excel báo cáo tổng hợp số lượng ca XML và lỗi theo tháng (Tách sheet và top 10 lỗi)"""
-    # 1. Đọc listbh.xlsx nếu tồn tại để có toàn bộ danh sách đã gửi thực tế
-    listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
-    if os.path.exists(listbh_path):
-        try:
-            df_listbh = excel_service.load_listbh(listbh_path)
-            # Chuẩn hóa tháng từ cột _ngay
+    # 1. Đọc danh sách listbh kết hợp từ các tháng đã lưu trữ
+    try:
+        df_listbh = excel_service.load_combined_listbh_for_range(UPLOAD_DIR)
+        if not df_listbh.empty:
             df_listbh["month"] = pd.to_datetime(df_listbh["_ngay"], errors="coerce").dt.strftime("%Y-%m")
             df_listbh = df_listbh.dropna(subset=["month"])
-        except Exception:
+        else:
             df_listbh = pd.DataFrame(columns=["MA_LK", "_ngay", "month"])
-    else:
+    except Exception:
         df_listbh = pd.DataFrame(columns=["MA_LK", "_ngay", "month"])
 
     # 2. Truy vấn danh sách records tối ưu hóa để bypass ORM overhead
@@ -3147,19 +3216,14 @@ async def auto_sync_scheduler():
                             try:
                                 df_sql = his_service.fetch_his_data(cfg_dict, from_date, to_date, log_callback=lambda msg: his_service.safe_print(f"[*] [Scheduler] {msg}"))
                                 
-                                listbh_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
-                                if os.path.exists(listbh_path):
-                                    df_listbh_raw = excel_service.load_listbh(listbh_path)
-                                    df_listbh = excel_service.filter_listbh_by_date(df_listbh_raw, from_dt, now.date())
-                                else:
-                                    df_listbh = pd.DataFrame()
+                                df_listbh, df_listbh_kpi, _ = _load_listbh_for_sync_range(UPLOAD_DIR, from_dt, now.date())
                                     
                                 # Scheduler tự động chỉ đối soát SQL HIS với listbh để tìm FAIL.
                                 # File lỗi chi tiết chỉ được dùng khi IT chủ động import/chạy lại.
                                 df_hsloi = pd.DataFrame()
                                     
                                 stats = compare_service.process_comparison(temp_db, df_sql, df_listbh, df_hsloi, now.date(), include_errors=False)
-                                save_last_kpis(temp_db, stats, df_listbh, now.date())
+                                save_last_kpis(temp_db, stats, df_listbh_kpi, now.date())
                                 print("[*] [Scheduler] Dong bo tu dong HIS thanh cong.")
                             except Exception as ex:
                                 print(f"[!] [Scheduler] Loi khi thuc hien: {ex}")

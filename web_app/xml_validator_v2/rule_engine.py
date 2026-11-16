@@ -23,7 +23,7 @@ class ValidationEngine:
 
         # Dấu hiệu nhận biết chuẩn 4750 / CV 130:
         # Trường T_TONGCHI_BV, MA_LOAI_KCB định dạng mới, hoặc các trường đặc thù CV 130
-        keys_4750 = ["T_TONGCHI_BV", "MA_TAI_NAN", "CAN_NANG", "SO_CCCD", "MA_THE_TAM"]
+        keys_4750 = ["T_TONGCHI_BV", "T_TONGCHI_BH", "MA_THE_BHYT", "MA_LY_DO_VNT", "MA_TAI_NAN", "CAN_NANG", "SO_CCCD", "MA_THE_TAM"]
         if any(k in xml1 for k in keys_4750) or "XML11" in case.raw_tables or "XML13" in case.raw_tables or "XML14" in case.raw_tables:
             return "4750"
 

@@ -56,6 +56,67 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-11-16 15:40 - Antigravity (Khắc phục Lỗi Đối soát Đa Tháng, Lưu trữ `listbh` Theo Tháng & Xử lý/Chốt Sổ Dữ liệu Tháng Cũ)
+- **Vấn đề được giải quyết:** Khi thực hiện đối soát chuyển sang tháng mới (ví dụ chạy tháng 11 khi tháng 10 còn ca `FAIL`), việc ghi đè `listbh.xlsx` đơn lẻ, lọc `df_listbh` rỗng không được bảo vệ, ngày cấu hình cũ từ `client_config.json`, hoặc thiếu bảo vệ các tháng chưa tải trên cổng đã khiến toàn bộ hồ sơ của tháng cũ (tháng 10) bị đẩy hàng loạt vào nhóm `FAIL` hoặc mở lại các hồ sơ đã `RESOLVED`.
+- **Thay đổi chi tiết:**
+  - `web_app/services/excel_service.py`:
+    - Tách helper `_find_listbh_columns()` và `_write_df_preserving_text_excel()`, tái cấu trúc `load_listbh()`.
+    - Bổ sung `archive_listbh_by_months()` lưu trữ song song file `listbh` theo từng tháng (`listbh_YYYY_MM.xlsx`) trong `uploaded_files` (hỗ trợ cả `explicit_month` khi tải từ Flow B và gom dòng tràn cuối tháng trước khi upload thủ công), đồng thời tổng hợp lại `listbh.xlsx` từ tối đa 3 tháng gần nhất.
+    - Bổ sung `load_combined_listbh_for_range()` đọc hợp nhất dữ liệu `listbh` theo khoảng ngày từ các file theo tháng (`listbh_YYYY_MM.xlsx`) và `listbh.xlsx`.
+  - `web_app/services/compare_service.py`:
+    - Bổ sung `_compute_covered_months()` xác định tập `(year, month)` thực sự được `listbh` bao phủ (loại bỏ các dòng nội trú tràn cuối tháng trước có tỷ lệ nhỏ `< 20%` và `min(day) > 15`).
+    - Bổ sung bước **1.1 (Auto-resolve đa tháng)**: tự động chuyển `RESOLVED` cho các hồ sơ `FAIL`/`LOI` đang `PENDING` của các tháng cũ khi `MA_LK` của chúng xuất hiện trong `sent_keys` của kỳ/tháng mới hơn (bao gồm hỗ trợ khớp dạng số bỏ `.0` ở đuôi).
+    - Siết điều kiện bảo vệ ở Bước 2: kiểm tra `df_listbh is None or df_listbh.empty`, chỉ tạo/cập nhật `FAIL` khi `(ngay_ra_vien.year, ngay_ra_vien.month) in covered_months`, đồng thời khóa không cho mở lại các hồ sơ `FAIL` thuộc tháng cũ đã ở trạng thái `RESOLVED`.
+    - Đảm bảo an toàn `None` cho `df_listbh` và `df_hsloi` trong toàn bộ quy trình đối soát.
+  - `web_app/services/portal_automation.py`:
+    - Cập nhật `run_flow_b()` để di trú file `listbh.xlsx` hiện có nếu chưa tồn tại `listbh_YYYY_MM.xlsx`, và gọi `archive_listbh_by_months(..., explicit_month=int(target_month))` sau khi tải xong từ Cổng Giám định.
+  - `web_app/main.py`:
+    - Bổ sung `_load_listbh_for_sync_range()` và `_save_and_archive_listbh()`, đồng bộ việc đọc/lưu trữ `listbh` theo tháng tại `run_sync_in_background`, `upload_listbh`, `upload_and_reconcile_from_tool`, `compare_records`, `export_monthly_summary` và `run_sync_sync` (scheduler). Khi `df_in_range` rỗng nhưng file có ngày hợp lệ, trả về `df_listbh` rỗng để tránh dùng file cũ của tháng đánh dấu `FAIL` cho ngày mới chưa tải.
+    - Bổ sung API `POST /api/records/admin/fail/resolve-month` (`resolve_fail_by_month`) phục vụ chức năng "Chốt sổ tháng" (chuyển hàng loạt hồ sơ `FAIL` `PENDING` của một tháng cũ sang `RESOLVED`).
+  - `web_app/templates/portal_automation.html` & `portal_downloader/templates/index.html`:
+    - Bổ sung `syncDateRangeWithMonth(thangVal)` gắn sự kiện `oninput`/`onchange` trên ô Tháng quyết toán (`#b_thang`) để tự động đồng bộ `Từ ngày` – `Đến ngày`, và khởi tạo `#b_thang` trong `portal_downloader/templates/index.html`.
+  - `client_runner/client_agent.py`:
+    - Cập nhật `load_config()` tự động đặt lại `from_date`/`to_date` về tháng hiện tại nếu `client_config.json` lưu ngày cũ từ tháng trước.
+  - `web_app/templates/admin.html`:
+    - Thêm nút `#btnResolveFailMonth` ("Chốt sổ tháng") được bật/tắt theo bộ lọc tháng `filterFailByMonth()`, hàm `resolveFailMonth()`, và cập nhật `resetSelectedFail(loai)` tự suy ra `from_date`/`to_date` theo `#failMonthFilter` khi đang chọn một tháng cụ thể.
+  - `tests/test_safety_and_regression.py`:
+    - Bổ sung unit/regression test `test_multi_month_reconciliation_and_old_month_protection()`.
+- **Kiểm chứng:** Chạy đạt 100% cả 3 bộ kiểm thử: `tests/test_xml_v2.py`, `tests/test_safety_and_regression.py` (bao gồm `test_multi_month_reconciliation_and_old_month_protection`), và `tests/test_validation_integration.py`.
+
+## 2026-11-16 14:43 - Antigravity (Chuyển đổi Hậu tố Cấp cứu `_CC` ↔ `/CC` trong SQL Server XML, Chuẩn hóa Trường CV130 QĐ 4750 & Đồng bộ Tài liệu)
+
+### Mục tiêu
+- Xử lý tình trạng các ca cấp cứu nội trú có hậu tố `_CC` (như `26.045759_CC`) bị báo `MISSING_XML` khi truy vấn CSDL SQL Server XML (vốn lưu khóa dạng `/CC`, ví dụ `26.045759/CC`), tuân thủ nghiêm ngặt quy tắc **chuyển đổi `_CC` sang `/CC` và tuyệt đối không tìm kiếm kiểu cắt bỏ hậu tố**.
+- Chuẩn hóa đầy đủ các tên trường đặc thù Công văn 130 (QĐ 4750) (`MA_THE_BHYT`, `MA_LY_DO_VNT`, `T_TONGCHI_BH`, `THANH_TIEN_BH`) để triệt tiêu cảnh báo giả trên các ca CV130.
+- Đồng bộ 100% tài liệu dự án (`Project.md`, `INSTALL_WEB.md`, `xml_validation_tool_spec.md`).
+
+### Thay đổi
+- `web_app/xml_validator_v2/source_adapter.py`:
+  - Thêm hàm `to_sql_ma_lk(ma_lk: str)` chuyển đổi hậu tố `_CC` sang `/CC` trước khi truy vấn SQL Server (tuyệt đối không cắt bỏ hậu tố).
+  - Cập nhật `fetch_xml_batch()` sử dụng danh sách khóa SQL đã chuyển `/CC` và bảng ánh xạ 2 chiều `sql_to_orig_map` để gán chính xác kết quả trả về từ SQL Server (`/CC`) vào đúng khóa gốc ban đầu (`_CC` hoặc `/CC`) trong `results` và `case_table_status`.
+  - Bổ sung các cột CV130 (`MA_THE_BHYT`, `MA_LY_DO_VNT`, `T_TONGCHI_BH`) vào `XML_TABLE_COLUMNS` của `XML1` và `MA_THE_BHYT` vào `XML6`, `XML7`, `XML8`, `XML11`, `XML14`.
+- `web_app/xml_validator_v2/rule_engine.py` & `web_app/xml_validator_v2/validation_service.py`:
+  - Bổ sung `"T_TONGCHI_BH"`, `"MA_THE_BHYT"`, `"MA_LY_DO_VNT"` vào `keys_4750` trong `detect_standard()`.
+  - Bổ sung fallback lấy `ho_ten` và `ma_the` (`MA_THE` hoặc `MA_THE_BHYT`) từ `XML1` nếu metadata đầu vào để trống khi lưu `ValCaseSnapshot` / `ValResult`.
+- `web_app/xml_validator_v2/rules/rules_4750.py` & `rules_4750_ctn.py`:
+  - **Rule 1 (Lý do vào viện):** Ưu tiên `MA_LYDO_VVIEN`, đọc mã số `MA_LY_DO_VNT` hoặc quy đổi văn bản `LY_DO_VV` ("Cấp cứu" -> `2`, "Đúng tuyến" -> `1`, "Trái tuyến" -> `3`, "Thông tuyến" -> `4`) thay vì lấy trực tiếp chuỗi text tiếng Việt để so sánh.
+  - **Rule 8 & Rule 17 (Mã thẻ BHYT):** Hỗ trợ tuần tự `MA_THE` -> `MA_THE_BHYT` -> `SO_THE`.
+  - **Rule 34, 47, 52, 115 & CTN_REQ_XML2/3:** Hỗ trợ các trường `T_TONGCHI_BH`, `THANH_TIEN_BH` song song với `T_TONGCHI_BV`, `THANH_TIEN_BV`.
+- `tests/test_xml_v2.py` & `tests/test_safety_and_regression.py`:
+  - Bổ sung `test_cv130_field_aliases_and_cc_suffix()` và `test_cc_suffix_conversion_in_source_adapter()`.
+- `Project.md`, `xml_validation_tool_spec.md`, `INSTALL_WEB.md`:
+  - Đồng bộ số lượng 123 quy tắc, tên tệp cấu hình `xml_db_config.json`, các đường dẫn REST API `/api/admin/xml-v2/*`, logic `test_connection()` và quy tắc `_CC` ↔ `/CC`.
+
+### Nghiệp vụ ảnh hưởng
+- Các ca cấp cứu nội trú có hậu tố `_CC` được ánh xạ chính xác 100% tới dữ liệu `/CC` trong SQL Server XML (không còn bị `MISSING_XML` và không bao giờ cắt bỏ hậu tố).
+- Kiểm tra hồ sơ chuẩn Công văn 130 (QĐ 4750) thực tế đạt 0 cảnh báo giả ở Rule 1, 8, 17, 34.
+
+### Kiểm tra
+- `.\.venv\Scripts\python.exe tests/test_xml_v2.py`: 10/10 tests PASSED.
+- `.\.venv\Scripts\python.exe tests/test_safety_and_regression.py`: 10/10 tests PASSED.
+- `.\.venv\Scripts\python.exe tests/test_validation_integration.py`: PASSED.
+- Kiểm tra 3 tệp XML CV130 thực tế tại `C:\Users\Admin\Downloads\BHYT` qua `ValidationEngine`: 0 vi phạm, Đạt 58/58 quy tắc thực thi trên cả 3 ca.
+
 ## 2026-10-30 14:55 - Antigravity (Khắc phục Lỗi JSON Serialization Đối tượng Decimal / Datetime Khi Lưu Snapshot Tab 9 XML Validator V2)
 
 ### Mục tiêu

@@ -292,6 +292,190 @@ def test_ma_lk_excel_string_and_numeric_formats():
     assert res_ambig == "26.01122", f"Ambiguous match must NOT guess, got {res_ambig}"
 
 
+def test_cc_suffix_conversion_in_source_adapter():
+    """
+    Xác minh XmlSourceAdapter chuyển đổi chính xác hậu tố cấp cứu _CC sang /CC khi truy vấn SQL Server,
+    tuyệt đối không bỏ hậu tố, và ánh xạ kết quả trả về đúng cho khóa gốc (_CC và /CC).
+    """
+    executed_params = []
+
+    class MockCursor:
+        def __init__(self):
+            self.description = [("MA_LK",), ("HO_TEN",)]
+            self._rows = []
+
+        def execute(self, sql, params=()):
+            executed_params.append(tuple(params))
+            if "FROM dbo.XML1_CV130" in sql:
+                # Chỉ trả về nếu SQL query truyền đúng /CC (không bỏ hậu tố)
+                rows = []
+                if "26.045759/CC" in params:
+                    rows.append(("26.045759/CC", "ĐẶNG THỊ HẢI"))
+                if "26.047594/CC" in params:
+                    rows.append(("26.047594/CC", "NGUYỄN THÀNH THÁI"))
+                self._rows = rows
+            else:
+                self._rows = []
+
+        def fetchall(self):
+            return self._rows
+
+        def close(self):
+            pass
+
+    class MockConn:
+        def cursor(self):
+            return MockCursor()
+
+        def close(self):
+            pass
+
+    class MockCCAdapter(source_adapter.XmlSourceAdapter):
+        def get_connection(self):
+            return MockConn()
+
+    adapter = MockCCAdapter({"tables": ["XML1_CV130", "XML2_CV130"]})
+    results, case_tbl_status, _ = adapter.fetch_xml_batch(["26.045759_CC", "26.047594/CC"])
+
+    # Phải chuyển đổi _CC -> /CC khi truyền tham số ODBC, tuyệt đối không tìm kiếm kiểu bỏ hậu tố
+    assert len(executed_params) > 0
+    for params in executed_params:
+        assert params == ("26.045759/CC", "26.047594/CC"), f"Unexpected SQL params: {params}"
+        assert "26.045759" not in params
+
+    # Dữ liệu SQL (/CC) phải ánh xạ trả về chính xác cho khóa gốc (_CC lẫn /CC)
+    assert "XML1" in results["26.045759_CC"]
+    assert results["26.045759_CC"]["XML1"][0]["HO_TEN"] == "ĐẶNG THỊ HẢI"
+    assert case_tbl_status["26.045759_CC"]["XML1"] == "SUCCESS"
+    assert "XML1" in results["26.047594/CC"]
+    assert case_tbl_status["26.047594/CC"]["XML1"] == "SUCCESS"
+
+
+def test_multi_month_reconciliation_and_old_month_protection():
+    """
+    Xác minh quy trình đối soát đa tháng:
+    1. Tải listbh Tháng 11 không làm mất listbh Tháng 10 (lưu phân tách listbh_YYYY_MM.xlsx).
+    2. Khi chạy Tháng 11 hoặc khoảng ngày có cả Tháng 10 khi chưa có listbh Tháng 10, các ca Tháng 10
+       không bị đẩy nhầm vào FAIL; khi df_listbh rỗng tuyệt đối không sinh FAIL.
+    3. Các ca FAIL tồn đọng Tháng 10 khi được đẩy bù sang Tháng 11 (xuất hiện trong listbh Tháng 11)
+       sẽ tự động chuyển sang RESOLVED.
+    4. Ca đã RESOLVED thuộc tháng cũ không bị tự động mở lại thành PENDING FAIL.
+    """
+    import tempfile
+    import datetime
+    import pandas as pd
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from models import Base, Record
+    from services import excel_service
+
+    # A. Kiểm tra lưu trữ phân tách listbh theo tháng và nạp gộp đa tháng
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        oct_rows = [{"Mã liên kết": f"OCT_SENT_{i:03d}", "Ngày ra": "05/10/2026 09:00"} for i in range(1, 21)]
+        df_oct_xl = pd.DataFrame(oct_rows)
+        oct_src = os.path.join(tmp_dir, "src_oct.xlsx")
+        df_oct_xl.to_excel(oct_src, index=False)
+        excel_service.archive_listbh_by_months(oct_src, tmp_dir, explicit_month=10, explicit_year=2026)
+
+        nov_rows = [{"Mã liên kết": f"NOV_SENT_{i:03d}", "Ngày ra": "03/11/2026 10:00"} for i in range(1, 16)]
+        # Thêm ca nội trú xuất viện cuối tháng 10 quyết toán tháng 11
+        nov_rows.append({"Mã liên kết": "OCT_FAIL_001", "Ngày ra": "30/10/2026 16:00"})
+        df_nov_xl = pd.DataFrame(nov_rows)
+        nov_src = os.path.join(tmp_dir, "src_nov.xlsx")
+        df_nov_xl.to_excel(nov_src, index=False)
+        excel_service.archive_listbh_by_months(nov_src, tmp_dir, explicit_month=11, explicit_year=2026)
+
+        assert os.path.exists(os.path.join(tmp_dir, "listbh_2026_10.xlsx"))
+        assert os.path.exists(os.path.join(tmp_dir, "listbh_2026_11.xlsx"))
+
+        df_comb = excel_service.load_combined_listbh_for_range(tmp_dir)
+        comb_keys = set(df_comb["MA_LK"].tolist())
+        assert "OCT_SENT_001" in comb_keys and "OCT_SENT_020" in comb_keys, "Mất dữ liệu Tháng 10 sau khi nạp Tháng 11!"
+        assert "NOV_SENT_001" in comb_keys and "OCT_FAIL_001" in comb_keys
+
+    # B. Kiểm tra logic compare_service với SQLite in-memory
+    test_engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(test_engine)
+    TestSession = sessionmaker(bind=test_engine)
+    db = TestSession()
+
+    try:
+        def make_sql_row(lk, ngay):
+            return {
+                "MA_LK": lk, "Họ tên": f"BN {lk}", "Mã thẻ": "DN4662320000001",
+                "Tên khoa": "Khoa Nội", "Loại ca": "Nội trú", "Mã y tế": "",
+                "Ngày ra viện": ngay, "Tổng cộng": 100000.0, "Tiền BHYT": 80000.0
+            }
+
+        oct_sql = [make_sql_row(f"OCT_{i:03d}", datetime.date(2026, 10, 5)) for i in range(1, 31)]  # 30 ca T10
+        df_sql_oct = pd.DataFrame(oct_sql)
+        # 25 ca đã gửi, còn 5 ca FAIL (OCT_026..OCT_030)
+        df_lb_oct = pd.DataFrame([{"MA_LK": f"OCT_{i:03d}", "_ngay": datetime.date(2026, 10, 5)} for i in range(1, 26)])
+        stats_10 = compare_service.process_comparison(
+            db, df_sql_oct, df_lb_oct, pd.DataFrame(), datetime.date(2026, 10, 31), include_errors=False
+        )
+        assert stats_10["sent"] == 25 and stats_10["fail"] == 5
+
+        # 1. Nếu đối soát với df_listbh rỗng (không có dữ liệu trong khoảng ngày), KHÔNG được biến 25 ca kia thành FAIL
+        stats_empty_lb = compare_service.process_comparison(
+            db, df_sql_oct, pd.DataFrame(), pd.DataFrame(), datetime.date(2026, 11, 16), include_errors=False
+        )
+        assert stats_empty_lb["fail"] == 0, f"df_listbh rỗng vẫn tạo FAIL: {stats_empty_lb}"
+        active_fails_after_empty = db.query(Record).filter(Record.type_group == "FAIL", Record.status != "RESOLVED").count()
+        assert active_fails_after_empty == 5
+
+        # 2. Chạy đối soát Tháng 11:
+        # - listbh chỉ có Tháng 11 (20/22 ca T11 đã gửi + 2 ca tồn T10 gửi bù: OCT_026, OCT_027 + 1 ca giao thoa cuối T10)
+        # - Giả sử df_sql gửi vào vô tình bao gồm cả Tháng 10 lẫn Tháng 11
+        nov_sql = [make_sql_row(f"NOV_{i:03d}", datetime.date(2026, 11, 3)) for i in range(1, 23)]
+        df_sql_oct_nov = pd.DataFrame(oct_sql + nov_sql)
+        lb_nov_only = [{"MA_LK": f"NOV_{i:03d}", "_ngay": datetime.date(2026, 11, 3)} for i in range(1, 21)]
+        lb_nov_only.append({"MA_LK": "OCT_026", "_ngay": datetime.date(2026, 11, 2)})
+        lb_nov_only.append({"MA_LK": "OCT_027", "_ngay": datetime.date(2026, 11, 2)})
+        # Thêm 1 ca spillover ngày 30/10 trong listbh Tháng 11
+        lb_nov_only.append({"MA_LK": "OCT_001", "_ngay": datetime.date(2026, 10, 30)})
+        df_lb_nov_only = pd.DataFrame(lb_nov_only)
+
+        compare_service.process_comparison(
+            db, df_sql_oct_nov, df_lb_nov_only, pd.DataFrame(), datetime.date(2026, 11, 16), include_errors=False
+        )
+
+        # Kiểm tra: Không có ca OCT_001..OCT_025 nào bị đẩy thành FAIL
+        for i in range(1, 26):
+            rec_old = db.query(Record).filter(Record.ma_lk == f"OCT_{i:03d}", Record.type_group == "FAIL", Record.status != "RESOLVED").first()
+            assert rec_old is None, f"Ca đã xử lý tháng 10 OCT_{i:03d} bị đẩy nhầm vào FAIL!"
+
+        # Kiểm tra: 2 ca FAIL tồn T10 (OCT_026, OCT_027) đã gửi bù ở T11 -> tự động chuyển RESOLVED
+        # Còn lại đúng 3 ca FAIL T10 (OCT_028..030) và 2 ca FAIL T11 (NOV_021..022)
+        active_oct_fails = {
+            r.ma_lk for r in db.query(Record).filter(
+                Record.type_group == "FAIL", Record.status != "RESOLVED", Record.ma_lk.like("OCT_%")
+            ).all()
+        }
+        active_nov_fails = {
+            r.ma_lk for r in db.query(Record).filter(
+                Record.type_group == "FAIL", Record.status != "RESOLVED", Record.ma_lk.like("NOV_%")
+            ).all()
+        }
+        assert active_oct_fails == {"OCT_028", "OCT_029", "OCT_030"}, f"Unexpected Oct FAILs: {active_oct_fails}"
+        assert active_nov_fails == {"NOV_021", "NOV_022"}, f"Unexpected Nov FAILs: {active_nov_fails}"
+
+        # 3. Kiểm tra bảo vệ ca đã RESOLVED của tháng cũ (giả sử OCT_028 được IT chốt sổ RESOLVED)
+        rec_028 = db.query(Record).filter(Record.ma_lk == "OCT_028").first()
+        rec_028.status = "RESOLVED"
+        db.commit()
+
+        # Chạy lại với combined listbh có cả tháng 10 & tháng 11 (nhưng OCT_028 vẫn không nằm trong sent_keys)
+        df_lb_both = pd.concat([df_lb_oct, df_lb_nov_only], ignore_index=True)
+        compare_service.process_comparison(
+            db, df_sql_oct_nov, df_lb_both, pd.DataFrame(), datetime.date(2026, 11, 16), include_errors=False
+        )
+        db.refresh(rec_028)
+        assert rec_028.status == "RESOLVED", "Ca tháng cũ đã chốt RESOLVED bị mở lại nhầm sang PENDING FAIL!"
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     test_sql_safety_source_adapter()
     print("test_sql_safety_source_adapter: PASSED")
@@ -311,4 +495,8 @@ if __name__ == "__main__":
     print("test_chunk_error_isolation_and_no_overwrite: PASSED")
     test_ma_lk_excel_string_and_numeric_formats()
     print("test_ma_lk_excel_string_and_numeric_formats: PASSED")
+    test_cc_suffix_conversion_in_source_adapter()
+    print("test_cc_suffix_conversion_in_source_adapter: PASSED")
+    test_multi_month_reconciliation_and_old_month_protection()
+    print("test_multi_month_reconciliation_and_old_month_protection: PASSED")
     print("ALL SAFETY & REGRESSION CHECKS PASSED!")

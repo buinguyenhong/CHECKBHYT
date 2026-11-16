@@ -238,6 +238,72 @@ def test_json_snapshot_serialization_with_decimal_and_datetime():
     assert loaded["XML1"][0]["NGAY_RA"] == "2026-10-30"
     assert loaded["XML1"][0]["RAW_BYTES"] == "BHYT_CHECK"
 
+def test_cv130_field_aliases_and_cc_suffix():
+    from xml_validator_v2.source_adapter import to_sql_ma_lk, XML_TABLE_COLUMNS
+
+    # 1. Xác minh chuyển đổi hậu tố cấp cứu _CC -> /CC, tuyệt đối không cắt bỏ hậu tố
+    assert to_sql_ma_lk("26.045759_CC") == "26.045759/CC"
+    assert to_sql_ma_lk("26.045759/CC") == "26.045759/CC"
+    assert to_sql_ma_lk("26.045759_CC") != "26.045759"
+    assert "MA_THE_BHYT" in XML_TABLE_COLUMNS["XML1"]
+    assert "MA_LY_DO_VNT" in XML_TABLE_COLUMNS["XML1"]
+    assert "T_TONGCHI_BH" in XML_TABLE_COLUMNS["XML1"]
+
+    # 2. Kiểm tra hồ sơ CV130 cấp cứu dùng MA_THE_BHYT, LY_DO_VV='Cấp cứu', MA_LY_DO_VNT='2', T_TONGCHI_BH
+    xml1_cv130 = {
+        "MA_LK": "26.045759/CC",
+        "MA_CSKCB": "66232",
+        "MA_DKBD": "67011",
+        "MA_BN": "23108618",
+        "HO_TEN": "ĐẶNG THỊ HẢI",
+        "NGAY_SINH": "197808100000",
+        "GIOI_TINH": "2",
+        "DIA_CHI": "Thôn 14, Xã Nam Dong, Lâm Đồng",
+        "MA_THE_BHYT": "GD4686721071873",
+        "GT_THE_TU": "20260204",
+        "GT_THE_DEN": "20270203",
+        "LY_DO_VV": "Cấp cứu",
+        "MA_LY_DO_VNT": "2",
+        "NGAY_VAO": "202610031420",
+        "NGAY_RA": "202610031706",
+        "MA_LOAI_KCB": "09",
+        "MA_BENH_CHINH": "S50.0",
+        "KET_QUA_DTRI": "1",
+        "MA_LOAI_RV": "1",
+        "T_TONGCHI_BH": Decimal("45000.00"),
+        "T_BHTT": Decimal("45000.00"),
+        "T_BNTT": Decimal("0.00"),
+        "T_BNCCT": Decimal("0.00"),
+        "T_NGUONKHAC": Decimal("0.00"),
+        "NAM_QT": "2026",
+        "THANG_QT": "10"
+    }
+    xml3_cv130 = [
+        {
+            "MA_LK": "26.045759/CC",
+            "MA_DICH_VU": "10.24",
+            "TEN_DICH_VU": "Khám Chấn thương chỉnh hình",
+            "MA_NHOM": "13",
+            "PHAM_VI": "1",
+            "SO_LUONG": Decimal("1.00"),
+            "DON_GIA_BV": Decimal("45000.00"),
+            "TYLE_TT_DV": Decimal("100"),
+            "THANH_TIEN_BH": Decimal("45000.00"),
+            "T_BHTT": Decimal("45000.00"),
+            "T_BNCCT": Decimal("0.00"),
+            "T_BNTT": Decimal("0.00"),
+            "T_NGUONKHAC": Decimal("0.00"),
+            "MA_KHOA": "K02",
+            "NGAY_YL": "202610031425"
+        }
+    ]
+    case = CaseXmlData(ma_lk="26.045759_CC", xml1=xml1_cv130, xml2=[], xml3=xml3_cv130, raw_tables={"XML1": [xml1_cv130], "XML3": xml3_cv130})
+    engine = ValidationEngine()
+    assert engine.detect_standard(case) == "4750"
+    res_map = {r.rule_code: r for r in check_rules_4750(case)}
+    for code in ["1", "8", "17", "34", "52"]:
+        assert res_map[code].status == RuleStatus.PASSED, f"Rule {code} unexpected violation: {res_map[code].violations}"
+
 if __name__ == "__main__":
     test_missing_xml()
     print("test_missing_xml: PASSED")
@@ -257,5 +323,7 @@ if __name__ == "__main__":
     print("test_projected_columns_and_extended_4750_rules: PASSED")
     test_json_snapshot_serialization_with_decimal_and_datetime()
     print("test_json_snapshot_serialization_with_decimal_and_datetime: PASSED")
+    test_cv130_field_aliases_and_cc_suffix()
+    print("test_cv130_field_aliases_and_cc_suffix: PASSED")
     print("ALL UNIT TESTS IN test_xml_v2.py PASSED!")
 

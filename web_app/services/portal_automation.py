@@ -1261,6 +1261,15 @@ class PortalAutomationService:
 
                 final_dest_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
 
+                # Bảo toàn dữ liệu các tháng cũ nếu trên server chỉ mới có tệp listbh.xlsx đơn lẻ trước đó
+                try:
+                    import glob as _glob
+                    from services.excel_service import archive_listbh_by_months
+                    if os.path.exists(final_dest_path) and not _glob.glob(os.path.join(UPLOAD_DIR, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")):
+                        archive_listbh_by_months(final_dest_path, UPLOAD_DIR)
+                except Exception:
+                    pass
+
                 if not tai_chua_de_nghi:
                     # Chế độ cũ: Chỉ tải 'Đã đề nghị thanh toán'
                     rows_da = select_status_and_download("Đã đề nghị thanh toán", final_dest_path)
@@ -1323,6 +1332,14 @@ class PortalAutomationService:
                         pass
 
                 context.storage_state(path=SESSION_FILE)
+
+                # Lưu phân tách theo tháng (listbh_YYYY_MM.xlsx) và gộp bảo toàn dữ liệu các tháng cũ vào listbh.xlsx
+                try:
+                    from services.excel_service import archive_listbh_by_months
+                    archive_listbh_by_months(final_dest_path, UPLOAD_DIR, explicit_month=int(target_month))
+                    log(f"📂 Đã lưu trữ danh sách theo Tháng {target_month} và đồng bộ bảo toàn dữ liệu các tháng trước.")
+                except Exception as arch_e:
+                    log(f"Lưu ý khi lưu trữ listbh theo tháng: {arch_e}")
 
                 log(f"✅ Hoàn tất Luồng B: {final_dest_path} ({total_rows} bản ghi)")
                 return {

@@ -67,7 +67,7 @@ def check_rules_4750_ctn(case: CaseXmlData) -> List[RuleResult]:
             if (not raw_v or str(raw_v).strip() == "") and f_code == "TYLE_TT":
                 raw_v = row.get("TYLE_TT_BH", row.get("TYLE", ""))
             if (not raw_v or str(raw_v).strip() == "") and f_code == "THANH_TIEN":
-                raw_v = row.get("THANH_TIEN_BV", "")
+                raw_v = row.get("THANH_TIEN_BV", row.get("THANH_TIEN_BH", ""))
             val = str(raw_v if raw_v is not None else "").strip()
             if not val or val.lower() in ["none", "nan", "null"]:
                 missing_xml2_violations.append(RuleViolation(
@@ -105,7 +105,7 @@ def check_rules_4750_ctn(case: CaseXmlData) -> List[RuleResult]:
             if (not raw_v or str(raw_v).strip() == "") and f_code == "TYLE_TT":
                 raw_v = row.get("TYLE_TT_DV", row.get("TYLE_TT_BH", row.get("TYLE", "")))
             if (not raw_v or str(raw_v).strip() == "") and f_code == "THANH_TIEN":
-                raw_v = row.get("THANH_TIEN_BV", "")
+                raw_v = row.get("THANH_TIEN_BV", row.get("THANH_TIEN_BH", ""))
             val = str(raw_v if raw_v is not None else "").strip()
             if not val or val.lower() in ["none", "nan", "null"]:
                 missing_xml3_violations.append(RuleViolation(

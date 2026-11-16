@@ -88,10 +88,10 @@ File quan trọng:
 - `Chay_Tool_Tai_BHYT.bat`: tệp thực thi 1-click tại thư mục gốc khởi động nhanh công cụ tải dữ liệu BHYT cục bộ.
 - `client_runner/`: bộ công cụ RPA Runner chạy trên máy trạm (`client_agent.py`, `Cai_Dat_May_Tram.bat`, `Chay_RPA_May_Tram.bat`).
 - `web_app/xml_validator_v2/`: thư mục chứa hệ thống Validate XML độc lập thế hệ mới tại Tab 9 (`/api/admin/xml-v2/*`).
-  - `source_adapter.py`: Bộ truy vấn SQL Server XML chỉ đọc (`SELECT ... FROM dbo.XML1_CV130..XML15_CV130 WITH (NOLOCK)` theo lô `MA_LK`), tuyệt đối không ghi dữ liệu hoặc gọi SP tạo XML.
+  - `source_adapter.py`: Bộ truy vấn SQL Server XML chỉ đọc (`SELECT ... FROM dbo.XML1_CV130..XML15_CV130 WITH (NOLOCK)` theo lô `MA_LK`, hỗ trợ chuyển đổi hậu tố cấp cứu `_CC` sang `/CC` mà không cắt bỏ hậu tố), tuyệt đối không ghi dữ liệu hoặc gọi SP tạo XML.
   - `models.py` & `db.py`: CSDL SQLite độc lập riêng biệt (`xml_validation_v2.db`) với các bảng `val_runs`, `val_case_snapshots`, `val_results`, `val_errors`, `val_rule_catalog`.
-  - `catalog.py`: Danh mục 116 quy tắc nghiệp vụ trích xuất từ tài liệu GDH & TLGDH.
-  - `rules/`: Triển khai độc lập 3 bộ quy tắc: `rules_9324.py` (12 quy tắc), `rules_4210.py` (50 quy tắc), `rules_4750.py` (54 quy tắc) sử dụng kiểu số học `Decimal` chống trôi sai số.
+  - `catalog.py`: Danh mục 123 quy tắc kiểm tra XML (gồm 116 quy tắc logic gốc trích xuất từ tài liệu GDH & TLGDH và 7 nhóm quy tắc CTN 4750).
+  - `rules/`: Triển khai độc lập 4 mô-đun quy tắc: `rules_9324.py` (12 quy tắc), `rules_4210.py` (50 quy tắc — thực thi trực tiếp 43/50), `rules_4750.py` (54 quy tắc — thực thi trực tiếp 51/54, hỗ trợ chuẩn tên trường CV130 `MA_THE_BHYT`, `MA_LY_DO_VNT`, `T_TONGCHI_BH`, `THANH_TIEN_BH`), và `rules_4750_ctn.py` (7 nhóm quy tắc CTN 4750), sử dụng kiểu số học `Decimal` chống trôi sai số (tổng cộng 113/123 quy tắc thực thi trực tiếp).
   - `rule_engine.py`: Bộ máy phát hiện chuẩn tự động và tổng hợp 7 trạng thái kết quả (`HAS_ERRORS`, `NO_ERRORS_FOUND`, `MISSING_XML`, `INCOMPLETE_DATA`, `RULESET_UNDETERMINED`, `VALIDATION_FAILED`, `PARTIAL`).
   - `validation_service.py`: Điều phối đợt kiểm tra, quản lý tiến trình ngầm và lưu snapshot truy vết.
   - `report_exporter.py`: Xuất file Excel báo cáo lỗi chi tiết.
@@ -389,11 +389,11 @@ Luồng nền `run_sync_in_background()`:
 4. `fetch_his_data()` dùng cache SQL nếu có.
 5. Nếu không có cache hoặc cache thiếu range, gọi 2 stored procedure HIS.
 6. Chuẩn hóa thành dataframe `df_sql`.
-7. Đọc `uploaded_files/listbh.xlsx` nếu có.
-8. Lọc `listbh` theo khoảng ngày.
+7. Đọc hợp nhất `listbh` theo khoảng ngày thông qua `_load_listbh_for_sync_range()` (kết hợp các file lưu trữ theo tháng `uploaded_files/listbh_YYYY_MM.xlsx` và `uploaded_files/listbh.xlsx`).
+8. Lọc `listbh` theo khoảng ngày (`from_date` → `to_date`). Nếu file có dữ liệu ngày hợp lệ nhưng rỗng trong khoảng lọc (`df_in_range.empty`), giữ `df_listbh` rỗng để tránh dùng dữ liệu cũ đánh `FAIL` nhầm các ngày mới chưa tải.
 9. Chỉ đọc `uploaded_files/HoSoLoiChiTiet.xlsx` nếu IT bật tùy chọn dùng file lỗi trong lần đối soát đó.
 10. Nếu không bật tùy chọn file lỗi, hệ thống bỏ qua file lỗi dù file đang tồn tại trên máy chủ để tránh dùng nhầm file cũ.
-11. Gọi `compare_service.process_comparison()`.
+11. Gọi `compare_service.process_comparison()` (bao gồm tự động `RESOLVED` các ca `PENDING` tháng cũ đã xuất hiện trong `sent_keys` kỳ mới và bảo vệ không tạo `FAIL` cho tháng chưa được `listbh` bao phủ).
 12. Lưu hoặc cập nhật records vào SQLite.
 13. Cập nhật progress/log cho UI.
 
@@ -416,8 +416,11 @@ Nếu `MA_LK` có trong `listbh`:
 
 Nếu `MA_LK` không có trong `listbh` và không có trong file lỗi:
 
-- Tạo/cập nhật record nhóm `FAIL`.
-- Trạng thái mặc định `PENDING`.
+- Trước khi tạo mới hoặc đánh dấu lại `FAIL`, hệ thống áp dụng các lớp bảo vệ đa tháng:
+  - **Bảo vệ rỗng & phạm vi tháng (`covered_months`):** Kiểm tra `df_listbh is None or df_listbh.empty`; chỉ tạo/cập nhật `FAIL` khi `(ngay_ra_vien.year, ngay_ra_vien.month) in covered_months` do `_compute_covered_months()` tính toán (tự động loại trừ phần dữ liệu tràn cuối tháng trước có tỷ lệ nhỏ `< 20%` và `min(day) > 15`).
+  - **Tự động xử lý ca tháng cũ đã gửi lên cổng (Bước 1.1):** Các hồ sơ `FAIL`/`LOI` đang `PENDING` của tháng cũ nếu có `MA_LK` xuất hiện trong `sent_keys` của kỳ/tháng mới hơn (bao gồm khớp số bỏ `.0` ở đuôi) sẽ được tự động chuyển sang `RESOLVED`.
+  - **Khóa hồ sơ `RESOLVED` tháng cũ:** Không cho phép mở lại về `PENDING` đối với các hồ sơ `FAIL` thuộc tháng cũ đã ở trạng thái `RESOLVED` khi chạy đối soát kỳ mới.
+- Nếu hợp lệ trong phạm vi đối soát: tạo/cập nhật record nhóm `FAIL`, trạng thái mặc định `PENDING`.
 - Nhóm này dành cho IT xử lý/reset. Toàn bộ ghi chú cũ của người dùng (kèm thông tin sửa lỗi từ đợt trước nếu có) được nối chuỗi bảo toàn tuyệt đối, không bao giờ bị ghi đè.
 
 Nếu `MA_LK` không có trong `listbh` nhưng có trong file lỗi:
@@ -492,12 +495,15 @@ Mở khóa/trả khoa:
 - Nếu action `CLOSE`, record chuyển về `NORMAL` và sinh SQL đưa `BenhAn.TrangThai` về `DaThanhToan` để khóa lại sau khi khoa sửa.
 - Script này hiện áp dụng cho ca `Nội trú` theo `BenhAn.SoBenhAn`. Đây là script mở/khóa bệnh án, không phải script reset cờ xuất XML.
 
-Đánh dấu xử lý thủ công:
+Đánh dấu xử lý thủ công & chốt sổ tháng:
 
 - `POST /api/records/{record_id}/admin-resolve`
 - IT có hai tùy chọn qua tham số `action`:
   - `edit`: Chỉ lưu ghi chú xử lý của IT (giữ nguyên trạng thái hồ sơ).
   - `resolve` (mặc định): Lưu ghi chú và đổi trạng thái hồ sơ sang `RESOLVED`.
+- `POST /api/records/admin/fail/resolve-month` (`resolve_fail_by_month`):
+  - Chức năng **"Chốt sổ tháng"** (`#btnResolveFailMonth` / `resolveFailMonth()` trên Tab 2 Admin): khi IT chọn một tháng cụ thể trên `#failMonthFilter`, cho phép chuyển hàng loạt các hồ sơ `FAIL` đang `PENDING` của tháng đó sang `RESOLVED`.
+  - Khi bấm `resetSelectedFail(loai)` trong lúc lọc một tháng cụ thể (`#failMonthFilter`), UI tự suy ra `from_date`/`to_date` theo đúng tháng đang chọn.
 
 ### 8.9. Scheduler tự đồng bộ
 
@@ -1042,6 +1048,7 @@ Admin xử lý:
 - `GET /api/records/admin/fail`
 - `POST /api/records/{record_id}/admin-resolve`
 - `POST /api/records/admin/fail/reset`
+- `POST /api/records/admin/fail/resolve-month`
 - `POST /api/records/{id}/toggle-his-unlock`
 - `GET /api/admin/dept-unlock-preview`
 - `POST /api/admin/bulk-unlock`
@@ -1159,12 +1166,14 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
 1. **Lựa chọn Kỳ quyết toán & Tháng:** 
    - Trên Cổng BHYT (`/DanhSachHSKCB/Index`), tự động chọn Kỳ quyết toán là **"Tháng"** (`cbx_thoigian`).
    - Tự động chọn đúng **Tháng** theo tham số người dùng nhập (mặc định là Tháng hiện tại) qua DevExpress Client API (`cbx_thang.SetSelectedIndex(...)` / `ProcessItemClick(...)` / `SetValue(...)`) kèm fallback DOM click.
-2. **Cơ chế Điều khiển & Tùy chọn Tải gộp linh hoạt:**
-   - **Chế độ đơn (Mặc định):** Chọn trạng thái "Đã đề nghị thanh toán" (`cb_TrangThaiTT`), bấm Tìm kiếm (`bt_TimKiem`), mở menu Xuất Excel (`btnExport`) và click "Xuất excel" (`btnExportExcel`) trong khối `expect_download` kèm tiến trình Heartbeat theo dõi kết nối để tải về `listbh.xlsx`.
+2. **Cơ chế Điều khiển, Tùy chọn Tải gộp & Lưu trữ Theo Tháng:**
+   - **Đồng bộ Ngày theo Tháng Quyết Toán:** Khi thay đổi `#b_thang` trên UI (`web_app/templates/portal_automation.html`, `portal_downloader/templates/index.html`), hàm `syncDateRangeWithMonth(thangVal)` tự động cập nhật `Từ ngày` – `Đến ngày` tương ứng; đồng thời `client_runner/client_agent.py` (`load_config()`) tự đặt lại `from_date`/`to_date` về tháng hiện tại nếu `client_config.json` đang lưu ngày cũ từ tháng trước.
+   - **Chế độ đơn (Mặc định):** Chọn trạng thái "Đã đề nghị thanh toán" (`cb_TrangThaiTT`), bấm Tìm kiếm (`bt_TimKiem`), mở menu Xuất Excel (`btnExport`) và click "Xuất excel" (`btnExportExcel`) trong khối `expect_download` kèm tiến trình Heartbeat theo dõi kết nối để tải về file kết quả.
    - **Chế độ tải gộp (Tùy chọn - Tích chọn "Tải gộp Chưa đề nghị"):**
      - Đợt 1: Tải danh sách **"Đã đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_da_de_nghi.xlsx`.
      - Đợt 2: Tải tiếp danh sách **"Chưa đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_chua_de_nghi.xlsx`.
-     - Gộp dữ liệu: Đọc bằng `pd.read_excel(..., dtype=str)`, sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` gộp nối tiếp toàn bộ dòng và ghi ra `listbh.xlsx` kèm định dạng ô Text (`number_format = '@'`), giữ nguyên 100% cấu trúc cột và chữ số `0` ở đầu/cuối của `Mã liên kết` / `Mã BN` (không drop trùng lặp).
+     - Gộp dữ liệu: Đọc bằng `pd.read_excel(..., dtype=str)`, sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` gộp nối tiếp toàn bộ dòng kèm định dạng ô Text (`number_format = '@'`) thông qua `_write_df_preserving_text_excel()`, giữ nguyên 100% cấu trúc cột và chữ số `0` ở đầu/cuối của `Mã liên kết` / `Mã BN` (không drop trùng lặp).
+   - **Lưu trữ đa tháng (`listbh_YYYY_MM.xlsx`):** Sau khi Flow B hoàn tất (`run_flow_b()`) hoặc khi upload/đối soát (`_save_and_archive_listbh()`), hệ thống di trú `listbh.xlsx` cũ nếu chưa có file tháng, gọi `archive_listbh_by_months()` để lưu bản riêng `listbh_YYYY_MM.xlsx` cho từng tháng (tránh ghi đè tháng trước khi sang tháng mới) và dựng lại `listbh.xlsx` từ tối đa 3 tháng gần nhất; khi đối soát đọc hợp nhất bằng `load_combined_listbh_for_range()`.
 3. **Đồng bộ toàn diện trên 3 nền tảng:**
    - **WebApp Server (`/portal-automation`):** Giao diện thêm ô nhập Tháng và Checkbox "Tải gộp Chưa đề nghị", truyền tham số qua API `/api/automation/v2/flow-b`.
    - **Công cụ Tải tại chỗ (`portal_downloader`):** Bổ sung ô nhập Tháng và Checkbox Tải gộp trên giao diện `downloader_server.py`.
@@ -1261,9 +1270,9 @@ Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bện
 - **CSDL XML:** `eHospital_ThienHanh_XML`
 - **Schema:** `dbo`
 - **Phạm vi 15 bảng XML:** Bao phủ toàn bộ từ `XML1_CV130` đến `XML15_CV130`.
-- **Khóa liên kết hồ sơ:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`.
+- **Khóa liên kết hồ sơ & Chuyển đổi ca cấp cứu `_CC` ↔ `/CC`:** Sử dụng khóa ngoại nghiệp vụ duy nhất `MA_LK` (có trên toàn bộ 15 bảng XML) để gom toàn bộ dữ liệu phân cấp của một bệnh nhân vào một đối tượng `CaseXmlData`. Đối với các hồ sơ cấp cứu nội trú có hậu tố `_CC`, hàm `to_sql_ma_lk()` tự động chuyển đổi sang định dạng `/CC` của SQL Server khi truy vấn (`26.045759_CC` $\rightarrow$ `26.045759/CC`) và dùng bảng ánh xạ 2 chiều `sql_to_orig_map` để trả dữ liệu về đúng khóa gốc ban đầu (tuyệt đối không tìm kiếm kiểu cắt bỏ hậu tố).
 - **Cam kết an toàn tuyệt đối, Column Projection và Tham số hóa truy vấn:**
-  - **Tối ưu Column Projection:** Thay vì `SELECT *` tốn dung lượng mạng và bộ nhớ RAM trên các bảng quy mô cực lớn (XML4 ~16 triệu dòng, XML3 ~6.4 triệu dòng), hệ thống xác định rõ danh mục cột cần thiết (`XML_TABLE_COLUMNS`) cho 15 bảng XML (bao gồm đầy đủ các cột bắt buộc và tài chính như `DIA_CHI`, `TINH_TRANG_RV`, `MUC_HUONG`, `MA_KHU_VUC`, `T_VANCHUYEN`, `T_GIUONG`, `PHAM_VI`, `TYLE_TT_BH`, `TYLE_TT_DV`, `THANH_TIEN_BV`, `THANH_TIEN_BH`, `T_NGOAIDS`, `NGAY_TH_YL`,...). Có cơ chế fallback tự động về `SELECT *` nếu schema SQL Server cũ thiếu trường, kèm phương thức `test_connection()` và API `POST /api/admin/xml-v2/test-connection` để kiểm tra kết nối trực tiếp trên giao diện Tab 9.
+  - **Tối ưu Column Projection:** Thay vì `SELECT *` tốn dung lượng mạng và bộ nhớ RAM trên các bảng quy mô cực lớn (XML4 ~16 triệu dòng, XML3 ~6.4 triệu dòng), hệ thống xác định rõ danh mục cột cần thiết (`XML_TABLE_COLUMNS`) cho 15 bảng XML (bao gồm đầy đủ các cột bắt buộc, cột chuẩn Công văn 130 như `MA_THE_BHYT`, `MA_LY_DO_VNT`, `T_TONGCHI_BH`, `DIA_CHI`, `TINH_TRANG_RV`, `MUC_HUONG`, `MA_KHU_VUC`, `T_VANCHUYEN`, `T_GIUONG`, `PHAM_VI`, `TYLE_TT_BH`, `TYLE_TT_DV`, `THANH_TIEN_BV`, `THANH_TIEN_BH`, `T_NGOAIDS`, `NGAY_TH_YL`,...). Có cơ chế fallback tự động về `SELECT *` nếu schema SQL Server cũ thiếu trường, kèm phương thức `test_connection()` và API `POST /api/admin/xml-v2/test-connection` để kiểm tra kết nối và đếm số bảng XML tồn tại qua `INFORMATION_SCHEMA.TABLES` trực tiếp trên giao diện Tab 9.
   - **Tùy chọn Lock Hint:** Hỗ trợ cấu hình `use_nolock: bool` (mặc định True để tránh leo thang khóa S-Lock làm ảnh hưởng đến bác sĩ/nhân viên thu ngân viện).
   - **Tham số hóa ODBC:** Sử dụng Parameterized Query chuẩn ODBC: `SELECT cols FROM dbo.{tbl} {lock_hint} WHERE MA_LK IN (?, ?, ?)` với `cur.execute(sql, tuple(chunk))`, loại bỏ hoàn toàn nguy cơ SQL Injection và tương thích 100% Python 3.10+.
   - Tuyệt đối không có lệnh `INSERT`, `UPDATE`, `DELETE`, `ALTER` hoặc gọi các Stored Procedure tạo XML.
@@ -1282,7 +1291,7 @@ Nhằm hỗ trợ kiểm tra chất lượng dữ liệu XML của các ca bện
   - `RULESET_UNDETERMINED`: Dữ liệu XML thiếu các trường đặc thù để nhận diện chuẩn áp dụng.
 
 ### 22.4. Tác nghiệp Chọn Hồ Sơ và Quản lý Tiến trình
-- **Bộ lọc ca chưa gửi chính xác (Xử lý 3-valued logic SQL):** Lọc ca chưa gửi từ bảng `records` sử dụng `Record.type_group.in_(["FAIL", "LOI"])` kết hợp `or_(Record.status != 'RESOLVED', Record.status.is_(None))` để không bao giờ bỏ sót các ca mới chưa gán status hoặc có status là NULL. Validate nghiêm ngặt định dạng ngày `doi_soat_date`.
+- **Bộ lọc ca chưa gửi chính xác (Xử lý 3-valued logic SQL):** Lọc ca chưa gửi từ bảng `records` sử dụng `Record.type_group.in_(["FAIL", "LOI"])` kết hợp `or_(Record.status != 'RESOLVED', Record.status.is_(None))` để không bao giờ bỏ sót các ca mới chưa gán status hoặc có status là NULL. Validate nghiêm ngặt định dạng ngày `doi_soat_date`. Hỗ trợ lấy fallback `ho_ten` và `ma_the` (`MA_THE` / `MA_THE_BHYT`) từ bảng `XML1` nếu metadata đầu vào để trống khi lưu `ValCaseSnapshot` và `ValResult`.
 - **Tuần tự hóa an toàn Snapshot (Xử lý Decimal, Datetime, Bytes):** Dữ liệu các bảng XML truy vấn từ SQL Server chứa các trường `NUMERIC`/`DECIMAL`/`MONEY` (được thư viện `pyodbc` chuyển thành `Decimal`) và `datetime`. Khi lưu `raw_snapshot_json` vào `val_case_snapshots`, hệ thống sử dụng hàm định dạng `_json_serialize_xml_value` tự động ép `Decimal` sang số (`int`/`float`), `datetime`/`date` sang ISO string và giải mã `bytes`, loại bỏ triệt để ngoại lệ `TypeError: Object of type Decimal is not JSON serializable`.
 - **Bảo toàn trạng thái hủy tiến trình:** Quản lý tiến trình qua đối tượng `CURRENT_VALIDATION_PROGRESS` dùng `.clear()` và `.update()` in-place. Nếu người dùng bấm "Hủy", trạng thái `CANCELLED` được bảo toàn và ghi nhận vĩnh viễn vào CSDL, không bao giờ bị ghi đè thành `COMPLETED`.
 
