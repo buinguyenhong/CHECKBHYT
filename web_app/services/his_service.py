@@ -2,6 +2,7 @@ import pandas as pd
 from typing import Optional, Tuple
 import datetime
 import os
+import re
 import json
 import shutil
 import sys
@@ -159,7 +160,7 @@ def chuan_hoa_ma_lk(value) -> str:
     if value is None or (isinstance(value, float) and pd.isna(value)) or pd.isna(value):
         return ""
     s = str(value).strip()
-    s = s.replace("_CC", "/CC")
+    s = re.sub(r"_cc", "/CC", s, flags=re.IGNORECASE)
     return s
 
 def remove_leading_A(value) -> str:

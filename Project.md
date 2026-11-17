@@ -337,12 +337,12 @@ Password HIS hiện được lưu dạng XOR/base64 trong SQLite. Đây chỉ l�
 
 Admin upload:
 
-- `listbh.xlsx` qua `POST /api/upload/listbh`: đọc luồng Excel **1 lần duy nhất** (`read_excel_preserving_ma_lk` dùng `openpyxl read_only=True` và vector hóa ngày qua `parse_datetime_to_date`), truyền thẳng DataFrame đã nạp vào `_save_and_archive_listbh()` để tách lưu theo tháng (`uploaded_files/listbh_YYYY_MM.xlsx`), dựng lại `uploaded_files/listbh.xlsx` và gạch nợ `RESOLVED` tức thì (bỏ qua gạch nợ trùng nếu `SYNC_PROGRESS["active"]` đang chạy).
+- `listbh.xlsx` qua `POST /api/upload/listbh`: đọc xác thực Excel bằng `load_listbh()` (`read_excel_preserving_ma_lk()` dùng `openpyxl read_only=True`, giới hạn `max_row = len(df) + 1`, bỏ dòng trống và khử trùng `MA_LK` trong RAM, vector hóa ngày qua `parse_datetime_to_date`), truyền DataFrame đã nạp sang `_save_and_archive_listbh()` để **lưu nguyên vẹn 100% byte gốc** vào `uploaded_files/listbh.xlsx` (không cắt cột, không sửa/gộp nhân dòng), dọn các tệp `listbh_YYYY_MM.xlsx` cũ nếu có và gạch nợ `RESOLVED` tức thì (bỏ qua gạch nợ trùng nếu `SYNC_PROGRESS["active"]` đang chạy).
 - `HoSoLoiChiTiet.xlsx` qua `POST /api/upload/loi`.
 
 Lưu trữ tệp:
 
-- `uploaded_files/listbh_YYYY_MM.xlsx` (lưu trữ phân tách từng tháng, bảo toàn dữ liệu các tháng trước) và `uploaded_files/listbh.xlsx` (tổng hợp tối đa 3 tháng gần nhất). `load_combined_listbh_for_range()` ưu tiên đọc các tệp `listbh_YYYY_MM.xlsx` khi đã tồn tại (không đọc trùng `listbh.xlsx`).
+- `uploaded_files/listbh.xlsx` (lưu nguyên bản 100% cấu trúc 22 cột gốc tải từ Cổng/Admin; `load_combined_listbh_for_range()` đọc trực tiếp từ `listbh.xlsx` và dọn sạch `listbh_YYYY_MM.xlsx` cũ nếu tồn tại).
 - `uploaded_files/HoSoLoiChiTiet.xlsx` (ghi atomic qua `*.tmp.xlsx`).
 
 Khi upload file lỗi, hệ thống còn cố gắng ghép ngay vào ngày đối soát gần nhất đang có trong SQLite và chuyển các record tương ứng sang nhóm `LOI`.
@@ -387,7 +387,7 @@ Luồng nền `run_sync_in_background()`:
 4. `fetch_his_data()` dùng cache SQL nếu có.
 5. Nếu không có cache hoặc cache thiếu range, gọi 2 stored procedure HIS. Nếu `df_op` chưa có cột tên phòng khám, `fetch_phong_kham_ngoai_tru()` ưu tiên truy vấn 1 lượt theo `tn.NgayTiepNhan` (`DATEADD(day, -7, ...)` đến `+1`), chỉ fallback theo lô `1000` mã có log tiến độ cho các ca còn thiếu.
 6. Chuẩn hóa thành dataframe `df_sql` (chuyển đổi ngày vector hóa qua `parse_datetime_to_date()`).
-7. Đọc hợp nhất `listbh` theo khoảng ngày thông qua `_load_listbh_for_sync_range()` (kết hợp các file lưu trữ theo tháng `uploaded_files/listbh_YYYY_MM.xlsx` hoặc fallback `uploaded_files/listbh.xlsx`).
+7. Đọc `listbh` theo khoảng ngày thông qua `_load_listbh_for_sync_range()` (đọc trực tiếp `uploaded_files/listbh.xlsx` nguyên bản thông qua `load_combined_listbh_for_range()`, tự khử trùng `MA_LK` trong RAM và dọn `listbh_YYYY_MM.xlsx` cũ nếu có).
 8. Lọc `listbh` theo khoảng ngày (`from_date` → `to_date`). Nếu file có dữ liệu ngày hợp lệ nhưng rỗng trong khoảng lọc (`df_in_range.empty`), giữ `df_listbh` rỗng để tránh dùng dữ liệu cũ đánh `FAIL` nhầm các ngày mới chưa tải.
 9. Chỉ đọc `uploaded_files/HoSoLoiChiTiet.xlsx` nếu IT bật tùy chọn dùng file lỗi trong lần đối soát đó.
 10. Nếu không bật tùy chọn file lỗi, hệ thống bỏ qua file lỗi dù file đang tồn tại trên máy chủ để tránh dùng nhầm file cũ.
@@ -1175,8 +1175,8 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
    - **Chế độ tải gộp (Tùy chọn - Tích chọn "Tải gộp Chưa đề nghị"):**
      - Đợt 1: Tải danh sách **"Đã đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_da_de_nghi.xlsx`.
      - Đợt 2: Tải tiếp danh sách **"Chưa đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_chua_de_nghi.xlsx`.
-     - Gộp dữ liệu: Đọc bằng `pd.read_excel(..., dtype=str)`, sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` gộp nối tiếp toàn bộ dòng kèm định dạng ô Text (`number_format = '@'`) thông qua `_write_df_preserving_text_excel()`, giữ nguyên 100% cấu trúc cột và chữ số `0` ở đầu/cuối của `Mã liên kết` / `Mã BN` (không drop trùng lặp).
-   - **Lưu trữ đa tháng & hiệu năng cao (`listbh_YYYY_MM.xlsx`):** Sau khi Flow B hoàn tất (`run_flow_b()`) hoặc khi upload/đối soát (`_save_and_archive_listbh()`), hệ thống di trú `listbh.xlsx` cũ nếu chưa có file tháng, gọi `archive_listbh_by_months()` để lưu bản riêng rút gọn các cột thiết yếu (`[found_key, found_date]`) thành `listbh_YYYY_MM.xlsx` theo từng tháng và dựng lại `listbh.xlsx` từ tối đa 3 tháng gần nhất (ghi atomic qua `*.tmp.xlsx` + `os.replace()`, chỉ định dạng `@` trên cột `MA_LK`, tái sử dụng DataFrame trong RAM). Tác vụ upload/đối soát đồng bộ chạy trên thread pool (`asyncio.to_thread()` với `SessionLocal()` riêng) để không khóa Event Loop Uvicorn, đồng thời kích hoạt gạch nợ `RESOLVED` tức thì cho các hồ sơ tồn đọng. Khi đối soát đọc hợp nhất bằng `load_combined_listbh_for_range()`.
+     - Gộp dữ liệu: Đọc bằng `read_excel_preserving_ma_lk`, sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` kèm `dropna(how="all")` và khử trùng lặp theo cột khóa (`Mã liên kết` / `MA_LK`), ghi ra `listbh.xlsx` với định dạng ô Text (`number_format = '@'`) chỉ trên cột `MA_LK` / `Mã liên kết` thông qua `_write_df_preserving_text_excel()` (giữ nguyên toàn bộ cấu trúc 22 cột gốc và chữ số `0` ở đầu/cuối).
+   - **Bảo toàn nguyên bản `listbh.xlsx` & hiệu năng cao:** Khi Luồng B hoàn tất (`tai_chua_de_nghi=False`) hoặc khi Admin upload (`_save_and_archive_listbh()`), hệ thống **lưu nguyên vẹn 100% file gốc** vào `listbh.xlsx` (không cắt cột, không ghép nối nhiều kỳ gây nhân bản số dòng), đồng thời dọn sạch các file `listbh_YYYY_MM.xlsx` cũ nếu còn tồn tại. Tác vụ upload/đối soát đồng bộ chạy trên thread pool (`asyncio.to_thread()` với `SessionLocal()` riêng) để không khóa Event Loop Uvicorn, và kích hoạt gạch nợ `RESOLVED` tức thì cho các hồ sơ tồn đọng trên SQLite (`app_state.db`); việc bảo vệ các tháng cũ được quản lý hoàn toàn qua CSDL SQLite và `_compute_covered_months()`.
 3. **Đồng bộ toàn diện trên 3 nền tảng:**
    - **WebApp Server (`/portal-automation`):** Giao diện thêm ô nhập Tháng và Checkbox "Tải gộp Chưa đề nghị", truyền tham số qua API `/api/automation/v2/flow-b`.
    - **Công cụ Tải tại chỗ (`portal_downloader`):** Bổ sung ô nhập Tháng và Checkbox Tải gộp trên giao diện `downloader_server.py`.
@@ -1192,7 +1192,7 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
    - Sau khi click dòng: Đợi popup `#PopupNhanChiTietLoiHS_PW-0` và loading indicator bên trong nạp xong.
    - Tìm và click nút "Xuất Excel" bên trong popup với `expect_download`.
    - Đóng popup an toàn (`PopupNhanChiTietLoiHS.Hide()`) và đợi mask ẩn hẳn trước khi sang dòng tiếp theo.
-5. **Gom file bảo toàn chuỗi `MA_LK` bằng `openpyxl` & Đối chiếu Nguồn Tin Cậy HIS (`trusted_keys`):** Đọc trực tiếp ô `MA_LK` / `Mã liên kết` bằng `openpyxl` (kiểm tra `cell.value`, `cell.data_type`, `cell.number_format` để khôi phục cả các ô lưu kiểu số có định dạng hiển thị thập phân như `0.000000`), gom thành `HoSoLoiChiTiet.xlsx` kèm khóa định dạng Text (`number_format = '@'`) và đối chiếu có căn cứ với tập `MA_LK` nguồn từ SQL Server HIS (`resolve_ma_lk_against_trusted_set` — không bao giờ tự ý thêm số `0` nếu không có căn cứ hoặc bị nhập nhằng).
+5. **Gom file bảo toàn chuỗi `MA_LK` bằng `openpyxl`, Chuẩn hóa `_CC` -> `/CC` & Đối chiếu Nguồn Tin Cậy HIS (`trusted_keys`):** Đọc trực tiếp ô `MA_LK` / `Mã liên kết` bằng `openpyxl` (`read_only=True`, giới hạn `max_row = len(df) + 1`, kiểm tra `cell.value`, `cell.data_type`, `cell.number_format` để khôi phục cả các ô lưu kiểu số có định dạng hiển thị thập phân như `0.000000`), chuyển đổi toàn bộ hậu tố `_CC`/`_cc` sang `/CC` ngay khi gộp `merge_excel_files()`, khử trùng lặp theo nội dung lỗi (loại trừ `STT`, `TT`, `MA_GD` để tránh nhân bản dòng khi gửi nhiều lần), ghi atomic thành `HoSoLoiChiTiet.xlsx` kèm khóa định dạng Text (`number_format = '@'`) trên cột `MA_LK`, và đối chiếu có căn cứ với tập `MA_LK` nguồn từ SQL Server HIS (`resolve_ma_lk_against_trusted_set` hỗ trợ cả mã có hậu tố `/CC` như `26.037040/CC` — không bao giờ tự ý thêm số `0` nếu không có căn cứ hoặc bị nhập nhằng).
 
 ### 19.5. Cơ chế xử lý đối soát ca lỗi khi đã gửi cổng
 - Khi chạy Đối soát C: nếu một ca bệnh (`MA_LK`) vừa có trong danh sách đã gửi (`listbh`) nhưng lại xuất hiện trong file lỗi chi tiết (`HoSoLoiChiTiet.xlsx`):

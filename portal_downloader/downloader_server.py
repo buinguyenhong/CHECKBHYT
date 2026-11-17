@@ -522,40 +522,55 @@ def _read_excel_preserving_ma_lk(file_path: str) -> pd.DataFrame:
     df = pd.read_excel(file_path, dtype=str)
     if df.empty:
         return df
+    raw_len = len(df)
+    wb = None
     try:
         import openpyxl
         from decimal import Decimal
-        wb = openpyxl.load_workbook(file_path, data_only=True)
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         ws = wb.active
         headers = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
-        for idx, h_cell in enumerate(headers):
-            h_name = str(h_cell.value or "").strip()
-            if h_name.lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"} and h_name in df.columns:
-                vals = []
-                for row in ws.iter_rows(min_row=2, min_col=idx + 1, max_col=idx + 1, values_only=False):
-                    c = row[0]
-                    v = c.value
+        lk_cols = [
+            (idx, str(h_cell.value or "").strip())
+            for idx, h_cell in enumerate(headers)
+            if str(h_cell.value or "").strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"}
+            and str(h_cell.value or "").strip() in df.columns
+        ]
+        if lk_cols:
+            max_idx = max(idx for idx, _ in lk_cols)
+            extracted = {h_name: [] for _, h_name in lk_cols}
+            for row in ws.iter_rows(min_row=2, max_row=raw_len + 1, min_col=1, max_col=max_idx + 1, values_only=False):
+                for idx, h_name in lk_cols:
+                    c = row[idx] if idx < len(row) else None
+                    v = c.value if c is not None else None
                     if v is None:
-                        vals.append("")
+                        extracted[h_name].append("")
                     elif c.data_type in ("s", "str", "inlineStr") or isinstance(v, str):
-                        vals.append(str(v).strip())
+                        extracted[h_name].append(str(v).strip())
                     elif c.data_type == "n" or isinstance(v, (int, float)):
                         fmt = str(getattr(c, "number_format", "") or "").split(";")[0].strip()
                         m = re.search(r"[0#]\.([0#]+)", fmt) if fmt.lower() not in ("", "general", "@") else None
                         if m and len(m.group(1).rstrip("#")) > 0:
                             dec_len = len(m.group(1).rstrip("#"))
-                            vals.append(str(Decimal(str(v)).quantize(Decimal("1." + ("0" * dec_len)))))
+                            extracted[h_name].append(str(Decimal(str(v)).quantize(Decimal("1." + ("0" * dec_len)))))
                         elif isinstance(v, float) and v.is_integer():
-                            vals.append(str(int(v)))
+                            extracted[h_name].append(str(int(v)))
                         else:
-                            vals.append(str(v).strip())
+                            extracted[h_name].append(str(v).strip())
                     else:
-                        vals.append(str(v).strip())
-                if len(vals) >= len(df):
-                    df[h_name] = vals[:len(df)]
-        wb.close()
+                        extracted[h_name].append(str(v).strip())
+            for _, h_name in lk_cols:
+                vals = extracted[h_name]
+                if len(vals) >= raw_len:
+                    df[h_name] = vals[:raw_len]
     except Exception:
         pass
+    finally:
+        if wb is not None:
+            try:
+                wb.close()
+            except Exception:
+                pass
     return df
 
 
@@ -592,25 +607,45 @@ def merge_excel_files(download_dir: str, output_file_path: str) -> Dict[str, Any
         return {"total_files": len(files), "total_records": 0, "unique_records": 0, "duplicates_removed": 0, "output_path": output_file_path}
 
     combined_df = pd.concat(all_dfs, ignore_index=True)
-    subset_cols = [c for c in combined_df.columns if str(c).strip().upper() not in ["STT", "TT"]]
+    for col in combined_df.columns:
+        if str(col).strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"}:
+            combined_df[col] = combined_df[col].map(
+                lambda x: "" if x is None or (isinstance(x, float) and pd.isna(x)) else re.sub(r"_cc", "/CC", str(x).strip(), flags=re.IGNORECASE)
+            )
+    ignore_dedup = {"STT", "TT", "MA_GD", "MÃ GD", "MAGD"}
+    subset_cols = [c for c in combined_df.columns if str(c).strip().upper() not in ignore_dedup]
     if not subset_cols:
         subset_cols = list(combined_df.columns)
 
-    unique_df = combined_df.drop_duplicates(subset=subset_cols, keep='first')
+    unique_df = combined_df.drop_duplicates(subset=subset_cols, keep='first').reset_index(drop=True)
     unique_data_rows = len(unique_df)
     duplicates_removed = total_data_rows - unique_data_rows
 
     add_log(f"💾 Đang ghi file Excel tổng hợp ra: {output_file_path}...")
+    tmp_out = f"{output_file_path}.{os.getpid()}.tmp.xlsx"
     try:
-        with pd.ExcelWriter(output_file_path, engine="openpyxl") as writer:
-            unique_df.to_excel(writer, index=False, sheet_name="Sheet1")
-            ws = writer.sheets["Sheet1"]
-            for row in ws.iter_rows(min_row=2, values_only=False):
-                for cell in row:
-                    if isinstance(cell.value, str):
-                        cell.number_format = "@"
-    except Exception:
-        unique_df.to_excel(output_file_path, index=False)
+        try:
+            with pd.ExcelWriter(tmp_out, engine="openpyxl") as writer:
+                unique_df.to_excel(writer, index=False, sheet_name="Sheet1")
+                ws = writer.sheets["Sheet1"]
+                header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
+                lk_cols = [
+                    idx + 1 for idx, h_cell in enumerate(header_cells)
+                    if str(h_cell.value or "").strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"}
+                ]
+                for col_idx in lk_cols:
+                    for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=False):
+                        if isinstance(row[0].value, str):
+                            row[0].number_format = "@"
+        except Exception:
+            unique_df.to_excel(tmp_out, index=False)
+        os.replace(tmp_out, output_file_path)
+    finally:
+        if os.path.exists(tmp_out):
+            try:
+                os.remove(tmp_out)
+            except Exception:
+                pass
 
     add_log("🎉 GỘP HOÀN TẤT:")
     add_log(f"   - Tổng số file xử lý: {len(files)} file")
@@ -1078,15 +1113,21 @@ def run_flow_b(params: dict) -> dict:
                 try: df_chua = _read_excel_preserving_ma_lk(temp_chua_path)
                 except Exception: df_chua = pd.DataFrame()
 
-                df_merged = pd.concat([df_da, df_chua], ignore_index=True)
+                df_merged = pd.concat([df_da, df_chua], ignore_index=True).dropna(how="all")
+                key_col_m = next((c for c in ["Mã liên kết", "MA_LK", "MÃ LIÊN KẾT", "MÃ_LK", "Ma_LK", "Mã LK"] if c in df_merged.columns), None)
+                if key_col_m:
+                    df_merged["_dedup_lk"] = df_merged[key_col_m].fillna("").astype(str).str.strip().str.replace("_CC", "/CC", regex=False).str.upper()
+                    df_merged = df_merged[df_merged["_dedup_lk"].str.len() > 0]
+                    df_merged = df_merged.drop_duplicates(subset=["_dedup_lk"], keep="first").drop(columns=["_dedup_lk"])
                 try:
                     with pd.ExcelWriter(final_dest_path, engine="openpyxl") as writer:
                         df_merged.to_excel(writer, index=False, sheet_name="Sheet1")
                         ws = writer.sheets["Sheet1"]
-                        for row in ws.iter_rows(min_row=2, values_only=False):
-                            for cell in row:
-                                if isinstance(cell.value, str):
-                                    cell.number_format = "@"
+                        lk_cols = [idx + 1 for idx, col_name in enumerate(df_merged.columns) if str(col_name).strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk"}]
+                        for col_idx in lk_cols:
+                            for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=False):
+                                if isinstance(row[0].value, str):
+                                    row[0].number_format = "@"
                 except Exception:
                     df_merged.to_excel(final_dest_path, index=False)
                 total_rows = len(df_merged)

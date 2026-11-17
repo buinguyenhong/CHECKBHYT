@@ -64,40 +64,55 @@ def _read_excel_preserving_ma_lk(file_path: str) -> pd.DataFrame:
     df = pd.read_excel(file_path, dtype=str)
     if df.empty:
         return df
+    raw_len = len(df)
+    wb = None
     try:
         import openpyxl
         from decimal import Decimal
-        wb = openpyxl.load_workbook(file_path, data_only=True)
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         ws = wb.active
         headers = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
-        for idx, h_cell in enumerate(headers):
-            h_name = str(h_cell.value or "").strip()
-            if h_name.lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"} and h_name in df.columns:
-                vals = []
-                for row in ws.iter_rows(min_row=2, min_col=idx + 1, max_col=idx + 1, values_only=False):
-                    c = row[0]
-                    v = c.value
+        lk_cols = [
+            (idx, str(h_cell.value or "").strip())
+            for idx, h_cell in enumerate(headers)
+            if str(h_cell.value or "").strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"}
+            and str(h_cell.value or "").strip() in df.columns
+        ]
+        if lk_cols:
+            max_idx = max(idx for idx, _ in lk_cols)
+            extracted = {h_name: [] for _, h_name in lk_cols}
+            for row in ws.iter_rows(min_row=2, max_row=raw_len + 1, min_col=1, max_col=max_idx + 1, values_only=False):
+                for idx, h_name in lk_cols:
+                    c = row[idx] if idx < len(row) else None
+                    v = c.value if c is not None else None
                     if v is None:
-                        vals.append("")
+                        extracted[h_name].append("")
                     elif c.data_type in ("s", "str", "inlineStr") or isinstance(v, str):
-                        vals.append(str(v).strip())
+                        extracted[h_name].append(str(v).strip())
                     elif c.data_type == "n" or isinstance(v, (int, float)):
                         fmt = str(getattr(c, "number_format", "") or "").split(";")[0].strip()
                         m = re.search(r"[0#]\.([0#]+)", fmt) if fmt.lower() not in ("", "general", "@") else None
                         if m and len(m.group(1).rstrip("#")) > 0:
                             dec_len = len(m.group(1).rstrip("#"))
-                            vals.append(str(Decimal(str(v)).quantize(Decimal("1." + ("0" * dec_len)))))
+                            extracted[h_name].append(str(Decimal(str(v)).quantize(Decimal("1." + ("0" * dec_len)))))
                         elif isinstance(v, float) and v.is_integer():
-                            vals.append(str(int(v)))
+                            extracted[h_name].append(str(int(v)))
                         else:
-                            vals.append(str(v).strip())
+                            extracted[h_name].append(str(v).strip())
                     else:
-                        vals.append(str(v).strip())
-                if len(vals) >= len(df):
-                    df[h_name] = vals[:len(df)]
-        wb.close()
+                        extracted[h_name].append(str(v).strip())
+            for _, h_name in lk_cols:
+                vals = extracted[h_name]
+                if len(vals) >= raw_len:
+                    df[h_name] = vals[:raw_len]
     except Exception:
         pass
+    finally:
+        if wb is not None:
+            try:
+                wb.close()
+            except Exception:
+                pass
     return df
 
 
@@ -991,16 +1006,22 @@ class ClientRPAGui:
                         except Exception:
                             df_chua = pd.DataFrame()
 
-                        df_merged = pd.concat([df_da, df_chua], ignore_index=True)
+                        df_merged = pd.concat([df_da, df_chua], ignore_index=True).dropna(how="all")
+                        key_col_m = next((c for c in ["Mã liên kết", "MA_LK", "MÃ LIÊN KẾT", "MÃ_LK", "Ma_LK", "Mã LK"] if c in df_merged.columns), None)
+                        if key_col_m:
+                            df_merged["_dedup_lk"] = df_merged[key_col_m].fillna("").astype(str).str.strip().str.replace("_CC", "/CC", regex=False).str.upper()
+                            df_merged = df_merged[df_merged["_dedup_lk"].str.len() > 0]
+                            df_merged = df_merged.drop_duplicates(subset=["_dedup_lk"], keep="first").drop(columns=["_dedup_lk"])
                         row_count = len(df_merged)
                         try:
                             with pd.ExcelWriter(dest_final, engine="openpyxl") as writer:
                                 df_merged.to_excel(writer, index=False, sheet_name="Sheet1")
                                 ws = writer.sheets["Sheet1"]
-                                for row in ws.iter_rows(min_row=2, values_only=False):
-                                    for cell in row:
-                                        if isinstance(cell.value, str):
-                                            cell.number_format = "@"
+                                lk_cols = [idx + 1 for idx, col_name in enumerate(df_merged.columns) if str(col_name).strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk"}]
+                                for col_idx in lk_cols:
+                                    for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=False):
+                                        if isinstance(row[0].value, str):
+                                            row[0].number_format = "@"
                         except Exception:
                             df_merged.to_excel(dest_final, index=False)
                         self.log(f"Gộp file hoàn tất -> {dest_final} ({row_count} dòng dữ liệu) ✅")
@@ -1012,9 +1033,10 @@ class ClientRPAGui:
                         try:
                             with open(dest_final, "rb") as f:
                                 resp = requests.post(
-                                    f"{srv}/api/reconcile/upload_listbh",
+                                    f"{srv}/api/automation/v2/upload-and-reconcile",
+                                    data={"flow": "B"},
                                     files={"file": ("listbh.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-                                    timeout=60
+                                    timeout=120
                                 )
                                 self.log(f"Kết quả gửi WebApp: {resp.status_code}")
                         except Exception as ue:
@@ -1294,34 +1316,57 @@ class ClientRPAGui:
                     self.log(f"Lỗi đọc file con {os.path.basename(f)}: {ef}")
 
             if all_dfs:
-                comb = pd.concat(all_dfs, ignore_index=True).drop_duplicates()
+                comb = pd.concat(all_dfs, ignore_index=True)
+                for col in comb.columns:
+                    if str(col).strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"}:
+                        comb[col] = comb[col].map(
+                            lambda x: "" if x is None or (isinstance(x, float) and pd.isna(x)) else re.sub(r"_cc", "/CC", str(x).strip(), flags=re.IGNORECASE)
+                        )
+                ignore_dedup = {"STT", "TT", "MA_GD", "MÃ GD", "MAGD"}
+                subset_cols = [c for c in comb.columns if str(c).strip().upper() not in ignore_dedup]
+                if not subset_cols:
+                    subset_cols = list(comb.columns)
+                comb = comb.drop_duplicates(subset=subset_cols, keep="first").reset_index(drop=True)
+                tmp_merged = f"{merged_file}.{os.getpid()}.tmp.xlsx"
                 try:
-                    with pd.ExcelWriter(merged_file, engine="openpyxl") as writer:
-                        comb.to_excel(writer, index=False, sheet_name="Sheet1")
-                        ws = writer.sheets["Sheet1"]
-                        for row in ws.iter_rows(min_row=2, values_only=False):
-                            for cell in row:
-                                if isinstance(cell.value, str):
-                                    cell.number_format = "@"
-                except Exception:
-                    comb.to_excel(merged_file, index=False)
+                    try:
+                        with pd.ExcelWriter(tmp_merged, engine="openpyxl") as writer:
+                            comb.to_excel(writer, index=False, sheet_name="Sheet1")
+                            ws = writer.sheets["Sheet1"]
+                            hdrs = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
+                            lk_cols = [
+                                idx + 1 for idx, h_cell in enumerate(hdrs)
+                                if str(h_cell.value or "").strip().lower() in {"ma_lk", "mã liên kết", "mã_lk", "ma lk", "so_seri"}
+                            ]
+                            for col_idx in lk_cols:
+                                for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=False):
+                                    if isinstance(row[0].value, str):
+                                        row[0].number_format = "@"
+                    except Exception:
+                        comb.to_excel(tmp_merged, index=False)
+                    os.replace(tmp_merged, merged_file)
+                finally:
+                    if os.path.exists(tmp_merged):
+                        try:
+                            os.remove(tmp_merged)
+                        except Exception:
+                            pass
                 self.log(f"Tổng hợp thành công {len(comb)} dòng lỗi chi tiết vào {merged_file} ✅")
             else:
                 self.log("Không có gói lỗi nào được tải về trong khoảng ngày này.")
                 pd.DataFrame(columns=["MA_LK", "MALOI", "MOTALOI", "Ngày ra", "Tên bệnh nhân", "Mã thẻ"]).to_excel(merged_file, index=False)
 
-            # Upload lên server
-            self.log(f"Đang đẩy file {merged_file} lên máy chủ {srv}...")
-            with open(merged_file, "rb") as f:
-                r_upload = requests.post(f"{srv}/api/upload/c", files={"file": ("HoSoLoiChiTiet.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}, timeout=60)
-
-            if r_upload.status_code != 200:
-                raise Exception(f"Lỗi tải file lỗi lên server: {r_upload.text}")
-
-            self.log("Tải file lỗi lên server thành công! Đang kích hoạt Đối soát C với CSDL HIS...")
+            # Upload lên server & kích hoạt đối soát Luồng C
+            self.log(f"Đang đẩy file {merged_file} lên máy chủ {srv} để đối soát...")
             clean_from = from_d.replace('-', '').replace('/', '')
             clean_to = to_d.replace('-', '').replace('/', '')
-            r_sync = requests.post(f"{srv}/api/sync/start", json={"from_date": clean_from, "to_date": clean_to, "include_errors": True}, timeout=120)
+            with open(merged_file, "rb") as f:
+                r_sync = requests.post(
+                    f"{srv}/api/automation/v2/upload-and-reconcile",
+                    data={"flow": "C", "fromDate": clean_from, "toDate": clean_to},
+                    files={"file": ("HoSoLoiChiTiet.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+                    timeout=180
+                )
 
             if r_sync.status_code == 200:
                 res_data = r_sync.json()

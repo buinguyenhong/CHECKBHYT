@@ -73,7 +73,7 @@ def normalize_date_to_iso(d_str: str) -> str:
 
 def _load_listbh_for_sync_range(upload_dir: str, tu_date: datetime.date, den_date: datetime.date):
     """
-    Nạp dữ liệu listbh kết hợp từ các tệp theo tháng (listbh_YYYY_MM.xlsx) và listbh.xlsx.
+    Nạp dữ liệu listbh.xlsx nguyên bản từ upload_dir và lọc theo khoảng ngày đối soát.
     Trả về tuple (df_for_compare, df_in_range, log_msg).
     """
     df_raw = excel_service.load_combined_listbh_for_range(upload_dir, tu_date, den_date)
@@ -85,14 +85,14 @@ def _load_listbh_for_sync_range(upload_dir: str, tu_date: datetime.date, den_dat
 
     if df_in_range.empty:
         if not has_valid_dates:
-            return df_raw, df_raw, f"Đọc listbh thành công ({len(df_raw)} ca, không có cột ngày lọc)."
+            return df_raw, df_raw, f"Đọc listbh.xlsx thành công ({len(df_raw)} ca, không có cột ngày lọc)."
         return (
             pd.DataFrame(),
             pd.DataFrame(),
             "Thông báo: Tệp listbh.xlsx không chứa dữ liệu trong khoảng ngày đối soát. Chạy đối soát không có listbh (không đánh dấu ca FAIL mới)."
         )
 
-    return df_raw, df_in_range, f"Đọc listbh đa tháng thành công. Tổng kho: {len(df_raw)} ca (trong khoảng ngày: {len(df_in_range)} ca)."
+    return df_raw, df_in_range, f"Đọc listbh.xlsx thành công: {len(df_raw)} ca (trong khoảng ngày: {len(df_in_range)} ca)."
 
 
 def _save_and_archive_listbh(
@@ -102,28 +102,22 @@ def _save_and_archive_listbh(
     preloaded_raw_df: Optional[pd.DataFrame] = None,
     preloaded_lb_df: Optional[pd.DataFrame] = None
 ) -> int:
-    """Lưu trữ phân tách listbh theo từng tháng và gạch nợ (RESOLVED) ngay các ca FAIL/LOI đã gửi."""
-    import glob as _glob
+    """Lưu nguyên bản byte gốc vào listbh.xlsx (không làm sai cấu trúc/nhân dòng) và gạch nợ (RESOLVED) ngay các ca FAIL/LOI đã gửi."""
     os.makedirs(upload_dir, exist_ok=True)
+    excel_service.cleanup_legacy_monthly_listbh(upload_dir)
+
     master_path = os.path.join(upload_dir, "listbh.xlsx")
-    if os.path.exists(master_path) and not _glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")):
-        try:
-            excel_service.archive_listbh_by_months(master_path, upload_dir)
-        except Exception:
-            pass
-    saved = excel_service.archive_listbh_by_months(contents, upload_dir, preloaded_df=preloaded_raw_df)
-    if not saved:
-        tmp_path = f"{master_path}.{os.getpid()}.tmp.xlsx"
-        try:
-            with open(tmp_path, "wb") as f:
-                f.write(contents)
-            os.replace(tmp_path, master_path)
-        finally:
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except Exception:
-                    pass
+    tmp_path = f"{master_path}.{os.getpid()}.tmp.xlsx"
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(contents)
+        os.replace(tmp_path, master_path)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
 
     if SYNC_PROGRESS.get("active"):
         return 0
@@ -1074,10 +1068,9 @@ async def upload_listbh(
         contents = await file.read()
 
         def _process_upload_listbh_sync():
-            df_raw = excel_service.read_excel_preserving_ma_lk(BytesIO(contents))
-            df_lb = excel_service.load_listbh(df_raw)
+            df_lb = excel_service.load_listbh(BytesIO(contents))
             resolved_count = _save_and_archive_listbh(
-                contents, UPLOAD_DIR, preloaded_raw_df=df_raw, preloaded_lb_df=df_lb
+                contents, UPLOAD_DIR, preloaded_lb_df=df_lb
             )
             return len(df_lb), resolved_count
 
@@ -1147,8 +1140,9 @@ async def upload_loi(
                         ).all()
 
                         for r in active_records:
-                            if r.ma_lk in error_map:
-                                err = error_map[r.ma_lk]
+                            rec_lk = his_service.chuan_hoa_ma_lk(r.ma_lk).upper()
+                            if rec_lk in error_map:
+                                err = error_map[rec_lk]
                                 r.type_group = "LOI"
                                 r.maloi = err["maloi"]
                                 r.motaloi = err["motaloi"]
@@ -1950,6 +1944,8 @@ def export_department_loi(
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df_chung.to_excel(writer, sheet_name="Lỗi chung", index=False)
         df_thau_thuoc.to_excel(writer, sheet_name="Lỗi thầu thuốc", index=False)
+        excel_service.apply_text_format_to_ma_lk_columns(writer.sheets["Lỗi chung"])
+        excel_service.apply_text_format_to_ma_lk_columns(writer.sheets["Lỗi thầu thuốc"])
 
     return FileResponse(
         out_path,
@@ -2646,7 +2642,7 @@ def export_sql_list(
         df_export = pd.DataFrame(export_rows)
         filename = f"DU_LIEU_SQL_HIS_{clean_from}_{clean_to}.xlsx"
         out_path = os.path.join(UPLOAD_DIR, filename)
-        df_export.to_excel(out_path, index=False)
+        excel_service._write_df_preserving_text_excel(df_export, out_path)
         return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
     except HTTPException:
         raise
@@ -2726,7 +2722,7 @@ def export_fail_list(
 
     filename = f"DANH_SACH_FAIL{date_suffix}.xlsx"
     out_path = os.path.join(UPLOAD_DIR, f"DANH_SACH_FAIL{date_suffix}_export.xlsx")
-    df.to_excel(out_path, index=False)
+    excel_service._write_df_preserving_text_excel(df, out_path)
     return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
 
 
@@ -2815,6 +2811,8 @@ def export_loi_list(
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df_chung.to_excel(writer, sheet_name="Lỗi chung", index=False)
         df_thau_thuoc.to_excel(writer, sheet_name="Lỗi thầu thuốc", index=False)
+        excel_service.apply_text_format_to_ma_lk_columns(writer.sheets["Lỗi chung"])
+        excel_service.apply_text_format_to_ma_lk_columns(writer.sheets["Lỗi thầu thuốc"])
 
     return FileResponse(out_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
 

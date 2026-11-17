@@ -81,9 +81,10 @@ def read_excel_preserving_ma_lk(file_source: Union[str, BytesIO, bytes]) -> pd.D
     if df.empty:
         return df
 
-    # Các tệp lưu trữ theo tháng (listbh_YYYY_MM.xlsx) đã được chuẩn hóa định dạng Text (@), bỏ qua vòng đọc thứ 2
-    if isinstance(file_source, str) and re.match(r"^listbh_\d{4}_\d{2}\.xlsx$", os.path.basename(file_source), re.IGNORECASE):
-        return df
+    raw_len = len(df)
+    non_empty_mask = df.notna().any(axis=1)
+    if not non_empty_mask.any():
+        return df.iloc[0:0].copy()
 
     wb = None
     try:
@@ -98,17 +99,18 @@ def read_excel_preserving_ma_lk(file_source: Union[str, BytesIO, bytes]) -> pd.D
 
         if lk_cols:
             max_idx = max(idx for idx, _ in lk_cols)
+            max_row_limit = raw_len + 1
             extracted_by_name = {h_name: [] for _, h_name in lk_cols}
-            for row in ws.iter_rows(min_row=2, min_col=1, max_col=max_idx + 1, values_only=False):
+            for row in ws.iter_rows(min_row=2, max_row=max_row_limit, min_col=1, max_col=max_idx + 1, values_only=False):
                 for idx, h_name in lk_cols:
                     cell = row[idx] if idx < len(row) else None
                     extracted_by_name[h_name].append(extract_cell_text_openpyxl(cell) if cell is not None else "")
             for _, h_name in lk_cols:
                 vals = extracted_by_name[h_name]
-                if len(vals) == len(df):
+                if len(vals) == raw_len:
                     df[h_name] = vals
-                elif len(vals) > len(df):
-                    df[h_name] = vals[:len(df)]
+                elif len(vals) > raw_len:
+                    df[h_name] = vals[:raw_len]
     except Exception:
         pass
     finally:
@@ -118,13 +120,13 @@ def read_excel_preserving_ma_lk(file_source: Union[str, BytesIO, bytes]) -> pd.D
             except Exception:
                 pass
 
-    return df
+    return df.loc[non_empty_mask].reset_index(drop=True)
 
 
 def build_trusted_numeric_ma_lk_map(trusted_keys: Iterable[str]) -> Dict[str, Optional[str]]:
     """
-    Xây dựng bảng ánh xạ từ dạng chuẩn hóa số thập phân (đã bỏ số 0 cuối) sang mã MA_LK gốc
-    từ nguồn dữ liệu đáng tin cậy (SQL Server HIS / bảng Record).
+    Xây dựng bảng ánh xạ từ dạng chuẩn hóa số thập phân (đã bỏ số 0 cuối, hỗ trợ kèm hậu tố /CC)
+    sang mã MA_LK gốc từ nguồn dữ liệu đáng tin cậy (SQL Server HIS / bảng Record).
     Nếu có từ 2 mã khác nhau cùng rút gọn về 1 giá trị (nhập nhằng), đánh dấu None để không tự đoán.
     """
     numeric_map: Dict[str, Optional[str]] = {}
@@ -132,8 +134,11 @@ def build_trusted_numeric_ma_lk_map(trusted_keys: Iterable[str]) -> Dict[str, Op
         if not raw_k:
             continue
         k = chuan_hoa_ma_lk(raw_k).upper()
-        if re.match(r"^\d+\.\d+$", k):
-            canon = k.rstrip("0").rstrip(".")
+        m = re.match(r"^(\d+\.\d+)(/CC)?$", k)
+        if m:
+            base = m.group(1).rstrip("0").rstrip(".")
+            suffix = m.group(2) or ""
+            canon = f"{base}{suffix}"
             if canon not in numeric_map:
                 numeric_map[canon] = k
             elif numeric_map[canon] != k:
@@ -149,8 +154,8 @@ def resolve_ma_lk_against_trusted_set(
     """
     Đối chiếu mã MA_LK đọc từ Excel với tập mã nguồn đáng tin cậy (SQL Server HIS):
     - Nếu khớp trực tiếp trong trusted_keys -> giữ nguyên.
-    - Nếu là mã dạng số thập phân bị mất số 0 ở cuối (do Excel lưu kiểu số General) và trong
-      trusted_keys có DUY NHẤT 1 mã khớp chính xác giá trị số đó -> khôi phục theo mã chuẩn của HIS.
+    - Nếu là mã dạng số thập phân (có thể kèm /CC) bị mất số 0 ở cuối (do Excel lưu kiểu số General)
+      và trong trusted_keys có DUY NHẤT 1 mã khớp chính xác giá trị số đó -> khôi phục theo mã chuẩn của HIS.
     - Nếu không có căn cứ trong trusted_keys hoặc bị trùng/nhập nhằng -> giữ nguyên, tuyệt đối không tự thêm số 0.
     """
     lk = chuan_hoa_ma_lk(ma_lk).upper()
@@ -158,13 +163,19 @@ def resolve_ma_lk_against_trusted_set(
         return lk
     if lk in trusted_keys:
         return lk
-    if re.match(r"^\d+\.\d+$", lk):
+    m = re.match(r"^(\d+\.\d+)(/CC)?$", lk)
+    if m:
         if numeric_map is None:
             numeric_map = build_trusted_numeric_ma_lk_map(trusted_keys)
-        canon = lk.rstrip("0").rstrip(".")
+        base = m.group(1).rstrip("0").rstrip(".")
+        suffix = m.group(2) or ""
+        canon = f"{base}{suffix}"
         candidate = numeric_map.get(canon)
-        if candidate and candidate.startswith(lk):
-            return candidate
+        if candidate:
+            cand_base = candidate[:-3] if candidate.endswith("/CC") else candidate
+            lk_base = m.group(1)
+            if cand_base.startswith(lk_base) and candidate.endswith(suffix):
+                return candidate
     return lk
 
 
@@ -203,6 +214,22 @@ def _find_listbh_columns(
     return found_key, found_date
 
 
+def apply_text_format_to_ma_lk_columns(ws, fallback_first_col: bool = False) -> None:
+    """Định dạng Text (@) cho các cột MA_LK / Mã liên kết trên worksheet openpyxl để bảo toàn số 0 ở cuối."""
+    header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
+    lk_cols = [
+        idx + 1 for idx, h_cell in enumerate(header_cells)
+        if str(h_cell.value or "").strip().lower() in MA_LK_CANDIDATE_HEADERS
+    ]
+    if not lk_cols and fallback_first_col and len(header_cells) > 0:
+        lk_cols = [1]
+    for col_idx in lk_cols:
+        for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=False):
+            cell = row[0]
+            if isinstance(cell.value, str):
+                cell.number_format = "@"
+
+
 def _write_df_preserving_text_excel(df: pd.DataFrame, out_path: str) -> None:
     """Ghi DataFrame ra file Excel (atomic qua file tạm) và định dạng Text (@) cho cột MA_LK để bảo toàn số 0 ở cuối."""
     tmp_path = f"{out_path}.{os.getpid()}.tmp.xlsx"
@@ -210,19 +237,7 @@ def _write_df_preserving_text_excel(df: pd.DataFrame, out_path: str) -> None:
         try:
             with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
                 df.to_excel(writer, index=False, sheet_name="Sheet1")
-                ws = writer.sheets["Sheet1"]
-                header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
-                lk_cols = [
-                    idx + 1 for idx, h_cell in enumerate(header_cells)
-                    if str(h_cell.value or "").strip().lower() in MA_LK_CANDIDATE_HEADERS
-                ]
-                if not lk_cols and len(df.columns) > 0:
-                    lk_cols = [1]
-                for col_idx in lk_cols:
-                    for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=False):
-                        cell = row[0]
-                        if isinstance(cell.value, str):
-                            cell.number_format = "@"
+                apply_text_format_to_ma_lk_columns(writer.sheets["Sheet1"], fallback_first_col=True)
         except Exception:
             df.to_excel(tmp_path, index=False)
         os.replace(tmp_path, out_path)
@@ -263,6 +278,9 @@ def load_listbh(
 
     out = df[[found_key, "_ngay"]].copy()
     out = out.rename(columns={found_key: "MA_LK"})
+    out["MA_LK"] = out["MA_LK"].astype(str).str.strip()
+    out = out[out["MA_LK"].str.len() > 0]
+    out = out.drop_duplicates(subset=["MA_LK"], keep="last").reset_index(drop=True)
     return out
 
 def load_hosoloichitiet(
@@ -344,6 +362,17 @@ def filter_listbh_by_date(df: pd.DataFrame, tu_ngay, den_ngay) -> pd.DataFrame:
     return df.loc[mask].copy()
 
 
+def cleanup_legacy_monthly_listbh(upload_dir: str = "uploaded_files") -> None:
+    """Dọn dẹp các tệp listbh_YYYY_MM.xlsx tách tháng cũ để tránh sai lệch cấu trúc hoặc nhân số dòng."""
+    if not upload_dir or not os.path.exists(upload_dir):
+        return
+    for old_path in glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")):
+        try:
+            os.remove(old_path)
+        except Exception:
+            pass
+
+
 def archive_listbh_by_months(
     file_source: Union[str, BytesIO, bytes],
     upload_dir: str = "uploaded_files",
@@ -352,127 +381,13 @@ def archive_listbh_by_months(
     preloaded_df: Optional[pd.DataFrame] = None
 ) -> List[str]:
     """
-    Phân tách và lưu trữ tệp listbh theo từng tháng (listbh_YYYY_MM.xlsx),
-    trộn thêm dữ liệu mới mà không làm mất dữ liệu các tháng cũ; đồng thời
-    cập nhật tệp tổng hợp listbh.xlsx từ các tháng gần nhất (tối đa 3 tháng).
+    Giữ nguyên bản 100% file listbh.xlsx gốc (không cắt cột, không ghép nhân bản giữa các tháng)
+    và dọn dẹp các tệp listbh_YYYY_MM.xlsx cũ nếu có.
     """
     os.makedirs(upload_dir, exist_ok=True)
-    df = preloaded_df.copy() if preloaded_df is not None else read_excel_preserving_ma_lk(file_source)
-    if df.empty:
-        return []
-
-    found_key, found_date = _find_listbh_columns(df)
-    if not found_key:
-        return []
-
-    today = datetime.date.today()
-    fallback_year = int(explicit_year) if explicit_year else today.year
-    fallback_month = int(explicit_month) if explicit_month else today.month
-
-    if found_date:
-        parsed_dates = parse_datetime_to_date(df[found_date])
-    else:
-        parsed_dates = pd.Series([None] * len(df), index=df.index)
-
-    ym_list = []
-    for d in parsed_dates:
-        if isinstance(d, datetime.datetime):
-            ym_list.append((d.year, d.month))
-        elif isinstance(d, datetime.date):
-            ym_list.append((d.year, d.month))
-        else:
-            ym_list.append((fallback_year, fallback_month))
-
-    keep_cols = [found_key]
-    if found_date and found_date not in keep_cols:
-        keep_cols.append(found_date)
-    df_work = df[keep_cols].copy()
-    df_work["_ym"] = ym_list
-
-    # Nếu không chỉ định explicit_month (upload thủ công), gộp các dòng giao thoa (cuối tháng trước < 20% hoặc lác đác < 5%) vào tháng chính
-    if explicit_month is None:
-        counts_by_ym = df_work["_ym"].value_counts().to_dict()
-        if counts_by_ym:
-            max_cnt = max(counts_by_ym.values())
-            dominant_ym = max(counts_by_ym.items(), key=lambda kv: kv[1])[0]
-            min_day_by_ym: Dict[Tuple[int, int], int] = {}
-            for d_val, ym_val in zip(parsed_dates, ym_list):
-                if isinstance(d_val, (datetime.date, datetime.datetime)):
-                    day_num = d_val.day
-                    if ym_val not in min_day_by_ym or day_num < min_day_by_ym[ym_val]:
-                        min_day_by_ym[ym_val] = day_num
-
-            genuine_yms = set()
-            for ym_val, cnt in counts_by_ym.items():
-                if (min_day_by_ym.get(ym_val, 31) <= 15 and cnt >= 0.05 * max_cnt) or cnt >= 0.2 * max_cnt:
-                    genuine_yms.add(ym_val)
-            if genuine_yms:
-                df_work["_ym"] = [ym if ym in genuine_yms else dominant_ym for ym in ym_list]
-    else:
-        # Khi tải theo tháng chỉ định (Luồng B), toàn bộ danh sách thuộc kỳ quyết toán tháng đó
-        df_work["_ym"] = [(fallback_year, fallback_month)] * len(df_work)
-
-    saved_paths: List[str] = []
-    written_dfs: Dict[str, pd.DataFrame] = {}
-
-    for (yr, mo), grp in df_work.groupby("_ym"):
-        month_df = grp.drop(columns=["_ym"]).copy()
-        month_path = os.path.join(upload_dir, f"listbh_{yr:04d}_{mo:02d}.xlsx")
-        if os.path.exists(month_path):
-            try:
-                old_df = read_excel_preserving_ma_lk(month_path)
-                if not old_df.empty:
-                    old_key, old_date = _find_listbh_columns(old_df)
-                    if old_key and old_key != found_key:
-                        old_df = old_df.rename(columns={old_key: found_key})
-                    if found_date and old_date and old_date != found_date and found_date not in old_df.columns:
-                        old_df = old_df.rename(columns={old_date: found_date})
-                    old_keep = [c for c in keep_cols if c in old_df.columns]
-                    old_df = old_df[old_keep].copy()
-                    combined = pd.concat([old_df, month_df], ignore_index=True)
-                    combined["_norm_key"] = combined[found_key].apply(lambda x: chuan_hoa_ma_lk(x).upper())
-                    combined = combined[combined["_norm_key"].str.len() > 0]
-                    combined = combined.drop_duplicates(subset=["_norm_key"], keep="last").drop(columns=["_norm_key"])
-                    month_df = combined
-            except Exception:
-                pass
-        _write_df_preserving_text_excel(month_df, month_path)
-        saved_paths.append(month_path)
-        written_dfs[os.path.normpath(month_path)] = month_df
-
-    # Cập nhật tệp listbh.xlsx tổng hợp từ tối đa 3 tháng gần nhất để tương thích với các báo cáo đọc listbh.xlsx trực tiếp
-    month_files = sorted(glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")))
-    recent_files = month_files[-3:] if len(month_files) > 3 else month_files
-    if recent_files:
-        dfs_recent = []
-        for mf in recent_files:
-            norm_mf = os.path.normpath(mf)
-            if norm_mf in written_dfs:
-                mdf = written_dfs[norm_mf]
-                if not mdf.empty:
-                    dfs_recent.append(mdf)
-                continue
-            try:
-                mdf = read_excel_preserving_ma_lk(mf)
-                if not mdf.empty:
-                    mk, md = _find_listbh_columns(mdf)
-                    if mk and mk != found_key:
-                        mdf = mdf.rename(columns={mk: found_key})
-                    if found_date and md and md != found_date and found_date not in mdf.columns:
-                        mdf = mdf.rename(columns={md: found_date})
-                    mdf_keep = [c for c in keep_cols if c in mdf.columns]
-                    dfs_recent.append(mdf[mdf_keep].copy())
-            except Exception:
-                pass
-        if dfs_recent:
-            merged_recent = pd.concat(dfs_recent, ignore_index=True)
-            merged_recent["_norm_key"] = merged_recent[found_key].apply(lambda x: chuan_hoa_ma_lk(x).upper())
-            merged_recent = merged_recent[merged_recent["_norm_key"].str.len() > 0]
-            merged_recent = merged_recent.drop_duplicates(subset=["_norm_key"], keep="last").drop(columns=["_norm_key"])
-            master_path = os.path.join(upload_dir, "listbh.xlsx")
-            _write_df_preserving_text_excel(merged_recent, master_path)
-
-    return saved_paths
+    cleanup_legacy_monthly_listbh(upload_dir)
+    master_path = os.path.join(upload_dir, "listbh.xlsx")
+    return [master_path] if os.path.exists(master_path) else []
 
 
 def load_combined_listbh_for_range(
@@ -482,36 +397,23 @@ def load_combined_listbh_for_range(
     trusted_keys: Optional[Set[str]] = None
 ) -> pd.DataFrame:
     """
-    Nạp kết hợp toàn bộ danh sách đã gửi BHYT từ các tệp listbh_YYYY_MM.xlsx và listbh.xlsx
-    trong upload_dir để đảm bảo không bỏ sót các ca chuyển tháng hoặc đối soát liên tháng.
+    Nạp danh sách BHYT đã gửi trực tiếp từ tệp listbh.xlsx gốc (giữ nguyên cấu trúc và tự khử trùng MA_LK trong RAM).
     """
-    candidate_paths: List[str] = []
-    if os.path.exists(upload_dir):
-        month_files = sorted(glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")))
-        if month_files:
-            candidate_paths = month_files
-        else:
-            master_path = os.path.join(upload_dir, "listbh.xlsx")
-            if os.path.exists(master_path):
-                candidate_paths.append(master_path)
-
-    if not candidate_paths:
+    cleanup_legacy_monthly_listbh(upload_dir)
+    master_path = os.path.join(upload_dir, "listbh.xlsx")
+    if not os.path.exists(master_path):
         return pd.DataFrame(columns=["MA_LK", "_ngay"])
 
-    dfs: List[pd.DataFrame] = []
-    for p in candidate_paths:
-        try:
-            df_part = load_listbh(p, trusted_keys=trusted_keys)
-            if not df_part.empty:
-                dfs.append(df_part)
-        except Exception:
-            pass
-
-    if not dfs:
+    try:
+        df = load_listbh(master_path, trusted_keys=trusted_keys)
+    except Exception:
         return pd.DataFrame(columns=["MA_LK", "_ngay"])
 
-    merged = pd.concat(dfs, ignore_index=True)
-    merged["MA_LK"] = merged["MA_LK"].apply(lambda x: chuan_hoa_ma_lk(x).upper())
-    merged = merged[merged["MA_LK"].str.len() > 0]
-    merged = merged.drop_duplicates(subset=["MA_LK"], keep="last").reset_index(drop=True)
-    return merged
+    if df.empty:
+        return pd.DataFrame(columns=["MA_LK", "_ngay"])
+
+    out = df.copy()
+    out["MA_LK"] = out["MA_LK"].apply(lambda x: chuan_hoa_ma_lk(x).upper())
+    out = out[out["MA_LK"].str.len() > 0]
+    out = out.drop_duplicates(subset=["MA_LK"], keep="last").reset_index(drop=True)
+    return out

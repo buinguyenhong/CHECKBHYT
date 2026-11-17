@@ -679,26 +679,26 @@ class PortalAutomationService:
 
         combined_df = pd.concat(all_dfs, ignore_index=True)
 
-        # Khử trùng dữ liệu dựa trên tất cả các cột trừ cột STT đầu tiên nếu có
-        subset_cols = [c for c in combined_df.columns if str(c).strip().upper() not in ["STT", "TT"]]
+        from services.his_service import chuan_hoa_ma_lk
+        from services.excel_service import MA_LK_CANDIDATE_HEADERS, _write_df_preserving_text_excel
+
+        # Chuẩn hóa _CC -> /CC trên cột MA_LK ngay khi gộp để đồng bộ với SQL Server HIS
+        for col in combined_df.columns:
+            if str(col).strip().lower() in MA_LK_CANDIDATE_HEADERS:
+                combined_df[col] = combined_df[col].map(chuan_hoa_ma_lk)
+
+        # Khử trùng lặp theo nội dung lỗi (loại trừ cột STT, TT, MA_GD để tránh lặp khi gửi nhiều lần)
+        ignore_dedup = {"STT", "TT", "MA_GD", "MÃ GD", "MAGD"}
+        subset_cols = [c for c in combined_df.columns if str(c).strip().upper() not in ignore_dedup]
         if not subset_cols:
             subset_cols = list(combined_df.columns)
 
-        unique_df = combined_df.drop_duplicates(subset=subset_cols, keep='first')
+        unique_df = combined_df.drop_duplicates(subset=subset_cols, keep='first').reset_index(drop=True)
         unique_data_rows = len(unique_df)
         duplicates_removed = total_data_rows - unique_data_rows
 
         log(f"💾 Đang ghi file Excel tổng hợp ra: {output_file_path}...")
-        try:
-            with pd.ExcelWriter(output_file_path, engine="openpyxl") as writer:
-                unique_df.to_excel(writer, index=False, sheet_name="Sheet1")
-                ws = writer.sheets["Sheet1"]
-                for row in ws.iter_rows(min_row=2, values_only=False):
-                    for cell in row:
-                        if isinstance(cell.value, str):
-                            cell.number_format = "@"
-        except Exception:
-            unique_df.to_excel(output_file_path, index=False)
+        _write_df_preserving_text_excel(unique_df, output_file_path)
 
         log("🎉 GỘP HOÀN TẤT:")
         log(f"   - Tổng số file xử lý: {len(files)} file")
@@ -1261,12 +1261,10 @@ class PortalAutomationService:
 
                 final_dest_path = os.path.join(UPLOAD_DIR, "listbh.xlsx")
 
-                # Bảo toàn dữ liệu các tháng cũ nếu trên server chỉ mới có tệp listbh.xlsx đơn lẻ trước đó
+                # Dọn dẹp các tệp listbh_YYYY_MM.xlsx tách tháng cũ nếu còn tồn tại
                 try:
-                    import glob as _glob
-                    from services.excel_service import archive_listbh_by_months
-                    if os.path.exists(final_dest_path) and not _glob.glob(os.path.join(UPLOAD_DIR, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")):
-                        archive_listbh_by_months(final_dest_path, UPLOAD_DIR)
+                    from services.excel_service import cleanup_legacy_monthly_listbh
+                    cleanup_legacy_monthly_listbh(UPLOAD_DIR)
                 except Exception:
                     pass
 
@@ -1298,7 +1296,7 @@ class PortalAutomationService:
 
                     log(f"📂 Đang gộp 2 danh sách Excel (Đã đề nghị: {rows_da} dòng, Chưa đề nghị: {rows_chua} dòng)...")
                     try:
-                        from services.excel_service import read_excel_preserving_ma_lk
+                        from services.excel_service import read_excel_preserving_ma_lk, _find_listbh_columns, _write_df_preserving_text_excel
                         df_da = read_excel_preserving_ma_lk(temp_da_path)
                     except Exception:
                         df_da = pd.DataFrame()
@@ -1308,17 +1306,14 @@ class PortalAutomationService:
                     except Exception:
                         df_chua = pd.DataFrame()
 
-                    df_merged = pd.concat([df_da, df_chua], ignore_index=True)
-                    try:
-                        with pd.ExcelWriter(final_dest_path, engine="openpyxl") as writer:
-                            df_merged.to_excel(writer, index=False, sheet_name="Sheet1")
-                            ws = writer.sheets["Sheet1"]
-                            for row in ws.iter_rows(min_row=2, values_only=False):
-                                for cell in row:
-                                    if isinstance(cell.value, str):
-                                        cell.number_format = "@"
-                    except Exception:
-                        df_merged.to_excel(final_dest_path, index=False)
+                    df_merged = pd.concat([df_da, df_chua], ignore_index=True).dropna(how="all")
+                    key_col_m, _ = _find_listbh_columns(df_merged)
+                    if key_col_m:
+                        from services.his_service import chuan_hoa_ma_lk
+                        df_merged["_dedup_lk"] = df_merged[key_col_m].apply(lambda x: chuan_hoa_ma_lk(x).upper())
+                        df_merged = df_merged[df_merged["_dedup_lk"].str.len() > 0]
+                        df_merged = df_merged.drop_duplicates(subset=["_dedup_lk"], keep="first").drop(columns=["_dedup_lk"])
+                    _write_df_preserving_text_excel(df_merged, final_dest_path)
                     total_rows = len(df_merged)
 
                     detail_msg = f"Tải và gộp thành công {total_rows} bản ghi Tháng {target_month} (Đã đề nghị: {rows_da}, Chưa đề nghị: {rows_chua})."
@@ -1333,15 +1328,7 @@ class PortalAutomationService:
 
                 context.storage_state(path=SESSION_FILE)
 
-                # Lưu phân tách theo tháng (listbh_YYYY_MM.xlsx) và gộp bảo toàn dữ liệu các tháng cũ vào listbh.xlsx
-                try:
-                    from services.excel_service import archive_listbh_by_months
-                    archive_listbh_by_months(final_dest_path, UPLOAD_DIR, explicit_month=int(target_month))
-                    log(f"📂 Đã lưu trữ danh sách theo Tháng {target_month} và đồng bộ bảo toàn dữ liệu các tháng trước.")
-                except Exception as arch_e:
-                    log(f"Lưu ý khi lưu trữ listbh theo tháng: {arch_e}")
-
-                log(f"✅ Hoàn tất Luồng B: {final_dest_path} ({total_rows} bản ghi)")
+                log(f"✅ Hoàn tất Luồng B (giữ nguyên cấu trúc file gốc): {final_dest_path} ({total_rows} bản ghi)")
                 return {
                     "status": "success",
                     "file_path": final_dest_path,

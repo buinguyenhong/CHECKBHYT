@@ -56,6 +56,45 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-11-17 10:36 - Antigravity (Rà Soát & Chuẩn Hóa Toàn Bộ Luồng C: `_CC` -> `/CC`, Bảo Toàn Số `0` Cuối & Khử Trùng Khác `MA_GD`)
+- **Mục tiêu:** Rà soát toàn diện Luồng tải C (gộp các gói lỗi `ExportExcelKPG_New` thành `HoSoLoiChiTiet.xlsx`, upload & đối soát, xuất Excel) đảm bảo mọi trường hợp `MA_LK` có hậu tố `_CC`/`_cc` đều được chuyển về `/CC` và mọi mã có số `0` ở cuối (kể cả dạng `26.037040/CC`) được bảo toàn xuyên suốt.
+- **Thay đổi chi tiết:**
+  - `web_app/services/his_service.py`:
+    - Cập nhật `chuan_hoa_ma_lk()` dùng regex `re.sub(r"_cc", "/CC", s, flags=re.IGNORECASE)` để chuyển cả `_CC` lẫn `_cc` sang `/CC`.
+  - `web_app/services/excel_service.py`:
+    - Mở rộng `build_trusted_numeric_ma_lk_map()` và `resolve_ma_lk_against_trusted_set()` hỗ trợ khôi phục số `0` cuối theo tập khóa HIS cho cả mã có hậu tố `/CC` (ví dụ `26.03704/CC` -> `26.037040/CC`).
+    - Tách helper dùng chung `apply_text_format_to_ma_lk_columns(ws)` để áp dụng `number_format = "@"` cho đúng các cột `MA_LK`.
+  - `web_app/services/portal_automation.py`, `portal_downloader/downloader_server.py`, `client_runner/client_agent.py`:
+    - Chuẩn hóa `_CC` -> `/CC` trên cột `MA_LK` ngay trong `merge_excel_files()` (và worker gộp file Luồng C) trước khi khử trùng lặp.
+    - Loại trừ `STT`, `TT`, `MA_GD` khỏi `subset` khử trùng lặp để không bị nhân bản dòng lỗi khi cùng một hồ sơ gửi nhiều gói giao dịch.
+    - Giới hạn `max_row = len(df) + 1` và bật `read_only=True` trong `_read_excel_preserving_ma_lk()`, chỉ gán `number_format = "@"` lên cột `MA_LK` và ghi file atomic qua `*.tmp.xlsx`.
+    - Đồng bộ URL upload của `client_runner/client_agent.py` về `/api/automation/v2/upload-and-reconcile`.
+  - `web_app/main.py`:
+    - Cập nhật `POST /api/upload/loi`: chuẩn hóa khóa `his_service.chuan_hoa_ma_lk(r.ma_lk).upper()` khi đối chiếu `error_map`.
+    - Áp dụng định dạng Text (`@`) cho cột `MA_LK` trong các API xuất Excel (`export_department_loi`, `export_sql_list`, `export_fail_list`, `export_loi_list`).
+  - Gộp lại `web_app/uploaded_files/HoSoLoiChiTiet.xlsx` từ 157 tệp trong `temp_errors/`: chuyển toàn bộ 18 dòng `_CC` -> `/CC`, khử dòng trùng khác `MA_GD` (132 -> 131 dòng duy nhất), giữ nguyên `26.035530`, `26.035970`, `26.036060`, `26.037040/CC`, `TN.2608.0024050`.
+- **Kiểm tra:**
+  - Chạy `.\.venv\Scripts\python.exe tests/test_xml_v2.py` -> PASSED (10/10 tests).
+  - Chạy `.\.venv\Scripts\python.exe tests/test_safety_and_regression.py` -> PASSED (12/12 tests, gồm `test_flow_c_merge_cc_and_trailing_zero_preservation`).
+  - Chạy `.\.venv\Scripts\python.exe tests/test_validation_integration.py` -> PASSED.
+  - Chạy `py_compile` cho toàn bộ 6 tệp Python đã sửa -> PASSED.
+
+## 2026-11-17 10:12 - Antigravity (Ngừng Sửa/Gộp File `listbh.xlsx` Gốc, Khử Trùng Khớp Bộ Nhớ & Giới Hạn Dòng Đọc Excel)
+- **Vấn đề được giải quyết:** Cơ chế cũ tách/gộp lại tệp `listbh.xlsx` và `listbh_YYYY_MM.xlsx` đã cắt bỏ cột gốc, biến đổi cấu trúc 22 cột của file tải từ Cổng BHYT, đồng thời gộp nối nhiều kỳ/lần tải làm phình to số dòng; ngoài ra `ws.iter_rows` không giới hạn `max_row` có thể quét hàng triệu dòng trắng trên file Excel đã qua chỉnh sửa.
+- **Thay đổi chi tiết:**
+  - `web_app/services/excel_service.py`:
+    - Cập nhật `read_excel_preserving_ma_lk()`: loại bỏ dòng trắng hoàn toàn (`dropna(how="all")`) và giới hạn `max_row = len(df) + 1` khi duyệt `ws.iter_rows(...)` chế độ `read_only=True`.
+    - Cập nhật `load_listbh()`: loại bỏ dòng trống `MA_LK` và khử trùng lặp `MA_LK` ngay trên RAM.
+    - Bổ sung `cleanup_legacy_monthly_listbh()`, cập nhật `archive_listbh_by_months()` và `load_combined_listbh_for_range()`: ngừng cắt cột/ghi đè gộp nhiều tháng vào `listbh.xlsx`, tự động dọn dẹp các tệp `listbh_YYYY_MM.xlsx` cũ và đọc trực tiếp từ `uploaded_files/listbh.xlsx` nguyên bản.
+  - `web_app/main.py`:
+    - Cập nhật `_save_and_archive_listbh()` và `upload_listbh`: ghi nguyên vẹn 100% byte gốc người dùng tải lên vào `uploaded_files/listbh.xlsx` (atomic via `*.tmp.xlsx` + `os.replace()`), dọn `listbh_YYYY_MM.xlsx` cũ và gọi `reconcile_pending_records_with_listbh()` trên DataFrame đã nạp. Cập nhật thông điệp log `_load_listbh_for_sync_range()`.
+  - `web_app/services/portal_automation.py`, `portal_downloader/downloader_server.py`, `client_runner/client_agent.py`:
+    - Ngừng gọi `archive_listbh_by_months()` ghi đè file sau khi tải Luồng B (giữ nguyên 100% file gốc từ cổng).
+    - Khi bật chế độ tải gộp (`tai_chua_de_nghi`): loại bỏ dòng trống, khử trùng lặp theo `Mã liên kết` / `MA_LK` và chỉ áp dụng định dạng `@` trên cột `MA_LK`.
+  - `tests/test_safety_and_regression.py`:
+    - Cập nhật Part A của `test_multi_month_reconciliation_and_old_month_protection()` xác minh bảo toàn đầy đủ 22 cột và nguyên số dòng trên `listbh.xlsx`, dọn `listbh_YYYY_MM.xlsx` cũ và khử trùng/lọc rỗng trên RAM.
+- **Kiểm chứng:** Chạy đạt 100% cả 3 bộ kiểm thử: `tests/test_xml_v2.py`, `tests/test_safety_and_regression.py`, `tests/test_validation_integration.py`.
+
 ## 2026-11-17 08:55 - Antigravity (Tối ưu Hiệu năng Đọc/Nạp `listbh`, Truy vấn Ngoại trú HIS & Đối soát RAM O(1))
 - **Vấn đề được giải quyết:**
   1. Nạp `listbh.xlsx` (27.395 dòng) mất ~49 giây do đọc lại file Excel nhiều lần trên mỗi lần upload, hàm `parse_datetime_to_date()` lặp từng dòng gọi `pd.to_datetime()` 27.395 lần (~5s/lượt), và dễ chạm khóa SQLite khi đồng bộ đang chạy ngầm.

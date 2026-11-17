@@ -354,7 +354,7 @@ def test_cc_suffix_conversion_in_source_adapter():
 def test_multi_month_reconciliation_and_old_month_protection():
     """
     Xác minh quy trình đối soát đa tháng:
-    1. Tải listbh Tháng 11 không làm mất listbh Tháng 10 (lưu phân tách listbh_YYYY_MM.xlsx).
+    1. Giữ nguyên 100% cấu trúc 22 cột của listbh.xlsx, tự dọn listbh_YYYY_MM.xlsx cũ và không nhân bản dòng.
     2. Khi chạy Tháng 11 hoặc khoảng ngày có cả Tháng 10 khi chưa có listbh Tháng 10, các ca Tháng 10
        không bị đẩy nhầm vào FAIL; khi df_listbh rỗng tuyệt đối không sinh FAIL.
     3. Các ca FAIL tồn đọng Tháng 10 khi được đẩy bù sang Tháng 11 (xuất hiện trong listbh Tháng 11)
@@ -369,29 +369,39 @@ def test_multi_month_reconciliation_and_old_month_protection():
     from models import Base, Record
     from services import excel_service
 
-    # A. Kiểm tra lưu trữ phân tách listbh theo tháng và nạp gộp đa tháng
+    # A. Kiểm tra bảo toàn nguyên vẹn cấu trúc 22 cột của listbh.xlsx, dọn tệp tách tháng cũ và khử trùng trên RAM
     with tempfile.TemporaryDirectory() as tmp_dir:
-        oct_rows = [{"Mã liên kết": f"OCT_SENT_{i:03d}", "Ngày ra": "05/10/2026 09:00"} for i in range(1, 21)]
-        df_oct_xl = pd.DataFrame(oct_rows)
-        oct_src = os.path.join(tmp_dir, "src_oct.xlsx")
-        df_oct_xl.to_excel(oct_src, index=False)
-        excel_service.archive_listbh_by_months(oct_src, tmp_dir, explicit_month=10, explicit_year=2026)
+        cols_22 = [
+            "STT", "Mã liên kết", "Mã thẻ", "Mã BN", "Họ tên", "Ngày sinh", "Giới tính",
+            "Ngày vào", "Ngày ra", "Chẩn đoán", "Tổng chi", "Bệnh nhân TT", "Bệnh nhân CCT",
+            "Bảo hiểm TT", "Ngày TT", "Ngày gửi HS", "Ngày đề nghị TT", "Trạng thái HS",
+            "Trạng thái TT", "Loại HS", "Mã lỗi", "Miêu tả"
+        ]
+        raw_rows = [
+            {c: (i if c == "STT" else f"OCT_SENT_{i:03d}" if c == "Mã liên kết" else "05/10/2026 09:00" if c == "Ngày ra" else f"V_{c}") for c in cols_22}
+            for i in range(1, 21)
+        ]
+        # Thêm 1 dòng rỗng ở giữa và 1 dòng trùng mã để test lọc rỗng/khử trùng khi đọc mà vẫn giữ nguyên file gốc
+        raw_rows.insert(5, {c: None for c in cols_22})
+        raw_rows.append(dict(raw_rows[0]))
 
-        nov_rows = [{"Mã liên kết": f"NOV_SENT_{i:03d}", "Ngày ra": "03/11/2026 10:00"} for i in range(1, 16)]
-        # Thêm ca nội trú xuất viện cuối tháng 10 quyết toán tháng 11
-        nov_rows.append({"Mã liên kết": "OCT_FAIL_001", "Ngày ra": "30/10/2026 16:00"})
-        df_nov_xl = pd.DataFrame(nov_rows)
-        nov_src = os.path.join(tmp_dir, "src_nov.xlsx")
-        df_nov_xl.to_excel(nov_src, index=False)
-        excel_service.archive_listbh_by_months(nov_src, tmp_dir, explicit_month=11, explicit_year=2026)
+        master_path = os.path.join(tmp_dir, "listbh.xlsx")
+        pd.DataFrame(raw_rows).to_excel(master_path, index=False)
+        legacy_month_path = os.path.join(tmp_dir, "listbh_2026_09.xlsx")
+        pd.DataFrame([{"Mã liên kết": "OLD_001", "Ngày ra": "01/09/2026 08:00"}]).to_excel(legacy_month_path, index=False)
 
-        assert os.path.exists(os.path.join(tmp_dir, "listbh_2026_10.xlsx"))
-        assert os.path.exists(os.path.join(tmp_dir, "listbh_2026_11.xlsx"))
+        excel_service.archive_listbh_by_months(master_path, tmp_dir, explicit_month=10, explicit_year=2026)
+        assert not os.path.exists(legacy_month_path), "Phải tự dọn tệp listbh_YYYY_MM.xlsx cũ tránh nhân bản/sai lệch!"
 
+        # Kiểm tra tệp listbh.xlsx trên đĩa vẫn giữ nguyên 100% 22 cột và đúng số dòng gốc (22)
+        df_disk = pd.read_excel(master_path, dtype=str)
+        assert list(df_disk.columns) == cols_22, f"Cấu trúc cột listbh.xlsx bị biến đổi: {list(df_disk.columns)}"
+        assert len(df_disk) == 22, f"Số dòng file gốc listbh.xlsx bị thay đổi: {len(df_disk)}"
+
+        # Khi đọc vào RAM để đối soát: tự bỏ dòng rỗng và khử trùng MA_LK còn 20 mã duy nhất
         df_comb = excel_service.load_combined_listbh_for_range(tmp_dir)
         comb_keys = set(df_comb["MA_LK"].tolist())
-        assert "OCT_SENT_001" in comb_keys and "OCT_SENT_020" in comb_keys, "Mất dữ liệu Tháng 10 sau khi nạp Tháng 11!"
-        assert "NOV_SENT_001" in comb_keys and "OCT_FAIL_001" in comb_keys
+        assert len(df_comb) == 20 and "OCT_SENT_001" in comb_keys and "OCT_SENT_020" in comb_keys
 
     # B. Kiểm tra logic compare_service với SQLite in-memory
     test_engine = create_engine("sqlite:///:memory:")
@@ -562,6 +572,59 @@ def test_multi_month_reconciliation_and_old_month_protection():
         db.close()
 
 
+def test_flow_c_merge_cc_and_trailing_zero_preservation():
+    """
+    Xác minh Luồng C:
+    1. merge_excel_files() chuyển _CC / _cc -> /CC ngay trong HoSoLoiChiTiet.xlsx.
+    2. Bảo toàn số 0 ở cuối (26.035530, 26.037040/CC) dưới dạng chuỗi Text (@).
+    3. Khử trùng lặp chính xác khi cùng một hồ sơ lỗi xuất hiện ở 2 MA_GD khác nhau.
+    4. resolve_ma_lk_against_trusted_set() khôi phục số 0 cuối cho cả mã có hậu tố /CC (26.03704/CC -> 26.037040/CC).
+    """
+    import tempfile
+    import openpyxl
+    import pandas as pd
+    from services.portal_automation import portal_service
+    from services import excel_service, his_service
+
+    assert his_service.chuan_hoa_ma_lk("26.037040_cc") == "26.037040/CC"
+
+    trusted = {"26.035530", "26.037040/CC", "26.036522/CC"}
+    num_map = excel_service.build_trusted_numeric_ma_lk_map(trusted)
+    assert excel_service.resolve_ma_lk_against_trusted_set("26.03704_cc", trusted, num_map) == "26.037040/CC"
+    assert excel_service.resolve_ma_lk_against_trusted_set("26.03553", trusted, num_map) == "26.035530"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        dl_dir = os.path.join(tmp_dir, "dl")
+        os.makedirs(dl_dir, exist_ok=True)
+        out_path = os.path.join(tmp_dir, "HoSoLoiChiTiet.xlsx")
+
+        df1 = pd.DataFrame([
+            {"MA_GD": "GD_001", "MALOI": "XML8", "MA_CSKCB": "66232", "MOTALOI": "TOMTAT_KQ trống", "MA_LK": "26.036522_CC"},
+            {"MA_GD": "GD_001", "MALOI": "XML3", "MA_CSKCB": "66232", "MOTALOI": "TT_THAU sai", "MA_LK": "26.035530"},
+        ])
+        df2 = pd.DataFrame([
+            {"MA_GD": "GD_002", "MALOI": "XML8", "MA_CSKCB": "66232", "MOTALOI": "TOMTAT_KQ trống", "MA_LK": "26.036522_cc"},
+            {"MA_GD": "GD_002", "MALOI": "XML1", "MA_CSKCB": "66232", "MOTALOI": "NGAY_RA sai", "MA_LK": "26.037040_CC"},
+        ])
+        excel_service._write_df_preserving_text_excel(df1, os.path.join(dl_dir, "err_1.xlsx"))
+        excel_service._write_df_preserving_text_excel(df2, os.path.join(dl_dir, "err_2.xlsx"))
+
+        summary = portal_service.merge_excel_files(dl_dir, out_path)
+        assert summary["unique_records"] == 3, f"Expected 3 unique rows after MA_GD dedup, got {summary}"
+        assert summary["duplicates_removed"] == 1
+
+        wb = openpyxl.load_workbook(out_path, data_only=True)
+        ws = wb.active
+        hdr = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        idx = hdr.index("MA_LK")
+        vals = [(r[idx].value, r[idx].data_type, r[idx].number_format) for r in ws.iter_rows(min_row=2, values_only=False)]
+        wb.close()
+
+        assert ("26.036522/CC", "s", "@") in vals
+        assert ("26.035530", "s", "@") in vals
+        assert ("26.037040/CC", "s", "@") in vals
+
+
 if __name__ == "__main__":
     test_sql_safety_source_adapter()
     print("test_sql_safety_source_adapter: PASSED")
@@ -585,4 +648,6 @@ if __name__ == "__main__":
     print("test_cc_suffix_conversion_in_source_adapter: PASSED")
     test_multi_month_reconciliation_and_old_month_protection()
     print("test_multi_month_reconciliation_and_old_month_protection: PASSED")
+    test_flow_c_merge_cc_and_trailing_zero_preservation()
+    print("test_flow_c_merge_cc_and_trailing_zero_preservation: PASSED")
     print("ALL SAFETY & REGRESSION CHECKS PASSED!")
