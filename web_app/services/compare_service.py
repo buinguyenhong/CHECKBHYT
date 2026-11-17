@@ -1,7 +1,9 @@
 import pandas as pd
 import datetime
 import re
+from typing import Optional
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 from models import Record, RecordLog, ErrorHistoryArchive
 from services.his_service import chuan_hoa_ma_lk
 from services.excel_service import build_trusted_numeric_ma_lk_map, resolve_ma_lk_against_trusted_set
@@ -113,7 +115,7 @@ def _compute_covered_months(df_listbh: pd.DataFrame) -> set:
     max_cnt = max(counts.values())
     covered = set()
     for ym, cnt in counts.items():
-        if min_day.get(ym, 31) <= 15 or cnt >= 0.2 * max_cnt:
+        if (min_day.get(ym, 31) <= 15 and cnt >= 0.05 * max_cnt) or cnt >= 0.2 * max_cnt:
             covered.add(ym)
     return covered
 
@@ -176,6 +178,39 @@ def deduplicate_database_records(db: Session):
                 keep_rec.ma_lk = normalized_ma_lk
                 modified_count += 1
 
+        # Chuẩn hóa và khử trùng lặp cho nhóm FAIL
+        fail_records = db.query(Record).filter(Record.type_group == "FAIL").all()
+        fail_grouped = {}
+        for rec in fail_records:
+            norm_lk = chuan_hoa_ma_lk(rec.ma_lk).upper()
+            if norm_lk not in fail_grouped:
+                fail_grouped[norm_lk] = []
+            fail_grouped[norm_lk].append(rec)
+
+        for norm_lk, rec_list in fail_grouped.items():
+            if len(rec_list) > 1:
+                rec_list.sort(
+                    key=lambda r: (1 if r.status != "RESOLVED" else 0, r.updated_at or datetime.datetime.min),
+                    reverse=True
+                )
+                keep_rec = rec_list[0]
+                for dup_rec in rec_list[1:]:
+                    if dup_rec.note:
+                        if not keep_rec.note:
+                            keep_rec.note = dup_rec.note
+                        elif dup_rec.note not in keep_rec.note:
+                            keep_rec.note = f"{keep_rec.note} | {dup_rec.note}".strip(" | ")
+                    if keep_rec.status == "RESOLVED" and dup_rec.his_unlock_status in ("CLOSED_MONTH", "ADMIN_RESOLVED"):
+                        if keep_rec.his_unlock_status not in ("CLOSED_MONTH", "ADMIN_RESOLVED"):
+                            keep_rec.his_unlock_status = dup_rec.his_unlock_status
+                    db.delete(dup_rec)
+                    deleted_count += 1
+            else:
+                keep_rec = rec_list[0]
+            if norm_lk and keep_rec.ma_lk != norm_lk:
+                keep_rec.ma_lk = norm_lk
+                modified_count += 1
+
         # Xử lý dọn dẹp ma_y_te bị nhầm thành ma_lk ở đợt nạp trước
         corrupted_recs = db.query(Record).filter(Record.ma_y_te != "").all()
         for rec in corrupted_recs:
@@ -192,6 +227,138 @@ def deduplicate_database_records(db: Session):
     except Exception as e:
         print(f"[DEDUPLICATE] Loi khi don dep trung lap: {str(e)}")
         db.rollback()
+
+
+def reconcile_pending_records_with_listbh(
+    db: Session,
+    df_listbh: pd.DataFrame,
+    ngay_doi_soat: Optional[datetime.date] = None
+) -> int:
+    """
+    Gạch nợ (RESOLVED) ngay các hồ sơ FAIL / LOI đang tồn đọng trong CSDL khi MA_LK xuất hiện trong df_listbh,
+    đồng thời giải phóng cờ CLOSED_MONTH nếu ca đó thực tế đã được gửi thành công lên cổng.
+    """
+    if df_listbh is None or df_listbh.empty or "MA_LK" not in df_listbh.columns:
+        return 0
+
+    candidates = db.query(Record).filter(
+        (Record.status != "RESOLVED") | (Record.his_unlock_status == "CLOSED_MONTH")
+    ).all()
+    if not candidates:
+        return 0
+
+    candidate_keys = {chuan_hoa_ma_lk(r.ma_lk).upper() for r in candidates if r.ma_lk}
+    if not candidate_keys:
+        return 0
+
+    num_map = build_trusted_numeric_ma_lk_map(candidate_keys)
+    sent_keys = {
+        k for k in (
+            resolve_ma_lk_against_trusted_set(x, candidate_keys, num_map)
+            for x in df_listbh["MA_LK"].dropna().astype(str)
+        ) if k
+    }
+    if not sent_keys:
+        return 0
+
+    target_date = ngay_doi_soat or datetime.date.today()
+    d_moi_str = target_date.strftime("%d/%m/%Y")
+    resolved_count = 0
+    changed = False
+
+    for rec in candidates:
+        rec_lk = chuan_hoa_ma_lk(rec.ma_lk).upper()
+        if rec_lk not in sent_keys:
+            continue
+        if rec.status != "RESOLVED":
+            rec.status = "RESOLVED"
+            rec.his_unlock_status = "NORMAL"
+            d_cu_str = rec.ngay_doi_soat.strftime("%d/%m/%Y") if rec.ngay_doi_soat else "trước đó"
+            log_text = (
+                f"Hệ thống tự động duyệt: Ca bệnh (đợt {d_cu_str}) "
+                f"đã xuất hiện trong danh sách BHYT đã gửi (đối soát ngày {d_moi_str})."
+            )
+            db.add(RecordLog(
+                record_id=rec.id,
+                username="system",
+                action="CHANGE_STATUS",
+                note=log_text
+            ))
+            sync_archive_error(db, rec, resolved=True, resolved_by="system", note=log_text)
+            resolved_count += 1
+            changed = True
+        elif rec.his_unlock_status == "CLOSED_MONTH":
+            rec.his_unlock_status = "NORMAL"
+            changed = True
+
+    if changed:
+        db.commit()
+    return resolved_count
+
+
+def reopen_closed_month_with_listbh(
+    db: Session,
+    year: int,
+    mon: int,
+    df_listbh: Optional[pd.DataFrame],
+    username: str = "system"
+) -> dict:
+    """
+    Mở lại sổ các ca FAIL đã chốt của một tháng (trừ ADMIN_RESOLVED từng ca) và đối chiếu lại với df_listbh:
+    - Ca đã có trong df_listbh: giữ RESOLVED, đưa his_unlock_status về NORMAL.
+    - Ca chưa có trong df_listbh: khôi phục về PENDING để hiển thị lại trong danh sách FAIL.
+    """
+    month_start = datetime.date(year, mon, 1)
+    month_end = datetime.date(year + 1, 1, 1) if mon == 12 else datetime.date(year, mon + 1, 1)
+
+    records = db.query(Record).filter(
+        Record.type_group == "FAIL",
+        Record.status == "RESOLVED",
+        Record.ngay_ra_vien >= month_start,
+        Record.ngay_ra_vien < month_end
+    ).all()
+
+    eligible = [r for r in records if r.his_unlock_status != "ADMIN_RESOLVED"]
+    if not eligible:
+        return {"reopened_count": 0, "kept_resolved_count": 0}
+
+    record_keys = {chuan_hoa_ma_lk(r.ma_lk).upper() for r in eligible if r.ma_lk}
+    sent_keys = set()
+    if df_listbh is not None and not df_listbh.empty and "MA_LK" in df_listbh.columns and record_keys:
+        num_map = build_trusted_numeric_ma_lk_map(record_keys)
+        sent_keys = {
+            k for k in (
+                resolve_ma_lk_against_trusted_set(x, record_keys, num_map)
+                for x in df_listbh["MA_LK"].dropna().astype(str)
+            ) if k
+        }
+
+    reopened_count = 0
+    kept_resolved_count = 0
+    for r in eligible:
+        rec_lk = chuan_hoa_ma_lk(r.ma_lk).upper()
+        if rec_lk in sent_keys:
+            r.his_unlock_status = "NORMAL"
+            kept_resolved_count += 1
+        else:
+            r.status = "PENDING"
+            r.his_unlock_status = "NORMAL"
+            if r.note:
+                clean_parts = [p.strip() for p in r.note.split("|") if p.strip() and "chốt sổ" not in p.lower()]
+                r.note = " | ".join(clean_parts)
+            db.add(RecordLog(
+                record_id=r.id,
+                username=username,
+                action="CHANGE_STATUS",
+                note=f"IT mở lại sổ tháng {mon:02d}/{year}: hồ sơ chưa có trong danh sách BHYT đã gửi."
+            ))
+            reopened_count += 1
+
+    db.commit()
+    return {
+        "reopened_count": reopened_count,
+        "kept_resolved_count": kept_resolved_count
+    }
 
 def process_comparison(
     db: Session,
@@ -238,7 +405,7 @@ def process_comparison(
         ).all()
         
         for obs in obsolete_fails:
-            if obs.ma_lk not in current_sql_keys:
+            if chuan_hoa_ma_lk(obs.ma_lk).upper() not in current_sql_keys:
                 db.delete(obs)
         db.commit()
 
@@ -252,38 +419,9 @@ def process_comparison(
             )
         )
 
-    # 1.1. Tự động gạch nợ (RESOLVED) các ca FAIL / LOI tồn đọng của tháng cũ nếu đã xuất hiện trong listbh kỳ mới
+    # 1.1. Tự động gạch nợ (RESOLVED) các ca FAIL / LOI tồn đọng nếu đã xuất hiện trong listbh kỳ mới/hiện tại
     if df_listbh is not None and not df_listbh.empty:
-        pending_old_records = db.query(Record).filter(
-            Record.status != "RESOLVED"
-        ).all()
-        if pending_old_records:
-            pending_keys = {chuan_hoa_ma_lk(r.ma_lk).upper() for r in pending_old_records if r.ma_lk}
-            pending_num_map = build_trusted_numeric_ma_lk_map(pending_keys)
-            sent_keys_for_old = set(
-                df_listbh["MA_LK"].dropna().astype(str).map(
-                    lambda x: resolve_ma_lk_against_trusted_set(x, pending_keys, pending_num_map)
-                )
-            ) | sent_keys
-            for rec in pending_old_records:
-                rec_lk = chuan_hoa_ma_lk(rec.ma_lk).upper()
-                if rec_lk in sent_keys_for_old and rec_lk not in current_sql_keys:
-                    rec.status = "RESOLVED"
-                    rec.his_unlock_status = "NORMAL"
-                    d_cu_str = rec.ngay_doi_soat.strftime('%d/%m/%Y') if rec.ngay_doi_soat else "trước đó"
-                    d_moi_str = ngay_doi_soat.strftime('%d/%m/%Y')
-                    log_text = (
-                        f"Hệ thống tự động duyệt (gửi bù kỳ sau): Ca bệnh (đợt {d_cu_str}) "
-                        f"đã xuất hiện trong danh sách BHYT đã gửi (đối soát ngày {d_moi_str})."
-                    )
-                    db.add(RecordLog(
-                        record_id=rec.id,
-                        username="system",
-                        action="CHANGE_STATUS",
-                        note=log_text
-                    ))
-                    sync_archive_error(db, rec, resolved=True, resolved_by="system", note=log_text)
-            db.commit()
+        reconcile_pending_records_with_listbh(db, df_listbh, ngay_doi_soat)
 
     # 2. Xây dựng bản đồ lỗi (ma_lk -> DANH SÁCH các dòng lỗi chi tiết đã lọc trùng)
     error_map = {}
@@ -442,6 +580,8 @@ def process_comparison(
                     )
                     db.add(log)
                     sync_archive_error(db, rec, resolved=True, resolved_by="system", note=log_text)
+                elif rec.his_unlock_status == "CLOSED_MONTH":
+                    rec.his_unlock_status = "NORMAL"
             stats["sent"] += 1
         else:
             # Chưa gửi thành công:
@@ -491,12 +631,23 @@ def process_comparison(
                 note_val = f"đã sửa lỗi cũ (đợt {dates_str})" if had_previous_active_errors else ""
                 
                 if existing_record:
-                    # Khóa bảo vệ ca đã RESOLVED thuộc tháng cũ (không tự động mở lại thành FAIL)
+                    # Khóa bảo vệ ca đã chốt sổ / IT xử lý tay hoặc ca đã RESOLVED của tháng không nằm trong phạm vi listbh
+                    is_manually_closed = (
+                        existing_record.his_unlock_status in ("CLOSED_MONTH", "ADMIN_RESOLVED")
+                        or "chốt sổ" in (existing_record.note or "").lower()
+                    )
+                    rec_ym = (
+                        (ngay_ra_vien.year, ngay_ra_vien.month)
+                        if isinstance(ngay_ra_vien, datetime.date)
+                        else None
+                    )
                     is_old_resolved = (
                         existing_record.status == "RESOLVED"
                         and not had_previous_active_errors
-                        and isinstance(ngay_ra_vien, datetime.date)
-                        and (ngay_ra_vien.year, ngay_ra_vien.month) < ref_ym
+                        and (
+                            is_manually_closed
+                            or (rec_ym is not None and rec_ym not in covered_months and rec_ym < ref_ym)
+                        )
                     )
                     if is_old_resolved:
                         continue

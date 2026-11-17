@@ -55,6 +55,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Khởi chạy CheckBHYT WebApp")
     parser.add_argument("--port", type=int, default=int(os.environ.get("BHYT_PORT", 8000)), help="Cổng chạy dịch vụ")
+    parser.add_argument("--reload", action="store_true", help="Bật chế độ tự động tải lại khi sửa code (chỉ dùng cho dev)")
     args = parser.parse_known_args()[0]
     
     lan_ip = get_lan_ip()
@@ -74,6 +75,6 @@ if __name__ == "__main__":
     print("==================================================================")
     print("Khoi dong may chu uvicorn...")
     
-    # Tắt reload khi chạy ngầm để tối ưu hóa tài nguyên hệ thống
-    is_reload = os.environ.get("BHYT_NO_RELOAD") != "1"
+    # Mặc định tắt reload khi chạy ổn định để tránh nhân bản worker gây tranh chấp cổng
+    is_reload = bool(args.reload or os.environ.get("BHYT_RELOAD") == "1")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=is_reload)

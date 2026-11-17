@@ -56,6 +56,36 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-11-17 08:10 - Antigravity (Khắc phục Nghẽn/Tranh cổng `[Errno 10048]`, Tối ưu Nạp `listbh`, Gạch nợ Tức thì & Chức năng Mở lại Sổ Tháng)
+- **Vấn đề được giải quyết:**
+  1. Server thỉnh thoảng bị đơ (tưởng như tự tắt), khi bấm bật lại trên Launcher gặp lỗi `[Errno 10048] only one usage of each socket address (protocol/network address/port) is normally permitted` và tự chạy lại được sau khi tác vụ cũ xong.
+  2. Khi nạp lại `listbh` các tháng cũ (như Tháng 7, Tháng 8) và chạy đối soát lại, danh sách `FAIL` không cập nhật (do tiến trình cũ chưa dừng hẳn khi restart, tốc độ đọc/ghi `listbh` quá chậm trên luồng chính Event Loop, `upload_listbh` chưa tự gạch nợ ngay, Step 1.1 chặn `rec_lk not in current_sql_keys`, và khóa `is_old_resolved` chặn cả ca chưa chốt sổ thủ công).
+  3. Tháng đã bấm **"Chốt sổ tháng"** biến mất khỏi bộ lọc tháng trên Tab 2 và chưa có cơ chế mở lại để khôi phục các ca thực sự chưa gửi.
+- **Thay đổi chi tiết:**
+  - `web_app/services/excel_service.py`:
+    - Cập nhật `_write_df_preserving_text_excel()` ghi file an toàn qua file tạm (`*.tmp.xlsx` + `os.replace()`) và chỉ áp dụng định dạng Text (`@`) cho các cột `MA_LK` (`MA_LK_CANDIDATE_HEADERS`) thay vì lặp qua mọi cột, đồng thời rút gọn `archive_listbh_by_months()` chỉ lưu cột thiết yếu (`[found_key, found_date]`) và tái sử dụng DataFrame trong RAM.
+    - Siết điều kiện gộp dòng tràn cuối tháng khi upload thủ công trong `archive_listbh_by_months()` thành `(min_day <= 15 and cnt >= 0.05 * max_cnt) or cnt >= 0.2 * max_cnt`.
+  - `web_app/services/compare_service.py`:
+    - Bổ sung import `Session`, `Optional`; siết `_compute_covered_months()` theo ngưỡng `(min_day <= 15 and cnt >= 0.05 * max_cnt) or cnt >= 0.2 * max_cnt`.
+    - Mở rộng `deduplicate_database_records()` chuẩn hóa `ma_lk` (`chuan_hoa_ma_lk().upper()`) và khử trùng lặp cho cả nhóm `FAIL`.
+    - Bổ sung `reconcile_pending_records_with_listbh()` gạch nợ (`RESOLVED`) tức thì cho mọi hồ sơ `FAIL`/`LOI` đang tồn đọng có trong `listbh` và xóa cờ `CLOSED_MONTH` nếu hồ sơ đã được gửi cổng; tái sử dụng tại Bước 1.1 của `process_comparison()`.
+    - Bổ sung `reopen_closed_month_with_listbh()` phục vụ mở lại sổ tháng đối chiếu với `df_listbh` (giữ `RESOLVED` nếu đã có trong `listbh`, khôi phục `PENDING` nếu chưa gửi, bỏ qua hồ sơ `ADMIN_RESOLVED`).
+    - Cập nhật Bước 3 (`existing_record` nhóm `FAIL`): phân biệt ca khóa thủ công (`CLOSED_MONTH`, `ADMIN_RESOLVED`, hoặc ghi chú chứa `"chốt sổ"`) và ca thuộc tháng không nằm trong `covered_months` với các ca thuộc tháng đang được nạp lại đầy đủ `listbh` để cho phép cập nhật lại trạng thái chính xác.
+  - `web_app/main.py`:
+    - Cập nhật `_save_and_archive_listbh()` ghi atomic và gọi ngay `compare_service.reconcile_pending_records_with_listbh()` + cập nhật `cfg.last_resolved`.
+    - Đưa xử lý nặng trong `upload_listbh` (trả thêm `resolved_count`), `upload_loi`, `import_automation_to_system`, `upload_and_reconcile_from_tool` sang luồng nền `asyncio.to_thread()` với session `SessionLocal()` riêng theo thread để tránh khóa Event Loop của Uvicorn; tự động gạch nợ ngay sau khi `run_automation_v2_flow_b` hoàn tất.
+    - Đánh dấu `his_unlock_status = "ADMIN_RESOLVED"` trong `resolve_fail_record` và `"CLOSED_MONTH"` trong `resolve_fail_by_month`.
+    - Bổ sung API `GET /api/records/admin/fail/closed-months` (`get_closed_fail_months`) và `POST /api/records/admin/fail/reopen-month` (`reopen_fail_by_month` dùng helper `_reopen_fail_month_logic`).
+  - `web_app/templates/admin.html`:
+    - Cập nhật `uploadFile()`: khóa tạm `#btnStartSync` khi đang nạp, hiển thị trạng thái đang xử lý, reset `fileInput.value`, hiển thị số ca tự gạch nợ (`resolved_count`) và tự làm mới KPI + `fetchFailRecords()`.
+    - Tab 2: Bổ sung nút `#btnReopenFailMonth` (**"Mở lại sổ tháng"**) và hàm `reopenFailMonth()`, hiển thị các tháng đã chốt sổ trong `#failMonthFilter` (nhãn `Đã chốt sổ - N ca`) và hướng dẫn mở lại khi bảng rỗng.
+  - `web_app/run.py` & `LaunchWebBHYT.py`:
+    - `web_app/run.py`: mặc định tắt `reload` (`reload=False`, chỉ bật khi truyền `--reload` hoặc `BHYT_RELOAD=1`).
+    - `LaunchWebBHYT.py`: bổ sung `_get_listening_pids_on_port()` / `is_port_listening_netstat()`, tăng timeout kiểm tra cổng lên `1.5s` (kèm fallback netstat), nâng cấp `stop_server_on_port_sync()` dùng `taskkill /F /T /PID` và thử nâng quyền UAC (`ShellExecuteW(..., "runas", ...)`) nếu tiến trình cũ chạy quyền `SYSTEM`/Admin, đồng thời chặn khởi chạy trùng nếu cổng vẫn chưa được giải phóng.
+  - `tests/test_safety_and_regression.py`:
+    - Mở rộng `test_multi_month_reconciliation_and_old_month_protection()` bao phủ `CLOSED_MONTH` vs tự mở lại ca chưa chốt sổ khi đối soát lại tháng có `listbh`, gạch nợ tức thì `_CC`, và `reopen_closed_month_with_listbh()`.
+- **Kiểm chứng:** Chạy đạt 100% cả 3 bộ kiểm thử: `tests/test_xml_v2.py`, `tests/test_safety_and_regression.py`, và `tests/test_validation_integration.py`.
+
 ## 2026-11-16 15:40 - Antigravity (Khắc phục Lỗi Đối soát Đa Tháng, Lưu trữ `listbh` Theo Tháng & Xử lý/Chốt Sổ Dữ liệu Tháng Cũ)
 - **Vấn đề được giải quyết:** Khi thực hiện đối soát chuyển sang tháng mới (ví dụ chạy tháng 11 khi tháng 10 còn ca `FAIL`), việc ghi đè `listbh.xlsx` đơn lẻ, lọc `df_listbh` rỗng không được bảo vệ, ngày cấu hình cũ từ `client_config.json`, hoặc thiếu bảo vệ các tháng chưa tải trên cổng đã khiến toàn bộ hồ sơ của tháng cũ (tháng 10) bị đẩy hàng loạt vào nhóm `FAIL` hoặc mở lại các hồ sơ đã `RESOLVED`.
 - **Thay đổi chi tiết:**

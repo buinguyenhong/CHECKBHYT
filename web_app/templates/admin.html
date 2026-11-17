@@ -1243,6 +1243,7 @@
                         <option value="all">Tất cả các tháng</option>
                     </select>
                     <button id="btnResolveFailMonth" class="btn btn-secondary" onclick="resolveFailMonth()" style="display:none; background:#6366f1; color:white; border:none;">Chốt sổ tháng</button>
+                    <button id="btnReopenFailMonth" class="btn btn-secondary" onclick="reopenFailMonth()" style="display:none; background:#f59e0b; color:white; border:none;">Mở lại sổ tháng</button>
                     <button class="btn btn-success" onclick="resetSelectedFail('Ngoại trú')">Chạy Reset Ngoại trú</button>
                     <button class="btn btn-success" onclick="resetSelectedFail('Nội trú')">Chạy Reset Nội trú</button>
                     <button class="btn btn-danger" onclick="exportFailData()">Xuất Excel ca FAIL</button>
@@ -2406,6 +2407,7 @@
     async function uploadFile(type) {
         const fileInput = type === 'listbh' ? document.getElementById('fileListbh') : document.getElementById('fileLoi');
         const statusEl = type === 'listbh' ? document.getElementById('lblListbhStatus') : document.getElementById('lblLoiStatus');
+        const syncBtn = document.getElementById('btnStartSync');
         
         if (fileInput.files.length === 0) return;
 
@@ -2413,6 +2415,9 @@
         const formData = new FormData();
         formData.append("file", file);
 
+        const prevSyncDisabled = syncBtn ? syncBtn.disabled : false;
+        if (syncBtn) syncBtn.disabled = true;
+        if (statusEl) statusEl.innerText = "⏳ Đang nạp và xử lý...";
         logToConsole(`Đang nạp file ${file.name}...`);
         
         try {
@@ -2423,14 +2428,34 @@
 
             const data = await res.json();
             if (res.ok) {
-                statusEl.innerText = `Đã tải: ${file.name} (${data.rows} dòng)`;
-                logToConsole(`Tải tệp ${file.name} thành công. Ghi nhận ${data.rows} dòng.`);
+                if (type === 'listbh') {
+                    const resolvedCnt = data.resolved_count || 0;
+                    if (resolvedCnt > 0) {
+                        statusEl.innerText = `Đã tải: ${file.name} (${data.rows} dòng) — Tự động gạch nợ ${resolvedCnt} ca`;
+                        logToConsole(`Tải tệp ${file.name} thành công (${data.rows} dòng). Đã tự động chuyển RESOLVED ${resolvedCnt} ca FAIL/LOI.`);
+                    } else {
+                        statusEl.innerText = `Đã tải: ${file.name} (${data.rows} dòng)`;
+                        logToConsole(`Tải tệp ${file.name} thành công. Ghi nhận ${data.rows} dòng.`);
+                    }
+                    updateGlobalKPIs();
+                    fetchFailRecords();
+                } else {
+                    statusEl.innerText = `Đã tải: ${file.name} (${data.rows} dòng)`;
+                    logToConsole(`Tải tệp ${file.name} thành công. Ghi nhận ${data.rows} dòng.`);
+                    if (data.updated_records > 0) {
+                        updateGlobalKPIs();
+                    }
+                }
             } else {
                 statusEl.innerText = "Lỗi khi tải tệp";
                 logToConsole(`Lỗi tải tệp: ${data.detail || 'Lỗi xử lý file Excel'}`);
             }
         } catch {
+            statusEl.innerText = "Lỗi kết nối khi tải tệp";
             logToConsole("Lỗi mạng khi tải tệp.");
+        } finally {
+            fileInput.value = "";
+            if (syncBtn) syncBtn.disabled = prevSyncDisabled;
         }
     }
 
@@ -3319,6 +3344,7 @@
 
     // ========== PHÂN TRANG TAB FAIL (TAB 2) ==========
     let allFailRecords = [];
+    let closedFailMonthsMap = {};
     let failPagination = {
         currentPage: 1,
         pageSize: 50,
@@ -3343,20 +3369,37 @@
     // Fetch Fail Records (Tab 2)
     async function fetchFailRecords() {
         try {
-            const url = `/api/records/admin/fail`;
-            
-            const res = await fetch(url);
+            const [res, closedRes] = await Promise.all([
+                fetch(`/api/records/admin/fail`),
+                fetch(`/api/records/admin/fail/closed-months`).catch(() => null)
+            ]);
+
+            closedFailMonthsMap = {};
+            if (closedRes && closedRes.ok) {
+                try {
+                    const closedData = await closedRes.json();
+                    (closedData.closed_months || []).forEach(item => {
+                        if (item && item.month && item.count > 0) {
+                            closedFailMonthsMap[item.month] = item.count;
+                        }
+                    });
+                } catch {}
+            }
+
             if (res.ok) {
                 const data = await res.json();
                 allFailRecords = data;
                 
-                // Trích xuất các tháng khả dụng từ danh sách ca FAIL
-                const monthYears = new Set();
+                // Trích xuất các tháng khả dụng từ danh sách ca FAIL hiện hành & các tháng đã chốt sổ
+                const monthYears = new Set(Object.keys(closedFailMonthsMap));
+                const activeCountByMonth = {};
                 allFailRecords.forEach(r => {
                     if (r.ngay_ra_vien) {
                         const match = r.ngay_ra_vien.match(/^(\d{4})-(\d{2})/);
                         if (match) {
-                            monthYears.add(`${match[1]}-${match[2]}`);
+                            const ym = `${match[1]}-${match[2]}`;
+                            monthYears.add(ym);
+                            activeCountByMonth[ym] = (activeCountByMonth[ym] || 0) + 1;
                         }
                     }
                 });
@@ -3371,7 +3414,15 @@
                 let optionsHtml = '<option value="all">Tất cả các tháng</option>';
                 sortedMonths.forEach(my => {
                     const [year, month] = my.split('-');
-                    optionsHtml += `<option value="${my}">Tháng ${month}/${year}</option>`;
+                    const activeCnt = activeCountByMonth[my] || 0;
+                    const closedCnt = closedFailMonthsMap[my] || 0;
+                    if (activeCnt === 0 && closedCnt > 0) {
+                        optionsHtml += `<option value="${my}">Tháng ${month}/${year} (Đã chốt sổ - ${closedCnt} ca)</option>`;
+                    } else if (closedCnt > 0) {
+                        optionsHtml += `<option value="${my}">Tháng ${month}/${year} (${activeCnt} chờ / ${closedCnt} đã chốt)</option>`;
+                    } else {
+                        optionsHtml += `<option value="${my}">Tháng ${month}/${year}</option>`;
+                    }
                 });
                 
                 if (monthFilter) {
@@ -3394,9 +3445,18 @@
     function filterFailByMonth() {
         const monthFilter = document.getElementById('failMonthFilter');
         const selectedMonth = monthFilter ? monthFilter.value : 'all';
+        const hasActiveInSelectedMonth = selectedMonth && selectedMonth !== 'all' && allFailRecords.some(
+            r => r.ngay_ra_vien && r.ngay_ra_vien.startsWith(selectedMonth)
+        );
+        const hasClosedInSelectedMonth = selectedMonth && selectedMonth !== 'all' && (closedFailMonthsMap[selectedMonth] || 0) > 0;
+
         const btnResolveMonth = document.getElementById('btnResolveFailMonth');
         if (btnResolveMonth) {
-            btnResolveMonth.style.display = (selectedMonth && selectedMonth !== 'all') ? 'inline-block' : 'none';
+            btnResolveMonth.style.display = hasActiveInSelectedMonth ? 'inline-block' : 'none';
+        }
+        const btnReopenMonth = document.getElementById('btnReopenFailMonth');
+        if (btnReopenMonth) {
+            btnReopenMonth.style.display = hasClosedInSelectedMonth ? 'inline-block' : 'none';
         }
         const query = (document.getElementById('fail_search')?.value || '').toLowerCase().trim();
         
@@ -3448,7 +3508,13 @@
         tbody.innerHTML = '';
 
         if (pageData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào phù hợp với bộ lọc.</td></tr>`;
+            const selectedMonth = document.getElementById('failMonthFilter')?.value || 'all';
+            const closedCnt = (selectedMonth !== 'all') ? (closedFailMonthsMap[selectedMonth] || 0) : 0;
+            if (closedCnt > 0) {
+                tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: #f59e0b; padding: 30px;">Tháng này đã được chốt sổ (${closedCnt} ca đã chuyển sang RESOLVED). Bấm nút <b>"Mở lại sổ tháng"</b> phía trên để đối chiếu lại với listbh và khôi phục các ca chưa gửi.</td></tr>`;
+            } else {
+                tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 30px;">Không có hồ sơ FAIL nào phù hợp với bộ lọc.</td></tr>`;
+            }
             return;
         }
 
@@ -3701,6 +3767,37 @@
                 updateGlobalKPIs();
             } else {
                 showAdminToast(`Thất bại: ${data.detail || 'Lỗi chốt sổ'}`, "error", 2500);
+            }
+        } catch {
+            showAdminToast("Lỗi kết nối máy chủ.", "error", 2000);
+        }
+    }
+
+    // Mở lại sổ các ca FAIL đã chốt của một tháng và đối chiếu lại với kho listbh hiện có
+    async function reopenFailMonth() {
+        const monthFilter = document.getElementById('failMonthFilter');
+        const selectedMonth = monthFilter ? monthFilter.value : 'all';
+        if (!selectedMonth || selectedMonth === 'all') {
+            showAdminToast("Vui lòng chọn một tháng đã chốt sổ để mở lại.", "warning", 2000);
+            return;
+        }
+        const [yr, mo] = selectedMonth.split('-');
+        if (!confirm(`Xác nhận mở lại sổ Tháng ${mo}/${yr} và đối chiếu lại với danh sách listbh hiện có trên máy chủ?`)) {
+            return;
+        }
+        try {
+            const res = await fetch('/api/records/admin/fail/reopen-month', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ month: selectedMonth })
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                showAdminToast(data.message || `Đã mở lại sổ tháng ${mo}/${yr}.`, "success", 3000);
+                fetchFailRecords();
+                updateGlobalKPIs();
+            } else {
+                showAdminToast(`Thất bại: ${data.detail || 'Lỗi mở lại sổ tháng'}`, "error", 2500);
             }
         } catch {
             showAdminToast("Lỗi kết nối máy chủ.", "error", 2000);

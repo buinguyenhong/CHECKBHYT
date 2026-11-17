@@ -190,17 +190,34 @@ def _find_listbh_columns(
 
 
 def _write_df_preserving_text_excel(df: pd.DataFrame, out_path: str) -> None:
-    """Ghi DataFrame ra file Excel với định dạng Text (@) cho các ô chuỗi để bảo toàn số 0 ở cuối MA_LK."""
+    """Ghi DataFrame ra file Excel (atomic qua file tạm) và định dạng Text (@) cho cột MA_LK để bảo toàn số 0 ở cuối."""
+    tmp_path = f"{out_path}.{os.getpid()}.tmp.xlsx"
     try:
-        with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Sheet1")
-            ws = writer.sheets["Sheet1"]
-            for row in ws.iter_rows(min_row=2, values_only=False):
-                for cell in row:
-                    if isinstance(cell.value, str):
-                        cell.number_format = "@"
-    except Exception:
-        df.to_excel(out_path, index=False)
+        try:
+            with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="Sheet1")
+                ws = writer.sheets["Sheet1"]
+                header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), [])
+                lk_cols = [
+                    idx + 1 for idx, h_cell in enumerate(header_cells)
+                    if str(h_cell.value or "").strip().lower() in MA_LK_CANDIDATE_HEADERS
+                ]
+                if not lk_cols and len(df.columns) > 0:
+                    lk_cols = [1]
+                for col_idx in lk_cols:
+                    for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=False):
+                        cell = row[0]
+                        if isinstance(cell.value, str):
+                            cell.number_format = "@"
+        except Exception:
+            df.to_excel(tmp_path, index=False)
+        os.replace(tmp_path, out_path)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
 
 
 def load_listbh(
@@ -348,10 +365,13 @@ def archive_listbh_by_months(
         else:
             ym_list.append((fallback_year, fallback_month))
 
-    df_work = df.copy()
+    keep_cols = [found_key]
+    if found_date and found_date not in keep_cols:
+        keep_cols.append(found_date)
+    df_work = df[keep_cols].copy()
     df_work["_ym"] = ym_list
 
-    # Nếu không chỉ định explicit_month (upload thủ công), gộp các dòng giao thoa (cuối tháng trước < 20% và không có đầu tháng <= 15) vào tháng chính
+    # Nếu không chỉ định explicit_month (upload thủ công), gộp các dòng giao thoa (cuối tháng trước < 20% hoặc lác đác < 5%) vào tháng chính
     if explicit_month is None:
         counts_by_ym = df_work["_ym"].value_counts().to_dict()
         if counts_by_ym:
@@ -366,7 +386,7 @@ def archive_listbh_by_months(
 
             genuine_yms = set()
             for ym_val, cnt in counts_by_ym.items():
-                if min_day_by_ym.get(ym_val, 31) <= 15 or cnt >= 0.2 * max_cnt:
+                if (min_day_by_ym.get(ym_val, 31) <= 15 and cnt >= 0.05 * max_cnt) or cnt >= 0.2 * max_cnt:
                     genuine_yms.add(ym_val)
             if genuine_yms:
                 df_work["_ym"] = [ym if ym in genuine_yms else dominant_ym for ym in ym_list]
@@ -375,6 +395,7 @@ def archive_listbh_by_months(
         df_work["_ym"] = [(fallback_year, fallback_month)] * len(df_work)
 
     saved_paths: List[str] = []
+    written_dfs: Dict[str, pd.DataFrame] = {}
 
     for (yr, mo), grp in df_work.groupby("_ym"):
         month_df = grp.drop(columns=["_ym"]).copy()
@@ -383,9 +404,13 @@ def archive_listbh_by_months(
             try:
                 old_df = read_excel_preserving_ma_lk(month_path)
                 if not old_df.empty:
-                    old_key, _ = _find_listbh_columns(old_df)
+                    old_key, old_date = _find_listbh_columns(old_df)
                     if old_key and old_key != found_key:
                         old_df = old_df.rename(columns={old_key: found_key})
+                    if found_date and old_date and old_date != found_date and found_date not in old_df.columns:
+                        old_df = old_df.rename(columns={old_date: found_date})
+                    old_keep = [c for c in keep_cols if c in old_df.columns]
+                    old_df = old_df[old_keep].copy()
                     combined = pd.concat([old_df, month_df], ignore_index=True)
                     combined["_norm_key"] = combined[found_key].apply(lambda x: chuan_hoa_ma_lk(x).upper())
                     combined = combined[combined["_norm_key"].str.len() > 0]
@@ -395,6 +420,7 @@ def archive_listbh_by_months(
                 pass
         _write_df_preserving_text_excel(month_df, month_path)
         saved_paths.append(month_path)
+        written_dfs[os.path.normpath(month_path)] = month_df
 
     # Cập nhật tệp listbh.xlsx tổng hợp từ tối đa 3 tháng gần nhất để tương thích với các báo cáo đọc listbh.xlsx trực tiếp
     month_files = sorted(glob.glob(os.path.join(upload_dir, "listbh_[0-9][0-9][0-9][0-9]_[0-9][0-9].xlsx")))
@@ -402,13 +428,22 @@ def archive_listbh_by_months(
     if recent_files:
         dfs_recent = []
         for mf in recent_files:
+            norm_mf = os.path.normpath(mf)
+            if norm_mf in written_dfs:
+                mdf = written_dfs[norm_mf]
+                if not mdf.empty:
+                    dfs_recent.append(mdf)
+                continue
             try:
                 mdf = read_excel_preserving_ma_lk(mf)
                 if not mdf.empty:
-                    mk, _ = _find_listbh_columns(mdf)
+                    mk, md = _find_listbh_columns(mdf)
                     if mk and mk != found_key:
                         mdf = mdf.rename(columns={mk: found_key})
-                    dfs_recent.append(mdf)
+                    if found_date and md and md != found_date and found_date not in mdf.columns:
+                        mdf = mdf.rename(columns={md: found_date})
+                    mdf_keep = [c for c in keep_cols if c in mdf.columns]
+                    dfs_recent.append(mdf[mdf_keep].copy())
             except Exception:
                 pass
         if dfs_recent:

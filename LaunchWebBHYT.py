@@ -610,10 +610,17 @@ class BHYTLauncher:
             if res:
                 self.stop_server_on_port_sync(int(port))
                 # Chờ socket Windows giải phóng hẳn
-                for _ in range(6):
+                for _ in range(10):
                     if not self.is_port_active(int(port)):
                         break
                     time.sleep(0.5)
+                if self.is_port_active(int(port)):
+                    messagebox.showerror(
+                        "Không thể giải phóng cổng",
+                        f"Tiến trình cũ vẫn đang giữ cổng {port} (có thể đang chạy dưới quyền Administrator/SYSTEM).\n"
+                        f"Vui lòng mở Launcher bằng 'Run as administrator' hoặc khởi động lại dịch vụ trong Task Scheduler."
+                    )
+                    return
             else:
                 return
 
@@ -696,30 +703,82 @@ class BHYTLauncher:
         count = self.stop_server_on_port_sync(int(port))
         if count > 0:
             messagebox.showinfo("Thành công", f"Đã giải phóng cổng {port} và dừng thành công {count} tiến trình chạy ngầm! ✅")
+        elif self.is_port_active(int(port)):
+            messagebox.showerror(
+                "Không thể dừng dịch vụ",
+                f"Cổng {port} vẫn đang bị chiếm dụng (tiến trình cũ có thể đang chạy dưới quyền Administrator hoặc SYSTEM).\n"
+                f"Vui lòng nhấp chuột phải vào Launcher và chọn 'Run as administrator' để dừng dịch vụ."
+            )
         else:
             messagebox.showinfo("Thông báo", f"Không có tiến trình nào đang chiếm dụng cổng {port}.")
 
+    def _get_listening_pids_on_port(self, port: int) -> set:
+        pids = set()
+        try:
+            output = subprocess.check_output(
+                "netstat -ano",
+                shell=True,
+                creationflags=0x08000000
+            ).decode("utf-8", errors="ignore")
+            port_suffix = f":{port}"
+            for line in output.splitlines():
+                parts = line.split()
+                if len(parts) >= 5 and parts[0].upper().startswith("TCP"):
+                    local_addr = parts[1]
+                    state = parts[3].upper()
+                    pid = parts[4]
+                    if local_addr.endswith(port_suffix) and state == "LISTENING" and pid != "0" and pid.isdigit():
+                        pids.add(pid)
+        except Exception:
+            pass
+        return pids
+
+    def is_port_listening_netstat(self, port: int) -> bool:
+        return len(self._get_listening_pids_on_port(port)) > 0
+
     def stop_server_on_port_sync(self, port: int) -> int:
         try:
-            cmd = f'netstat -ano | findstr :{port}'
-            output = subprocess.check_output(cmd, shell=True).decode('utf-8')
-            pids = set()
-            for line in output.strip().split('\n'):
-                parts = line.split()
-                if len(parts) >= 5:
-                    pids.add(parts[-1])
-            
+            pids = self._get_listening_pids_on_port(port)
+            if not pids:
+                return 0
+
             killed = 0
+            failed_pids = []
             for pid in pids:
-                if pid != '0' and pid.isdigit():
-                    subprocess.run(f'taskkill /F /PID {pid}', shell=True, creationflags=0x08000000)
+                res = subprocess.run(
+                    f"taskkill /F /T /PID {pid}",
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    creationflags=0x08000000
+                )
+                if res.returncode == 0:
                     killed += 1
+                else:
+                    failed_pids.append(pid)
+
+            # Nếu không đủ quyền dừng tiến trình SYSTEM/Admin, thử nâng quyền UAC để kill sạch
+            if failed_pids and self.is_port_listening_netstat(port):
+                try:
+                    import ctypes
+                    pid_args = " ".join(f"/PID {pid}" for pid in failed_pids)
+                    ret = ctypes.windll.shell32.ShellExecuteW(
+                        None, "runas", "taskkill", f"/F /T {pid_args}", None, 0
+                    )
+                    if ret and int(ret) > 32:
+                        for _ in range(16):
+                            time.sleep(0.3)
+                            if not self.is_port_listening_netstat(port):
+                                killed += len(failed_pids)
+                                break
+                except Exception:
+                    pass
 
             # Chờ Windows giải phóng socket TIME_WAIT hoàn toàn
-            for _ in range(10):
-                time.sleep(0.3)
-                if not self.is_port_active(port):
+            for _ in range(12):
+                if not self.is_port_listening_netstat(port):
                     break
+                time.sleep(0.3)
 
             return killed
         except Exception:
@@ -758,10 +817,12 @@ class BHYTLauncher:
     def is_port_active(self, port: int) -> bool:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(0.3)
-                return s.connect_ex(('127.0.0.1', port)) == 0
+                s.settimeout(1.5)
+                if s.connect_ex(('127.0.0.1', port)) == 0:
+                    return True
         except Exception:
-            return False
+            pass
+        return self.is_port_listening_netstat(port)
 
     def status_checking_loop(self):
         """

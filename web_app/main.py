@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 import pandas as pd
 
-from database import engine, Base, get_db
+from database import engine, Base, SessionLocal, get_db
 from models import User, AppConfig, Record, RecordLog, ErrorHistoryArchive
 from auth import (
     hash_password, verify_password, get_current_user, require_admin, SESSION_COOKIE_NAME
@@ -95,8 +95,8 @@ def _load_listbh_for_sync_range(upload_dir: str, tu_date: datetime.date, den_dat
     return df_raw, df_in_range, f"Đọc listbh đa tháng thành công. Tổng kho: {len(df_raw)} ca (trong khoảng ngày: {len(df_in_range)} ca)."
 
 
-def _save_and_archive_listbh(contents: bytes, upload_dir: str):
-    """Lưu trữ phân tách listbh theo từng tháng mà không ghi đè mất dữ liệu các tháng cũ."""
+def _save_and_archive_listbh(contents: bytes, upload_dir: str, db: Optional[Session] = None) -> int:
+    """Lưu trữ phân tách listbh theo từng tháng và gạch nợ (RESOLVED) ngay các ca FAIL/LOI đã gửi."""
     import glob as _glob
     os.makedirs(upload_dir, exist_ok=True)
     master_path = os.path.join(upload_dir, "listbh.xlsx")
@@ -107,8 +107,38 @@ def _save_and_archive_listbh(contents: bytes, upload_dir: str):
             pass
     saved = excel_service.archive_listbh_by_months(contents, upload_dir)
     if not saved:
-        with open(master_path, "wb") as f:
-            f.write(contents)
+        tmp_path = f"{master_path}.{os.getpid()}.tmp.xlsx"
+        try:
+            with open(tmp_path, "wb") as f:
+                f.write(contents)
+            os.replace(tmp_path, master_path)
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+
+    resolved_count = 0
+    try:
+        df_combined = excel_service.load_combined_listbh_for_range(upload_dir)
+        if df_combined is not None and not df_combined.empty:
+            owns_db = db is None
+            target_db = db if db is not None else SessionLocal()
+            try:
+                resolved_count = compare_service.reconcile_pending_records_with_listbh(
+                    target_db, df_combined, datetime.date.today()
+                )
+                cfg = target_db.query(AppConfig).first()
+                if cfg:
+                    cfg.last_resolved = target_db.query(Record).filter(Record.status == "RESOLVED").count()
+                    target_db.commit()
+            finally:
+                if owns_db:
+                    target_db.close()
+    except Exception:
+        pass
+    return resolved_count
 
 # ==========================================
 # GLOBAL STATE FOR ASYNC SYNC PROGRESS
@@ -1026,15 +1056,22 @@ async def upload_listbh(
     file: UploadFile = File(...),
     user: User = Depends(require_admin)
 ):
-    """Tải lên file Excel danh sách BHYT đã gửi"""
+    """Tải lên file Excel danh sách BHYT đã gửi (chạy trên thread riêng và tự động gạch nợ FAIL/LOI)"""
     try:
         contents = await file.read()
-        df = excel_service.load_listbh(BytesIO(contents))
-        
-        # Lưu trữ theo tháng và bảo toàn dữ liệu các tháng trước
-        _save_and_archive_listbh(contents, UPLOAD_DIR)
-            
-        return {"status": "success", "rows": len(df), "filename": file.filename}
+
+        def _process_upload_listbh_sync():
+            df = excel_service.load_listbh(BytesIO(contents))
+            resolved_count = _save_and_archive_listbh(contents, UPLOAD_DIR)
+            return len(df), resolved_count
+
+        row_count, resolved_count = await asyncio.to_thread(_process_upload_listbh_sync)
+        return {
+            "status": "success",
+            "rows": row_count,
+            "resolved_count": resolved_count,
+            "filename": file.filename
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Lỗi đọc file Excel listbh: {str(e)}")
 
@@ -1042,66 +1079,83 @@ async def upload_listbh(
 @app.post("/api/upload/loi")
 async def upload_loi(
     file: UploadFile = File(...),
-    user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
+    user: User = Depends(require_admin)
 ):
     """Tải lên file Excel báo cáo lỗi chi tiết từ cổng BHYT và tự động cập nhật/ghép lỗi ngay lập tức"""
     try:
         contents = await file.read()
-        df = excel_service.load_hosoloichitiet(BytesIO(contents))
-        
-        # Lưu file tạm cục bộ để dùng đối soát sau
-        save_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
-        with open(save_path, "wb") as f:
-            f.write(contents)
-            
-        # 1. Tìm ngày đối soát gần nhất có dữ liệu
-        last_record = db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
-        updated_count = 0
-        if last_record and not df.empty:
-            target_date = last_record.ngay_doi_soat
-            # Chuyển df thành dictionary để tra cứu nhanh O(1)
-            active_records_pre = db.query(Record).filter(Record.ngay_doi_soat == target_date, Record.status != "RESOLVED").all()
-            trusted_keys_upload = {his_service.chuan_hoa_ma_lk(r.ma_lk).upper() for r in active_records_pre if r.ma_lk}
-            num_map_upload = excel_service.build_trusted_numeric_ma_lk_map(trusted_keys_upload)
-            error_map = {}
-            for _, row in df.iterrows():
-                lk = excel_service.resolve_ma_lk_against_trusted_set(row["MA_LK"], trusted_keys_upload, num_map_upload)
-                if lk:
-                    error_map[lk] = {
-                        "maloi": str(row.get("MALOI", "")).strip(),
-                        "motaloi": str(row.get("MOTALOI", "")).strip(),
-                        "ngay_ra": row.get("Ngày ra", None) if not pd.isna(row.get("Ngày ra")) else None
-                    }
-            
-            # Lấy tất cả records thuộc ngày đối soát đó và chưa được giải quyết
-            active_records = db.query(Record).filter(
-                Record.ngay_doi_soat == target_date,
-                Record.status != "RESOLVED"
-            ).all()
-            
-            for r in active_records:
-                if r.ma_lk in error_map:
-                    err = error_map[r.ma_lk]
-                    r.type_group = "LOI"
-                    r.maloi = err["maloi"]
-                    r.motaloi = err["motaloi"]
-                    r.ngay_ra = err["ngay_ra"]
-                    updated_count += 1
-                    
-                    # Thêm log lịch sử ghi nhận ghép lỗi
-                    log = RecordLog(
-                        record_id=r.id,
-                        username=user.username,
-                        action="CHANGE_STATUS",
-                        note=f"Tu dong ghep ma loi moi nap: {err['maloi']} - {err['motaloi']}"
-                    )
-                    db.add(log)
-            db.commit()
-            
+        username_str = user.username
+
+        def _process_upload_loi_sync():
+            df = excel_service.load_hosoloichitiet(BytesIO(contents))
+
+            save_path = os.path.join(UPLOAD_DIR, "HoSoLoiChiTiet.xlsx")
+            tmp_path = f"{save_path}.{os.getpid()}.tmp.xlsx"
+            try:
+                with open(tmp_path, "wb") as f:
+                    f.write(contents)
+                os.replace(tmp_path, save_path)
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+
+            updated_count = 0
+            if not df.empty:
+                local_db = SessionLocal()
+                try:
+                    last_record = local_db.query(Record).order_by(Record.ngay_doi_soat.desc()).first()
+                    if last_record:
+                        target_date = last_record.ngay_doi_soat
+                        active_records_pre = local_db.query(Record).filter(
+                            Record.ngay_doi_soat == target_date,
+                            Record.status != "RESOLVED"
+                        ).all()
+                        trusted_keys_upload = {his_service.chuan_hoa_ma_lk(r.ma_lk).upper() for r in active_records_pre if r.ma_lk}
+                        num_map_upload = excel_service.build_trusted_numeric_ma_lk_map(trusted_keys_upload)
+                        error_map = {}
+                        for _, row in df.iterrows():
+                            lk = excel_service.resolve_ma_lk_against_trusted_set(row["MA_LK"], trusted_keys_upload, num_map_upload)
+                            if lk:
+                                error_map[lk] = {
+                                    "maloi": str(row.get("MALOI", "")).strip(),
+                                    "motaloi": str(row.get("MOTALOI", "")).strip(),
+                                    "ngay_ra": row.get("Ngày ra", None) if not pd.isna(row.get("Ngày ra")) else None
+                                }
+
+                        active_records = local_db.query(Record).filter(
+                            Record.ngay_doi_soat == target_date,
+                            Record.status != "RESOLVED"
+                        ).all()
+
+                        for r in active_records:
+                            if r.ma_lk in error_map:
+                                err = error_map[r.ma_lk]
+                                r.type_group = "LOI"
+                                r.maloi = err["maloi"]
+                                r.motaloi = err["motaloi"]
+                                r.ngay_ra = err["ngay_ra"]
+                                updated_count += 1
+
+                                log = RecordLog(
+                                    record_id=r.id,
+                                    username=username_str,
+                                    action="CHANGE_STATUS",
+                                    note=f"Tu dong ghep ma loi moi nap: {err['maloi']} - {err['motaloi']}"
+                                )
+                                local_db.add(log)
+                        local_db.commit()
+                finally:
+                    local_db.close()
+
+            return len(df), updated_count
+
+        row_count, updated_count = await asyncio.to_thread(_process_upload_loi_sync)
         return {
-            "status": "success", 
-            "rows": len(df), 
+            "status": "success",
+            "rows": row_count,
             "filename": file.filename,
             "updated_records": updated_count
         }
@@ -1209,10 +1263,33 @@ async def run_automation_v2_flow_b(
         cur_m = thang or datetime.datetime.now().month
         add_portal_log(f"--- BẮT ĐẦU LUỒNG B (TẢI listbh.xlsx - THÁNG {cur_m}, GỘP CHƯA ĐỀ NGHỊ: {'CÓ' if tai_chua_de_nghi else 'KHÔNG'}) ---")
         result = await asyncio.to_thread(portal_service.run_flow_b, add_portal_log, client_token, thang, tai_chua_de_nghi)
+        resolved_count = 0
+        if result.get("status") == "success":
+            def _reconcile_flow_b_sync():
+                df_combined = excel_service.load_combined_listbh_for_range(UPLOAD_DIR)
+                if df_combined is None or df_combined.empty:
+                    return 0
+                local_db = SessionLocal()
+                try:
+                    cnt = compare_service.reconcile_pending_records_with_listbh(
+                        local_db, df_combined, datetime.date.today()
+                    )
+                    cfg = local_db.query(AppConfig).first()
+                    if cfg:
+                        cfg.last_resolved = local_db.query(Record).filter(Record.status == "RESOLVED").count()
+                        local_db.commit()
+                    return cnt
+                finally:
+                    local_db.close()
+
+            resolved_count = await asyncio.to_thread(_reconcile_flow_b_sync)
+            if resolved_count > 0:
+                add_portal_log(f"Đã tự động gạch nợ (RESOLVED) {resolved_count} ca FAIL/LOI từ listbh vừa tải.")
         return {
             "status": result.get("status", "success"),
             "flow": "B",
             "rows": result.get("rows", 0),
+            "resolved_count": resolved_count,
             "month": result.get("month", cur_m),
             "merged": result.get("merged", tai_chua_de_nghi),
             "file_path": result.get("file_path", ""),
@@ -1278,8 +1355,7 @@ def download_automation_file(file_type: str = "error_detail", user: User = Depen
 @app.post("/api/automation/v2/import-to-system")
 async def import_automation_to_system(
     data: dict,
-    user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
+    user: User = Depends(require_admin)
 ):
     """
     Tự động nạp file vừa tải (listbh.xlsx hoặc HoSoLoiChiTiet.xlsx) vào CSDL đối soát CHECKBHYT.
@@ -1298,7 +1374,15 @@ async def import_automation_to_system(
     try:
         add_portal_log(f"Đang kích hoạt đối soát tự động với CSDL HIS cho khoảng ngày {clean_from} - {clean_to}...")
         include_errors = (flow == "C")
-        compare_res = compare_records(clean_from, clean_to, include_errors=include_errors, user=user, db=db)
+
+        def _run_import_compare_sync():
+            local_db = SessionLocal()
+            try:
+                return compare_records(clean_from, clean_to, include_errors=include_errors, user=user, db=local_db)
+            finally:
+                local_db.close()
+
+        compare_res = await asyncio.to_thread(_run_import_compare_sync)
         add_portal_log(f"Đối soát tự động hoàn tất thành công! ✅ (Tổng: {compare_res.get('total', 0)} ca, Đã gửi: {compare_res.get('sent', 0)}, Lỗi: {compare_res.get('loi', 0)}, Chưa gửi FAIL: {compare_res.get('fail', 0)})")
         return {
             "status": "success",
@@ -1319,24 +1403,18 @@ async def upload_and_reconcile_from_tool(
     fromDate: Optional[str] = Form(None),
     toDate: Optional[str] = Form(None),
     from_date: Optional[str] = Form(None),
-    to_date: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    to_date: Optional[str] = Form(None)
 ):
     """
     Nhận file tải về từ tool local runner (listbh.xlsx hoặc HoSoLoiChiTiet.xlsx),
     lưu vào thư mục uploaded_files và tự động kích hoạt đối soát với CSDL HIS theo khoảng ngày chỉ định.
     """
-    from services.portal_automation import UPLOAD_DIR
+    from services.portal_automation import UPLOAD_DIR as PA_UPLOAD_DIR
     flow_upper = flow.upper()
     target_filename = "listbh.xlsx" if flow_upper == "B" else "HoSoLoiChiTiet.xlsx"
-    dest_path = os.path.join(UPLOAD_DIR, target_filename)
+    dest_path = os.path.join(PA_UPLOAD_DIR, target_filename)
 
     content = await file.read()
-    if flow_upper == "B":
-        _save_and_archive_listbh(content, UPLOAD_DIR)
-    else:
-        with open(dest_path, "wb") as f:
-            f.write(content)
 
     today = datetime.date.today()
     first_day_of_month = today.replace(day=1)
@@ -1347,12 +1425,34 @@ async def upload_and_reconcile_from_tool(
     clean_from = from_raw.replace("-", "").replace("/", "") if from_raw else first_day_of_month.strftime("%Y%m%d")
     clean_to = to_raw.replace("-", "").replace("/", "") if to_raw else today.strftime("%Y%m%d")
 
-    admin_user = db.query(User).filter(User.role == "admin").first()
-    if not admin_user:
-        admin_user = db.query(User).first()
+    def _run_tool_upload_and_reconcile_sync():
+        local_db = SessionLocal()
+        try:
+            if flow_upper == "B":
+                _save_and_archive_listbh(content, PA_UPLOAD_DIR, db=local_db)
+            else:
+                tmp_path = f"{dest_path}.{os.getpid()}.tmp.xlsx"
+                try:
+                    with open(tmp_path, "wb") as f:
+                        f.write(content)
+                    os.replace(tmp_path, dest_path)
+                finally:
+                    if os.path.exists(tmp_path):
+                        try:
+                            os.remove(tmp_path)
+                        except Exception:
+                            pass
 
-    include_errors = (flow_upper == "C")
-    compare_res = compare_records(clean_from, clean_to, include_errors=include_errors, user=admin_user, db=db)
+            admin_user = local_db.query(User).filter(User.role == "admin").first()
+            if not admin_user:
+                admin_user = local_db.query(User).first()
+
+            include_errors = (flow_upper == "C")
+            return compare_records(clean_from, clean_to, include_errors=include_errors, user=admin_user, db=local_db)
+        finally:
+            local_db.close()
+
+    compare_res = await asyncio.to_thread(_run_tool_upload_and_reconcile_sync)
     return {
         "status": "success",
         "flow": flow,
@@ -2071,6 +2171,7 @@ def resolve_fail_record(
         log_action = "EDIT_NOTE"
     else:
         record.status = "RESOLVED"
+        record.his_unlock_status = "ADMIN_RESOLVED"
         log_msg = f"IT xác nhận xử lý thành công. Ghi chú: {note}"
         log_action = "CHANGE_STATUS"
 
@@ -2198,7 +2299,7 @@ def resolve_fail_by_month(
 
     for r in records:
         r.status = "RESOLVED"
-        r.his_unlock_status = "NORMAL"
+        r.his_unlock_status = "CLOSED_MONTH"
         r.note = f"{r.note} | {note}".strip(" | ") if r.note else note
         db.add(RecordLog(
             record_id=r.id,
@@ -2206,12 +2307,108 @@ def resolve_fail_by_month(
             action="CHANGE_STATUS",
             note=note
         ))
+    cfg = db.query(AppConfig).first()
+    if cfg:
+        db.flush()
+        cfg.last_resolved = db.query(Record).filter(Record.status == "RESOLVED").count()
     db.commit()
     return {
         "status": "success",
         "resolved_count": len(records),
         "message": f"Đã chốt sổ đóng {len(records)} ca FAIL của tháng {mon:02d}/{year}."
     }
+
+
+@app.get("/api/records/admin/fail/closed-months")
+def get_closed_fail_months(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Lấy danh sách các tháng đã chốt sổ đóng ca FAIL để cho phép IT mở lại kiểm tra."""
+    rows = db.query(Record.ngay_ra_vien, Record.his_unlock_status, Record.note).filter(
+        Record.type_group == "FAIL",
+        Record.status == "RESOLVED",
+        Record.ngay_ra_vien.isnot(None)
+    ).all()
+
+    counts = {}
+    for ngay_rv, unlock_st, note in rows:
+        if unlock_st == "ADMIN_RESOLVED":
+            continue
+        if unlock_st == "CLOSED_MONTH" or "chốt sổ" in str(note or "").lower():
+            ym = ngay_rv.strftime("%Y-%m")
+            counts[ym] = counts.get(ym, 0) + 1
+
+    return {
+        "closed_months": [
+            {"month": ym, "count": cnt}
+            for ym, cnt in sorted(counts.items(), reverse=True)
+        ]
+    }
+
+
+def _reopen_fail_month_logic(
+    db: Session,
+    month_str: str,
+    username: str,
+    upload_dir: str = UPLOAD_DIR
+) -> dict:
+    """Xử lý mở lại sổ các ca FAIL đã chốt của một tháng cũ và đối chiếu lại với kho listbh."""
+    month_str = str(month_str or "").strip()
+    try:
+        year, mon = map(int, month_str.split("-"))
+        datetime.date(year, mon, 1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Định dạng tháng không hợp lệ (cần YYYY-MM).")
+
+    df_listbh = excel_service.load_combined_listbh_for_range(upload_dir)
+    res = compare_service.reopen_closed_month_with_listbh(
+        db=db,
+        year=year,
+        mon=mon,
+        df_listbh=df_listbh,
+        username=username
+    )
+    reopened_count = res["reopened_count"]
+    kept_resolved_count = res["kept_resolved_count"]
+
+    cfg = db.query(AppConfig).first()
+    if cfg:
+        cfg.last_resolved = db.query(Record).filter(Record.status == "RESOLVED").count()
+        db.commit()
+
+    if reopened_count == 0 and kept_resolved_count == 0:
+        return {
+            "status": "success",
+            "reopened_count": 0,
+            "kept_resolved_count": 0,
+            "message": f"Không có ca FAIL đã chốt sổ nào cần mở lại trong tháng {mon:02d}/{year}."
+        }
+
+    return {
+        "status": "success",
+        "reopened_count": reopened_count,
+        "kept_resolved_count": kept_resolved_count,
+        "message": (
+            f"Đã mở lại sổ tháng {mon:02d}/{year}: khôi phục {reopened_count} ca FAIL chưa gửi "
+            f"(giữ nguyên RESOLVED {kept_resolved_count} ca đã có trong listbh)."
+        )
+    }
+
+
+@app.post("/api/records/admin/fail/reopen-month")
+def reopen_fail_by_month(
+    data: dict,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Mở lại sổ các ca FAIL đã chốt của một tháng cũ và đối chiếu lại ngay với kho listbh hiện có."""
+    return _reopen_fail_month_logic(
+        db=db,
+        month_str=data.get("month", ""),
+        username=user.username,
+        upload_dir=UPLOAD_DIR
+    )
 
 
 @app.get("/api/records/kpi")

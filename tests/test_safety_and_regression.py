@@ -460,18 +460,104 @@ def test_multi_month_reconciliation_and_old_month_protection():
         assert active_oct_fails == {"OCT_028", "OCT_029", "OCT_030"}, f"Unexpected Oct FAILs: {active_oct_fails}"
         assert active_nov_fails == {"NOV_021", "NOV_022"}, f"Unexpected Nov FAILs: {active_nov_fails}"
 
-        # 3. Kiểm tra bảo vệ ca đã RESOLVED của tháng cũ (giả sử OCT_028 được IT chốt sổ RESOLVED)
+        # 3. Kiểm tra bảo vệ ca đã chốt sổ (CLOSED_MONTH) và tự động mở lại ca RESOLVED thường khi đối soát lại tháng có trong listbh
         rec_028 = db.query(Record).filter(Record.ma_lk == "OCT_028").first()
         rec_028.status = "RESOLVED"
+        rec_028.his_unlock_status = "CLOSED_MONTH"
+        rec_028.note = "Ghi chú gốc | IT chốt sổ đóng ca FAIL tồn đọng tháng 10/2026"
+
+        rec_plain_resolved = Record(
+            ma_lk="OCT_PLAIN_RES",
+            ho_ten="BN OCT_PLAIN_RES",
+            ma_the="DN4662320000001",
+            ten_khoa="Khoa Nội",
+            loai_ca="Nội trú",
+            ngay_ra_vien=datetime.date(2026, 10, 5),
+            ngay_doi_soat=datetime.date(2026, 10, 31),
+            status="RESOLVED",
+            his_unlock_status="NORMAL",
+            type_group="FAIL",
+            maloi="",
+            motaloi="",
+            note=""
+        )
+        db.add(rec_plain_resolved)
         db.commit()
 
-        # Chạy lại với combined listbh có cả tháng 10 & tháng 11 (nhưng OCT_028 vẫn không nằm trong sent_keys)
+        df_sql_with_plain = pd.DataFrame(oct_sql + [make_sql_row("OCT_PLAIN_RES", datetime.date(2026, 10, 5))] + nov_sql)
         df_lb_both = pd.concat([df_lb_oct, df_lb_nov_only], ignore_index=True)
         compare_service.process_comparison(
-            db, df_sql_oct_nov, df_lb_both, pd.DataFrame(), datetime.date(2026, 11, 16), include_errors=False
+            db, df_sql_with_plain, df_lb_both, pd.DataFrame(), datetime.date(2026, 11, 16), include_errors=False
         )
         db.refresh(rec_028)
-        assert rec_028.status == "RESOLVED", "Ca tháng cũ đã chốt RESOLVED bị mở lại nhầm sang PENDING FAIL!"
+        db.refresh(rec_plain_resolved)
+        assert rec_028.status == "RESOLVED", "Ca tháng cũ đã chốt sổ (CLOSED_MONTH) bị mở lại nhầm sang PENDING FAIL!"
+        assert rec_plain_resolved.status == "PENDING", "Ca chưa gửi thật trong tháng có listbh (chưa chốt sổ) phải được cập nhật lại sang PENDING FAIL!"
+
+        # 4. Kiểm tra gạch nợ tức thì khi nạp listbh (bao gồm hậu tố _CC và xóa cờ CLOSED_MONTH trên ca đã gửi)
+        rec_cc = Record(
+            ma_lk="26.077777_CC",
+            ho_ten="BN CAP CUU",
+            ma_the="DN4662320000099",
+            ten_khoa="Khoa Cấp Cứu",
+            loai_ca="Nội trú",
+            ngay_ra_vien=datetime.date(2026, 7, 15),
+            ngay_doi_soat=datetime.date(2026, 7, 31),
+            status="PENDING",
+            his_unlock_status="NORMAL",
+            type_group="FAIL",
+            maloi="",
+            motaloi="",
+            note=""
+        )
+        db.add(rec_cc)
+        rec_029 = db.query(Record).filter(Record.ma_lk == "OCT_029").first()
+        rec_029.status = "RESOLVED"
+        rec_029.his_unlock_status = "CLOSED_MONTH"
+        db.commit()
+
+        df_lb_instant = pd.DataFrame([
+            {"MA_LK": "26.077777/CC", "_ngay": datetime.date(2026, 7, 15)},
+            {"MA_LK": "OCT_029", "_ngay": datetime.date(2026, 10, 5)}
+        ])
+        resolved_imm = compare_service.reconcile_pending_records_with_listbh(db, df_lb_instant, datetime.date(2026, 11, 17))
+        db.refresh(rec_cc)
+        db.refresh(rec_029)
+        assert resolved_imm >= 1 and rec_cc.status == "RESOLVED", "Gạch nợ tức thì khi nạp listbh thất bại với ca _CC!"
+        assert rec_029.his_unlock_status == "NORMAL", "Phải bỏ cờ CLOSED_MONTH khi ca đã có trong listbh!"
+
+        # 5. Kiểm tra mở lại sổ tháng (reopen_closed_month_with_listbh)
+        rec_030 = db.query(Record).filter(Record.ma_lk == "OCT_030").first()
+        rec_030.status = "RESOLVED"
+        rec_030.his_unlock_status = "CLOSED_MONTH"
+        rec_admin_done = Record(
+            ma_lk="OCT_ADMIN_DONE",
+            ho_ten="BN ADMIN",
+            ma_the="DN4662320000002",
+            ten_khoa="Khoa Nội",
+            loai_ca="Nội trú",
+            ngay_ra_vien=datetime.date(2026, 10, 6),
+            ngay_doi_soat=datetime.date(2026, 10, 31),
+            status="RESOLVED",
+            his_unlock_status="ADMIN_RESOLVED",
+            type_group="FAIL",
+            maloi="",
+            motaloi="",
+            note="IT xử lý tay riêng"
+        )
+        db.add(rec_admin_done)
+        db.commit()
+
+        df_lb_reopen = pd.DataFrame([{"MA_LK": "OCT_030", "_ngay": datetime.date(2026, 10, 5)}])
+        reopen_res = compare_service.reopen_closed_month_with_listbh(db, 2026, 10, df_lb_reopen, username="admin")
+        db.refresh(rec_028)
+        db.refresh(rec_030)
+        db.refresh(rec_admin_done)
+        assert rec_028.status == "PENDING" and rec_028.his_unlock_status == "NORMAL"
+        assert rec_028.note == "Ghi chú gốc", f"Note không sạch sau mở lại sổ: {rec_028.note}"
+        assert rec_030.status == "RESOLVED" and rec_030.his_unlock_status == "NORMAL"
+        assert rec_admin_done.status == "RESOLVED" and rec_admin_done.his_unlock_status == "ADMIN_RESOLVED"
+        assert reopen_res["reopened_count"] >= 1 and reopen_res["kept_resolved_count"] >= 1
     finally:
         db.close()
 

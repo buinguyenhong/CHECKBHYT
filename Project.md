@@ -289,7 +289,7 @@ python web_app/run.py
 - Chuyển working directory vào `web_app`.
 - Đọc port từ `--port` hoặc biến môi trường `BHYT_PORT`, mặc định `8000`.
 - In IP LAN dò được.
-- Chạy Uvicorn với `host="0.0.0.0"`.
+- Chạy Uvicorn với `host="0.0.0.0"`, mặc định tắt auto-reload (`reload=False`, chỉ bật khi truyền `--reload` hoặc `BHYT_RELOAD=1`) để tránh nhân bản worker gây tranh chấp cổng.
 
 3. `web_app/main.py` khi import:
 
@@ -417,9 +417,9 @@ Nếu `MA_LK` có trong `listbh`:
 Nếu `MA_LK` không có trong `listbh` và không có trong file lỗi:
 
 - Trước khi tạo mới hoặc đánh dấu lại `FAIL`, hệ thống áp dụng các lớp bảo vệ đa tháng:
-  - **Bảo vệ rỗng & phạm vi tháng (`covered_months`):** Kiểm tra `df_listbh is None or df_listbh.empty`; chỉ tạo/cập nhật `FAIL` khi `(ngay_ra_vien.year, ngay_ra_vien.month) in covered_months` do `_compute_covered_months()` tính toán (tự động loại trừ phần dữ liệu tràn cuối tháng trước có tỷ lệ nhỏ `< 20%` và `min(day) > 15`).
-  - **Tự động xử lý ca tháng cũ đã gửi lên cổng (Bước 1.1):** Các hồ sơ `FAIL`/`LOI` đang `PENDING` của tháng cũ nếu có `MA_LK` xuất hiện trong `sent_keys` của kỳ/tháng mới hơn (bao gồm khớp số bỏ `.0` ở đuôi) sẽ được tự động chuyển sang `RESOLVED`.
-  - **Khóa hồ sơ `RESOLVED` tháng cũ:** Không cho phép mở lại về `PENDING` đối với các hồ sơ `FAIL` thuộc tháng cũ đã ở trạng thái `RESOLVED` khi chạy đối soát kỳ mới.
+  - **Bảo vệ rỗng & phạm vi tháng (`covered_months`):** Kiểm tra `df_listbh is None or df_listbh.empty`; chỉ tạo/cập nhật `FAIL` khi `(ngay_ra_vien.year, ngay_ra_vien.month) in covered_months` do `_compute_covered_months()` tính toán (chỉ chấp nhận tháng có `(min_day <= 15 and cnt >= 0.05 * max_cnt)` hoặc `cnt >= 0.2 * max_cnt` để tự động loại trừ các ca nội trú tràn cuối tháng trước).
+  - **Gạch nợ tức thì & tự động duyệt ca đã gửi (Bước 1.1):** Mọi hồ sơ `FAIL`/`LOI` đang tồn đọng (`PENDING`/`WAITING_RESEND`) khi có `MA_LK` xuất hiện trong `listbh` (tại `POST /api/upload/listbh`, sau khi Luồng B hoàn tất, hoặc qua `reconcile_pending_records_with_listbh()` trong đối soát — hỗ trợ khớp số bỏ `.0` và chuẩn hóa `_CC` ↔ `/CC`) đều được chuyển ngay sang `RESOLVED` và xóa cờ `CLOSED_MONTH` nếu có. Đồng thời `deduplicate_database_records()` chuẩn hóa và khử trùng lặp cho cả nhóm `FAIL` lẫn `LOI`.
+  - **Khóa hồ sơ `RESOLVED` tháng cũ & xử lý tay:** Giữ nguyên `RESOLVED` đối với các hồ sơ đã chốt sổ thủ công (`his_unlock_status` là `CLOSED_MONTH` / `ADMIN_RESOLVED` hoặc ghi chú chứa `"chốt sổ"`) và các hồ sơ thuộc tháng không nằm trong `covered_months` (`< ref_ym`). Ngược lại, khi chạy đối soát lại một tháng đã nạp đầy đủ `listbh` của chính tháng đó, các hồ sơ chưa gửi không thuộc nhóm chốt sổ thủ công sẽ được cập nhật lại sang `PENDING` `FAIL`.
 - Nếu hợp lệ trong phạm vi đối soát: tạo/cập nhật record nhóm `FAIL`, trạng thái mặc định `PENDING`.
 - Nhóm này dành cho IT xử lý/reset. Toàn bộ ghi chú cũ của người dùng (kèm thông tin sửa lỗi từ đợt trước nếu có) được nối chuỗi bảo toàn tuyệt đối, không bao giờ bị ghi đè.
 
@@ -495,15 +495,18 @@ Mở khóa/trả khoa:
 - Nếu action `CLOSE`, record chuyển về `NORMAL` và sinh SQL đưa `BenhAn.TrangThai` về `DaThanhToan` để khóa lại sau khi khoa sửa.
 - Script này hiện áp dụng cho ca `Nội trú` theo `BenhAn.SoBenhAn`. Đây là script mở/khóa bệnh án, không phải script reset cờ xuất XML.
 
-Đánh dấu xử lý thủ công & chốt sổ tháng:
+Đánh dấu xử lý thủ công, chốt sổ & mở lại sổ tháng:
 
 - `POST /api/records/{record_id}/admin-resolve`
 - IT có hai tùy chọn qua tham số `action`:
   - `edit`: Chỉ lưu ghi chú xử lý của IT (giữ nguyên trạng thái hồ sơ).
-  - `resolve` (mặc định): Lưu ghi chú và đổi trạng thái hồ sơ sang `RESOLVED`.
+  - `resolve` (mặc định): Lưu ghi chú, đổi trạng thái hồ sơ sang `RESOLVED` và gắn `his_unlock_status = "ADMIN_RESOLVED"` (bảo toàn không bị mở lại tự động).
 - `POST /api/records/admin/fail/resolve-month` (`resolve_fail_by_month`):
-  - Chức năng **"Chốt sổ tháng"** (`#btnResolveFailMonth` / `resolveFailMonth()` trên Tab 2 Admin): khi IT chọn một tháng cụ thể trên `#failMonthFilter`, cho phép chuyển hàng loạt các hồ sơ `FAIL` đang `PENDING` của tháng đó sang `RESOLVED`.
+  - Chức năng **"Chốt sổ tháng"** (`#btnResolveFailMonth` / `resolveFailMonth()` trên Tab 2 Admin): khi IT chọn một tháng cụ thể có ca chờ trên `#failMonthFilter`, cho phép chuyển hàng loạt các hồ sơ `FAIL` đang `PENDING` của tháng đó sang `RESOLVED` và đánh dấu `his_unlock_status = "CLOSED_MONTH"`.
   - Khi bấm `resetSelectedFail(loai)` trong lúc lọc một tháng cụ thể (`#failMonthFilter`), UI tự suy ra `from_date`/`to_date` theo đúng tháng đang chọn.
+- `GET /api/records/admin/fail/closed-months` (`get_closed_fail_months`) & `POST /api/records/admin/fail/reopen-month` (`reopen_fail_by_month`):
+  - Bộ lọc `#failMonthFilter` trên Tab 2 giữ nguyên các tháng đã chốt sổ (`Đã chốt sổ - N ca`) và hiển thị nút **"Mở lại sổ tháng"** (`#btnReopenFailMonth` / `reopenFailMonth()`).
+  - Khi kích hoạt mở lại sổ qua `reopen_closed_month_with_listbh()`, hệ thống đối chiếu ngay các hồ sơ `RESOLVED` của tháng đó (trừ `ADMIN_RESOLVED`) với kho `listbh`: ca nào đã có trong `listbh` giữ nguyên `RESOLVED` (đưa `his_unlock_status = "NORMAL"`), ca nào chưa có trong `listbh` được khôi phục về `PENDING` và gỡ đoạn ghi chú chốt sổ để hiển thị lại trong danh sách `FAIL`.
 
 ### 8.9. Scheduler tự đồng bộ
 
@@ -1049,6 +1052,8 @@ Admin xử lý:
 - `POST /api/records/{record_id}/admin-resolve`
 - `POST /api/records/admin/fail/reset`
 - `POST /api/records/admin/fail/resolve-month`
+- `GET /api/records/admin/fail/closed-months`
+- `POST /api/records/admin/fail/reopen-month`
 - `POST /api/records/{id}/toggle-his-unlock`
 - `GET /api/admin/dept-unlock-preview`
 - `POST /api/admin/bulk-unlock`
@@ -1173,7 +1178,7 @@ Hệ thống cung cấp cơ chế tự động hóa dữ liệu từ Cổng BHYT
      - Đợt 1: Tải danh sách **"Đã đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_da_de_nghi.xlsx`.
      - Đợt 2: Tải tiếp danh sách **"Chưa đề nghị thanh toán"** $\rightarrow$ lưu file tạm `temp_listbh_chua_de_nghi.xlsx`.
      - Gộp dữ liệu: Đọc bằng `pd.read_excel(..., dtype=str)`, sử dụng `pd.concat([df_da, df_chua], ignore_index=True)` gộp nối tiếp toàn bộ dòng kèm định dạng ô Text (`number_format = '@'`) thông qua `_write_df_preserving_text_excel()`, giữ nguyên 100% cấu trúc cột và chữ số `0` ở đầu/cuối của `Mã liên kết` / `Mã BN` (không drop trùng lặp).
-   - **Lưu trữ đa tháng (`listbh_YYYY_MM.xlsx`):** Sau khi Flow B hoàn tất (`run_flow_b()`) hoặc khi upload/đối soát (`_save_and_archive_listbh()`), hệ thống di trú `listbh.xlsx` cũ nếu chưa có file tháng, gọi `archive_listbh_by_months()` để lưu bản riêng `listbh_YYYY_MM.xlsx` cho từng tháng (tránh ghi đè tháng trước khi sang tháng mới) và dựng lại `listbh.xlsx` từ tối đa 3 tháng gần nhất; khi đối soát đọc hợp nhất bằng `load_combined_listbh_for_range()`.
+   - **Lưu trữ đa tháng & hiệu năng cao (`listbh_YYYY_MM.xlsx`):** Sau khi Flow B hoàn tất (`run_flow_b()`) hoặc khi upload/đối soát (`_save_and_archive_listbh()`), hệ thống di trú `listbh.xlsx` cũ nếu chưa có file tháng, gọi `archive_listbh_by_months()` để lưu bản riêng rút gọn các cột thiết yếu (`[found_key, found_date]`) thành `listbh_YYYY_MM.xlsx` theo từng tháng và dựng lại `listbh.xlsx` từ tối đa 3 tháng gần nhất (ghi atomic qua `*.tmp.xlsx` + `os.replace()`, chỉ định dạng `@` trên cột `MA_LK`, tái sử dụng DataFrame trong RAM). Tác vụ upload/đối soát đồng bộ chạy trên thread pool (`asyncio.to_thread()` với `SessionLocal()` riêng) để không khóa Event Loop Uvicorn, đồng thời kích hoạt gạch nợ `RESOLVED` tức thì cho các hồ sơ tồn đọng. Khi đối soát đọc hợp nhất bằng `load_combined_listbh_for_range()`.
 3. **Đồng bộ toàn diện trên 3 nền tảng:**
    - **WebApp Server (`/portal-automation`):** Giao diện thêm ô nhập Tháng và Checkbox "Tải gộp Chưa đề nghị", truyền tham số qua API `/api/automation/v2/flow-b`.
    - **Công cụ Tải tại chỗ (`portal_downloader`):** Bổ sung ô nhập Tháng và Checkbox Tải gộp trên giao diện `downloader_server.py`.
@@ -1251,8 +1256,9 @@ Nhằm đảm bảo hệ thống phản hồi tức thì và không bị treo đ
 Để đơn giản hóa vận hành cho quản trị viên và phòng CNTT, tập lệnh `LaunchWebBHYT.py` cung cấp giao diện Tkinter trực quan để cài đặt, khởi chạy và giám sát hệ thống:
 - **Tự động nhận diện môi trường ảo `.venv`:**
   - Tự động ưu tiên sử dụng `python.exe` và `pythonw.exe` nằm trong thư mục `.venv/Scripts/` của dự án nếu tồn tại, loại bỏ hoàn toàn nguy cơ chạy nhầm vào Python hệ thống thiếu thư viện.
-- **Xác thực trạng thái cổng thực tế (Health check thông minh):**
-  - Khi bấm "Khởi chạy WebApp Chạy Ngầm", hệ thống kiểm tra và tự động giải phóng cổng cũ (chờ socket Windows TIME_WAIT thoát hoàn toàn).
+- **Xác thực trạng thái cổng thực tế (Health check thông minh & chống `[Errno 10048]`):**
+  - `is_port_active()` kiểm tra kết nối socket với timeout `1.5s` và đối chiếu fallback qua `is_port_listening_netstat()` (`_get_listening_pids_on_port()`) để không báo nhầm `STOPPED` khi Event Loop đang bận.
+  - Khi dừng hoặc khởi động lại, `stop_server_on_port_sync()` tìm đúng PID đang `LISTENING` trên cổng, sử dụng `taskkill /F /T /PID` (kèm tự động nâng quyền UAC `ShellExecuteW(..., "runas", ...)` nếu tiến trình cũ chạy quyền `SYSTEM`/Administrator), chờ socket giải phóng hoàn toàn và chặn khởi chạy trùng nếu cổng vẫn bị chiếm.
   - Sử dụng cờ `-u` và `PYTHONUNBUFFERED=1` để log không bị kẹt trong RAM.
   - Lắng nghe trạng thái cổng tối đa 15 giây (30 lần x 0.5s), phân biệt rõ giữa trường hợp tiến trình thực sự crash (`poll() != None` kèm exit code) và trường hợp hệ thống nạp chậm.
 - **Tự khởi động cùng hệ điều hành (Auto-start Service):**
