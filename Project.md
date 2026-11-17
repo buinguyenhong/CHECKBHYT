@@ -242,7 +242,7 @@ Sau khi ghép ngoại trú và nội trú:
 
 ## 7. Mô hình dữ liệu SQLite nội bộ
 
-SQLite lưu trạng thái vận hành của webapp, không thay thế SQL Server HIS.
+SQLite lưu trạng thái vận hành của webapp, không thay thế SQL Server HIS (`web_app/database.py` cấu hình `timeout=30`, `PRAGMA journal_mode=WAL`, `PRAGMA synchronous=NORMAL`, `PRAGMA busy_timeout=30000` để hạn chế khóa DB khi đọc/ghi đồng thời).
 
 Các bảng chính:
 
@@ -337,15 +337,13 @@ Password HIS hiện được lưu dạng XOR/base64 trong SQLite. Đây chỉ l�
 
 Admin upload:
 
-- `listbh.xlsx` qua `POST /api/upload/listbh`.
+- `listbh.xlsx` qua `POST /api/upload/listbh`: đọc luồng Excel **1 lần duy nhất** (`read_excel_preserving_ma_lk` dùng `openpyxl read_only=True` và vector hóa ngày qua `parse_datetime_to_date`), truyền thẳng DataFrame đã nạp vào `_save_and_archive_listbh()` để tách lưu theo tháng (`uploaded_files/listbh_YYYY_MM.xlsx`), dựng lại `uploaded_files/listbh.xlsx` và gạch nợ `RESOLVED` tức thì (bỏ qua gạch nợ trùng nếu `SYNC_PROGRESS["active"]` đang chạy).
 - `HoSoLoiChiTiet.xlsx` qua `POST /api/upload/loi`.
 
-Hiện file được lưu cố định:
+Lưu trữ tệp:
 
-- `uploaded_files/listbh.xlsx`
-- `uploaded_files/HoSoLoiChiTiet.xlsx`
-
-Nếu upload lại, file cũ bị ghi đè.
+- `uploaded_files/listbh_YYYY_MM.xlsx` (lưu trữ phân tách từng tháng, bảo toàn dữ liệu các tháng trước) và `uploaded_files/listbh.xlsx` (tổng hợp tối đa 3 tháng gần nhất). `load_combined_listbh_for_range()` ưu tiên đọc các tệp `listbh_YYYY_MM.xlsx` khi đã tồn tại (không đọc trùng `listbh.xlsx`).
+- `uploaded_files/HoSoLoiChiTiet.xlsx` (ghi atomic qua `*.tmp.xlsx`).
 
 Khi upload file lỗi, hệ thống còn cố gắng ghép ngay vào ngày đối soát gần nhất đang có trong SQLite và chuyển các record tương ứng sang nhóm `LOI`.
 
@@ -387,14 +385,14 @@ Luồng nền `run_sync_in_background()`:
 2. Giải mã password HIS.
 3. Gọi `his_service.fetch_his_data(cfg, from_date, to_date)`.
 4. `fetch_his_data()` dùng cache SQL nếu có.
-5. Nếu không có cache hoặc cache thiếu range, gọi 2 stored procedure HIS.
-6. Chuẩn hóa thành dataframe `df_sql`.
-7. Đọc hợp nhất `listbh` theo khoảng ngày thông qua `_load_listbh_for_sync_range()` (kết hợp các file lưu trữ theo tháng `uploaded_files/listbh_YYYY_MM.xlsx` và `uploaded_files/listbh.xlsx`).
+5. Nếu không có cache hoặc cache thiếu range, gọi 2 stored procedure HIS. Nếu `df_op` chưa có cột tên phòng khám, `fetch_phong_kham_ngoai_tru()` ưu tiên truy vấn 1 lượt theo `tn.NgayTiepNhan` (`DATEADD(day, -7, ...)` đến `+1`), chỉ fallback theo lô `1000` mã có log tiến độ cho các ca còn thiếu.
+6. Chuẩn hóa thành dataframe `df_sql` (chuyển đổi ngày vector hóa qua `parse_datetime_to_date()`).
+7. Đọc hợp nhất `listbh` theo khoảng ngày thông qua `_load_listbh_for_sync_range()` (kết hợp các file lưu trữ theo tháng `uploaded_files/listbh_YYYY_MM.xlsx` hoặc fallback `uploaded_files/listbh.xlsx`).
 8. Lọc `listbh` theo khoảng ngày (`from_date` → `to_date`). Nếu file có dữ liệu ngày hợp lệ nhưng rỗng trong khoảng lọc (`df_in_range.empty`), giữ `df_listbh` rỗng để tránh dùng dữ liệu cũ đánh `FAIL` nhầm các ngày mới chưa tải.
 9. Chỉ đọc `uploaded_files/HoSoLoiChiTiet.xlsx` nếu IT bật tùy chọn dùng file lỗi trong lần đối soát đó.
 10. Nếu không bật tùy chọn file lỗi, hệ thống bỏ qua file lỗi dù file đang tồn tại trên máy chủ để tránh dùng nhầm file cũ.
-11. Gọi `compare_service.process_comparison()` (bao gồm tự động `RESOLVED` các ca `PENDING` tháng cũ đã xuất hiện trong `sent_keys` kỳ mới và bảo vệ không tạo `FAIL` cho tháng chưa được `listbh` bao phủ).
-12. Lưu hoặc cập nhật records vào SQLite.
+11. Gọi `compare_service.process_comparison()` (nạp 1 lần bảng `records` vào dict RAM để tra cứu $O(1)$, tự động `RESOLVED` các ca `PENDING` đã có trong `sent_keys` và bảo vệ tháng chưa được `listbh` bao phủ).
+12. Lưu hoặc cập nhật records vào SQLite (gắn `RecordLog` qua relationship thay cho flush lẻ nhóm `FAIL`).
 13. Cập nhật progress/log cho UI.
 
 Ngày đối soát lưu vào record hiện là `datetime.date.today()`, tức ngày chạy đối soát, không phải `from_date` hoặc `to_date`.

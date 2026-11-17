@@ -95,7 +95,13 @@ def _load_listbh_for_sync_range(upload_dir: str, tu_date: datetime.date, den_dat
     return df_raw, df_in_range, f"Đọc listbh đa tháng thành công. Tổng kho: {len(df_raw)} ca (trong khoảng ngày: {len(df_in_range)} ca)."
 
 
-def _save_and_archive_listbh(contents: bytes, upload_dir: str, db: Optional[Session] = None) -> int:
+def _save_and_archive_listbh(
+    contents: bytes,
+    upload_dir: str,
+    db: Optional[Session] = None,
+    preloaded_raw_df: Optional[pd.DataFrame] = None,
+    preloaded_lb_df: Optional[pd.DataFrame] = None
+) -> int:
     """Lưu trữ phân tách listbh theo từng tháng và gạch nợ (RESOLVED) ngay các ca FAIL/LOI đã gửi."""
     import glob as _glob
     os.makedirs(upload_dir, exist_ok=True)
@@ -105,7 +111,7 @@ def _save_and_archive_listbh(contents: bytes, upload_dir: str, db: Optional[Sess
             excel_service.archive_listbh_by_months(master_path, upload_dir)
         except Exception:
             pass
-    saved = excel_service.archive_listbh_by_months(contents, upload_dir)
+    saved = excel_service.archive_listbh_by_months(contents, upload_dir, preloaded_df=preloaded_raw_df)
     if not saved:
         tmp_path = f"{master_path}.{os.getpid()}.tmp.xlsx"
         try:
@@ -119,15 +125,22 @@ def _save_and_archive_listbh(contents: bytes, upload_dir: str, db: Optional[Sess
                 except Exception:
                     pass
 
+    if SYNC_PROGRESS.get("active"):
+        return 0
+
     resolved_count = 0
     try:
-        df_combined = excel_service.load_combined_listbh_for_range(upload_dir)
-        if df_combined is not None and not df_combined.empty:
+        df_for_reconcile = (
+            preloaded_lb_df
+            if (preloaded_lb_df is not None and not preloaded_lb_df.empty)
+            else excel_service.load_combined_listbh_for_range(upload_dir)
+        )
+        if df_for_reconcile is not None and not df_for_reconcile.empty:
             owns_db = db is None
             target_db = db if db is not None else SessionLocal()
             try:
                 resolved_count = compare_service.reconcile_pending_records_with_listbh(
-                    target_db, df_combined, datetime.date.today()
+                    target_db, df_for_reconcile, datetime.date.today()
                 )
                 cfg = target_db.query(AppConfig).first()
                 if cfg:
@@ -1061,9 +1074,12 @@ async def upload_listbh(
         contents = await file.read()
 
         def _process_upload_listbh_sync():
-            df = excel_service.load_listbh(BytesIO(contents))
-            resolved_count = _save_and_archive_listbh(contents, UPLOAD_DIR)
-            return len(df), resolved_count
+            df_raw = excel_service.read_excel_preserving_ma_lk(BytesIO(contents))
+            df_lb = excel_service.load_listbh(df_raw)
+            resolved_count = _save_and_archive_listbh(
+                contents, UPLOAD_DIR, preloaded_raw_df=df_raw, preloaded_lb_df=df_lb
+            )
+            return len(df_lb), resolved_count
 
         row_count, resolved_count = await asyncio.to_thread(_process_upload_listbh_sync)
         return {

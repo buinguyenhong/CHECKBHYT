@@ -519,6 +519,21 @@ def process_comparison(
     ref_end_date = max_d or ngay_doi_soat
     ref_ym = (ref_end_date.year, ref_end_date.month)
 
+    # Nạp 1 lần toàn bộ bản ghi Record vào RAM để tra cứu O(1), tránh hàng chục nghìn SELECT trong vòng lặp
+    all_existing_recs = db.query(Record).all()
+    all_records_by_lk = {}
+    fail_record_by_lk = {}
+    loi_records_by_lk = {}
+    for rec in all_existing_recs:
+        rk = chuan_hoa_ma_lk(rec.ma_lk).upper()
+        if not rk:
+            continue
+        all_records_by_lk.setdefault(rk, []).append(rec)
+        if rec.type_group == "FAIL" and rk not in fail_record_by_lk:
+            fail_record_by_lk[rk] = rec
+        elif rec.type_group == "LOI":
+            loi_records_by_lk.setdefault(rk, []).append(rec)
+
     # 3. Quét từng hồ sơ trong CSDL HIS
     for _, row in df_sql.iterrows():
         ma_lk = chuan_hoa_ma_lk(row["MA_LK"]).upper()
@@ -556,7 +571,7 @@ def process_comparison(
 
         if is_sent:
             # Quy tắc 4: Tự động chuyển thành RESOLVED cho toàn bộ bản ghi lỗi/fail cũ của ma_lk này
-            existing_records = db.query(Record).filter(Record.ma_lk == ma_lk).all()
+            existing_records = all_records_by_lk.get(ma_lk, [])
             for rec in existing_records:
                 if tong_tien > 0:
                     rec.tong_tien = tong_tien
@@ -601,11 +616,10 @@ def process_comparison(
                 prev_error_dates = []
                 
                 if include_errors:
-                    existing_loi_records = db.query(Record).filter(
-                        Record.ma_lk == ma_lk,
-                        Record.type_group == "LOI",
-                        Record.status != "RESOLVED"
-                    ).all()
+                    existing_loi_records = [
+                        r for r in loi_records_by_lk.get(ma_lk, [])
+                        if r.status != "RESOLVED"
+                    ]
                     if existing_loi_records:
                         had_previous_active_errors = True
                         for loi_rec in existing_loi_records:
@@ -622,10 +636,7 @@ def process_comparison(
                             db.add(log)
                             sync_archive_error(db, loi_rec, resolved=True, resolved_by="system", note=note_text)
                 
-                existing_record = db.query(Record).filter(
-                    Record.ma_lk == ma_lk,
-                    Record.type_group == "FAIL"
-                ).first()
+                existing_record = fail_record_by_lk.get(ma_lk)
                 
                 dates_str = ", ".join(sorted(list(set(prev_error_dates))))
                 note_val = f"đã sửa lỗi cũ (đợt {dates_str})" if had_previous_active_errors else ""
@@ -671,6 +682,7 @@ def process_comparison(
                     # Nếu ca FAIL này trước đó đã gửi thành công nay bị mở lại
                     if existing_record.status == "RESOLVED":
                         existing_record.status = "PENDING"
+                        existing_record.his_unlock_status = "NORMAL"
                         log = RecordLog(
                             record_id=existing_record.id,
                             username="system",
@@ -698,25 +710,23 @@ def process_comparison(
                         ngay_ra=None,
                         note=note_val
                     )
-                    db.add(new_rec)
-                    db.flush()
-                    
                     log_entry = RecordLog(
-                        record_id=new_rec.id,
                         username="system",
                         action="CREATE",
                         note=f"Khoi tao doi soat ngay {ngay_doi_soat.strftime('%d/%m/%Y')}. Nhom: FAIL" + (f" ({note_val})" if note_val else "")
                     )
-                    db.add(log_entry)
+                    new_rec.logs.append(log_entry)
+                    db.add(new_rec)
+                    fail_record_by_lk[ma_lk] = new_rec
+                    all_records_by_lk.setdefault(ma_lk, []).append(new_rec)
             else:
                 # Có lỗi chi tiết -> TẠO 1 BẢN GHI RIÊNG BIỆT CHO MỖI DÒNG LỖI!
                 # Khi đã có lỗi chi tiết, hồ sơ không còn thuộc định nghĩa FAIL
                 # (có trong SQL, chưa có listbh, và chưa có danh sách lỗi).
-                existing_fail_records = db.query(Record).filter(
-                    Record.ma_lk == ma_lk,
-                    Record.type_group == "FAIL",
-                    Record.status != "RESOLVED"
-                ).all()
+                existing_fail_records = [
+                    r for r in all_records_by_lk.get(ma_lk, [])
+                    if r.type_group == "FAIL" and r.status != "RESOLVED"
+                ]
                 for fail_rec in existing_fail_records:
                     fail_rec.status = "RESOLVED"
                     log = RecordLog(
@@ -728,10 +738,7 @@ def process_comparison(
                     db.add(log)
  
                 # Load tất cả bản ghi LOI đã có của ma_lk này để so khớp mềm dẻo trên bộ nhớ (tránh trùng do hoa thường/khoảng trắng)
-                existing_loi_records = db.query(Record).filter(
-                    Record.ma_lk == ma_lk,
-                    Record.type_group == "LOI"
-                ).all()
+                existing_loi_records = loi_records_by_lk.setdefault(ma_lk, [])
  
                 if include_errors:
                     # Tự động đóng các bản ghi lỗi cũ không còn xuất hiện trong danh sách lỗi mới
@@ -851,8 +858,9 @@ def process_comparison(
                         db.add(new_rec)
                         db.flush()
                         
-                        # Thêm bản ghi mới vào existing_loi_records để tránh tạo trùng nếu lặp lại
+                        # Thêm bản ghi mới vào map bộ nhớ để tránh tạo trùng nếu lặp lại
                         existing_loi_records.append(new_rec)
+                        all_records_by_lk.setdefault(ma_lk, []).append(new_rec)
                         
                         log_entry = RecordLog(
                             record_id=new_rec.id,

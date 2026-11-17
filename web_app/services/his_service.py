@@ -171,28 +171,69 @@ def remove_leading_A(value) -> str:
     return s
 
 def parse_datetime_to_date(series: pd.Series) -> pd.Series:
-    def parse_single(val):
-        if pd.isna(val) or val is None:
-            return None
-        if isinstance(val, (datetime.date, datetime.datetime)):
-            if isinstance(val, datetime.datetime):
-                return val.date()
-            return val
-        val_str = str(val).strip()
-        if not val_str:
-            return None
+    """Chuyển đổi Series ngày/chuỗi sang datetime.date dạng vector hóa tốc độ cao."""
+    if series is None or len(series) == 0:
+        return series
+
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return pd.Series(
+            [d.date() if pd.notna(d) else None for d in series.dt.to_pydatetime()],
+            index=series.index,
+            dtype=object
+        )
+
+    def _to_date_series(sub: pd.Series, dayfirst: bool) -> pd.Series:
         try:
-            # Nếu bắt đầu bằng 4 chữ số năm (ví dụ: 202606050823 hoặc 2026-06-01)
-            if len(val_str) >= 4 and val_str[:4].isdigit():
-                ts = pd.to_datetime(val_str, errors="coerce", dayfirst=False)
-            else:
-                ts = pd.to_datetime(val_str, errors="coerce", dayfirst=True)
-            if pd.isna(ts):
-                return None
-            return ts.date()
-        except Exception:
-            return None
-    return series.apply(parse_single)
+            dt = pd.to_datetime(sub, errors="coerce", format="mixed", dayfirst=dayfirst)
+        except (TypeError, ValueError):
+            dt = pd.to_datetime(sub, errors="coerce", dayfirst=dayfirst)
+        return pd.Series(
+            [d.date() if pd.notna(d) else None for d in dt.dt.to_pydatetime()],
+            index=sub.index,
+            dtype=object
+        )
+
+    raw_list = series.tolist()
+    n = len(raw_list)
+    out = [None] * n
+    str_indices = []
+    str_values = []
+
+    for i, val in enumerate(raw_list):
+        if val is None:
+            continue
+        if isinstance(val, float) and pd.isna(val):
+            continue
+        if val is pd.NaT:
+            continue
+        if isinstance(val, datetime.datetime):
+            out[i] = val.date()
+        elif isinstance(val, datetime.date):
+            out[i] = val
+        else:
+            s = str(val).strip()
+            if s:
+                if len(s) in (12, 14) and s.isdigit():
+                    s = s[:8]
+                str_indices.append(i)
+                str_values.append(s)
+
+    if str_values:
+        s_ser = pd.Series(str_values)
+        is_year_first = s_ser.str.match(r"^\d{4}").fillna(False)
+
+        if is_year_first.any():
+            parsed_yf = _to_date_series(s_ser[is_year_first], dayfirst=False)
+            for pos, dt_val in zip(is_year_first[is_year_first].index, parsed_yf.tolist()):
+                out[str_indices[pos]] = dt_val
+
+        not_yf = ~is_year_first
+        if not_yf.any():
+            parsed_df = _to_date_series(s_ser[not_yf], dayfirst=True)
+            for pos, dt_val in zip(not_yf[not_yf].index, parsed_df.tolist()):
+                out[str_indices[pos]] = dt_val
+
+    return pd.Series(out, index=series.index, dtype=object)
 
 def build_conn_str(driver: str, server: str, db: str, auth: str, user: str, pw: str) -> str:
     if auth == "Windows Auth":
@@ -317,59 +358,130 @@ def get_col_series(df: pd.DataFrame, candidates: list[str], default_val="") -> p
             return df[col_map[c.lower()]]
     return pd.Series([default_val] * len(df), index=df.index)
 
-def fetch_phong_kham_ngoai_tru(conn, stn_list: list) -> dict:
+def fetch_phong_kham_ngoai_tru(
+    conn,
+    stn_list: list,
+    tu_ngay: Optional[str] = None,
+    den_ngay: Optional[str] = None,
+    log_callback=None
+) -> dict:
     """
     Truy vấn tên phòng khám cho các ca Ngoại trú theo danh sách Số tiếp nhận (tn.SoTiepNhan).
-    - Đã bỏ JOIN DM_DichVu không cần thiết để tối ưu tốc độ truy vấn CSDL HIS.
-    - Trường hợp 1 phòng: hiển thị tên phòng khám.
-    - Trường hợp nhiều phòng: hiển thị tên tất cả các phòng (ghép bằng dấu phẩy).
+    - Ưu tiên truy vấn 1 lượt duy nhất theo khoảng ngày tiếp nhận [tu_ngay - 7d, den_ngay + 1d] để tránh hàng trăm query.
+    - Chỉ chạy bổ sung theo lô 1000 mã cho các số tiếp nhận chưa tìm thấy (nếu còn).
     """
-    stn_clean = [str(s).strip() for s in stn_list if str(s).strip()]
+    stn_clean = list(dict.fromkeys(str(s).strip() for s in stn_list if str(s).strip()))
     if not stn_clean or conn is None:
         return {}
 
-    res_map = {}
-    chunk_size = 500
-    for i in range(0, len(stn_clean), chunk_size):
-        chunk = stn_clean[i:i + chunk_size]
-        quoted = ", ".join([f"'{s}'" for s in chunk])
-        sql = f"""
-        SELECT 
-            tn.SoTiepNhan AS [So_Tiep_Nhan],
-            pb.TenPhongBan AS [Ten_Phong_Kham]
-        FROM KhamBenh kb WITH (NOLOCK)
-        INNER JOIN TiepNhan tn WITH (NOLOCK) ON kb.TiepNhan_Id = tn.TiepNhan_Id
-        INNER JOIN DM_PhongBan pb WITH (NOLOCK) ON kb.PhongBan_Id = pb.PhongBan_Id
-        WHERE tn.SoTiepNhan IN ({quoted})
-        """
-        cur = None
-        try:
-            cur = conn.cursor()
+    def log(msg):
+        if log_callback:
             try:
-                cur.timeout = SQL_QUERY_TIMEOUT_SECONDS
+                log_callback(msg)
             except Exception:
                 pass
-            cur.execute(sql)
-            rows = cur.fetchall()
-            for r in rows:
-                stn = str(r[0]).strip() if r[0] is not None else ""
-                tpk = str(r[1]).strip() if r[1] is not None else ""
-                if stn and tpk:
-                    k_raw = stn.upper()
-                    k_norm = chuan_hoa_ma_lk(stn).upper()
-                    for k in set([k_raw, k_norm]):
-                        if k not in res_map:
-                            res_map[k] = []
-                        if tpk not in res_map[k]:
-                            res_map[k].append(tpk)
-        except Exception as e:
-            safe_print(f"Lỗi khi truy vấn tên phòng khám ngoại trú: {str(e)}")
+        else:
+            safe_print(msg)
+
+    res_map = {}
+    target_keys_upper = set()
+    for s in stn_clean:
+        target_keys_upper.add(s.upper())
+        target_keys_upper.add(chuan_hoa_ma_lk(s).upper())
+
+    def _accumulate_rows(rows):
+        matched_cnt = 0
+        for r in rows:
+            stn = str(r[0]).strip() if r[0] is not None else ""
+            tpk = str(r[1]).strip() if r[1] is not None else ""
+            if not stn or not tpk:
+                continue
+            k_raw = stn.upper()
+            k_norm = chuan_hoa_ma_lk(stn).upper()
+            if k_raw not in target_keys_upper and k_norm not in target_keys_upper:
+                continue
+            matched_cnt += 1
+            for k in (k_raw, k_norm):
+                if k not in res_map:
+                    res_map[k] = []
+                if tpk not in res_map[k]:
+                    res_map[k].append(tpk)
+        return matched_cnt
+
+    # 1. Truy vấn nhanh 1 lượt theo khoảng ngày nếu có tu_ngay/den_ngay hợp lệ (YYYYMMDD)
+    clean_tu = "".join(c for c in str(tu_ngay or "") if c.isdigit())[:8]
+    clean_den = "".join(c for c in str(den_ngay or "") if c.isdigit())[:8]
+    if len(clean_tu) == 8 and len(clean_den) == 8:
+        cur_fast = None
+        try:
+            sql_fast = """
+            SELECT
+                tn.SoTiepNhan AS [So_Tiep_Nhan],
+                pb.TenPhongBan AS [Ten_Phong_Kham]
+            FROM KhamBenh kb WITH (NOLOCK)
+            INNER JOIN TiepNhan tn WITH (NOLOCK) ON kb.TiepNhan_Id = tn.TiepNhan_Id
+            INNER JOIN DM_PhongBan pb WITH (NOLOCK) ON kb.PhongBan_Id = pb.PhongBan_Id
+            WHERE tn.NgayTiepNhan >= DATEADD(day, -7, CONVERT(date, ?, 112))
+              AND tn.NgayTiepNhan < DATEADD(day, 1, CONVERT(date, ?, 112))
+            """
+            cur_fast = conn.cursor()
+            try:
+                cur_fast.timeout = SQL_QUERY_TIMEOUT_SECONDS
+            except Exception:
+                pass
+            cur_fast.execute(sql_fast, (clean_tu, clean_den))
+            rows = cur_fast.fetchall()
+            _accumulate_rows(rows)
+            log(f"  -> Đã ánh xạ nhanh phòng khám cho {sum(1 for s in stn_clean if s.upper() in res_map or chuan_hoa_ma_lk(s).upper() in res_map)}/{len(stn_clean)} ca Ngoại trú trong 1 lượt.")
+        except Exception as fast_err:
+            log(f"  -> Chuyển sang truy vấn phòng khám theo lô (do lọc ngày nhanh không khả dụng: {fast_err}).")
         finally:
-            if cur:
+            if cur_fast:
                 try:
-                    cur.close()
+                    cur_fast.close()
                 except Exception:
                     pass
+
+    # 2. Chỉ truy vấn theo lô cho các số tiếp nhận còn thiếu
+    remaining_stns = [
+        s for s in stn_clean
+        if s.upper() not in res_map and chuan_hoa_ma_lk(s).upper() not in res_map
+    ]
+    if remaining_stns:
+        chunk_size = 1000
+        total_chunks = (len(remaining_stns) + chunk_size - 1) // chunk_size
+        for idx in range(total_chunks):
+            chunk = remaining_stns[idx * chunk_size:(idx + 1) * chunk_size]
+            if total_chunks > 1:
+                log(f"  -> Đang lấy bổ sung tên phòng khám lô {idx + 1}/{total_chunks} ({len(chunk)} mã)...")
+            quoted = ", ".join(["'" + s.replace("'", "''") + "'" for s in chunk])
+            sql = f"""
+            SELECT 
+                tn.SoTiepNhan AS [So_Tiep_Nhan],
+                pb.TenPhongBan AS [Ten_Phong_Kham]
+            FROM KhamBenh kb WITH (NOLOCK)
+            INNER JOIN TiepNhan tn WITH (NOLOCK) ON kb.TiepNhan_Id = tn.TiepNhan_Id
+            INNER JOIN DM_PhongBan pb WITH (NOLOCK) ON kb.PhongBan_Id = pb.PhongBan_Id
+            WHERE tn.SoTiepNhan IN ({quoted})
+            """
+            cur = None
+            try:
+                cur = conn.cursor()
+                try:
+                    cur.timeout = SQL_QUERY_TIMEOUT_SECONDS
+                except Exception:
+                    pass
+                cur.execute(sql)
+                rows = cur.fetchall()
+                _accumulate_rows(rows)
+            except Exception as e:
+                log(f"Lỗi khi truy vấn tên phòng khám ngoại trú: {str(e)}")
+            finally:
+                if cur:
+                    try:
+                        cur.close()
+                    except Exception:
+                        pass
 
     final_map = {}
     for k, rooms in res_map.items():
@@ -460,23 +572,36 @@ def fetch_his_data_range(cfg: dict, tu_ngay: str, den_ngay: str, log_callback=No
         log(f"  -> Ngoại trú trả về: {len(df_op)} dòng. Cột: {list(df_op.columns)}")
 
         if not df_op.empty:
-            stn_series = get_col_series(df_op, ["column4", "SoPhieu_BA", "sobenhan", "ma_lk"])
-            stn_list = [s for s in stn_series.dropna().unique() if str(s).strip()]
-            if stn_list:
-                log(f"Đang lấy tên phòng khám cho {len(stn_list)} số tiếp nhận Ngoại trú...")
-                pk_map = fetch_phong_kham_ngoai_tru(conn, stn_list)
-                if pk_map:
-                    def resolve_pk(val):
-                        if pd.isna(val) or val is None:
-                            return "Khám bệnh"
-                        k_str = str(val).strip()
-                        if not k_str:
-                            return "Khám bệnh"
-                        res = pk_map.get(k_str.upper()) or pk_map.get(chuan_hoa_ma_lk(k_str).upper())
-                        return res if res else "Khám bệnh"
+            has_existing_pk = False
+            for pk_col in ["Ten_Phong_Kham", "TenKhoa", "Tên khoa", "ten_khoa"]:
+                if pk_col in df_op.columns:
+                    vals = df_op[pk_col].dropna().astype(str).str.strip()
+                    if (vals.str.len() > 0).any() and not vals.str.lower().isin(["nan", "none", "null", ""]).all():
+                        has_existing_pk = True
+                        break
 
-                    df_op["Ten_Phong_Kham"] = stn_series.apply(resolve_pk)
-                    log(f"  -> Đã lấy được tên phòng khám cho các ca Ngoại trú.")
+            if has_existing_pk:
+                log("  -> Ngoại trú đã có sẵn thông tin khoa/phòng khám từ Stored Procedure.")
+            else:
+                stn_series = get_col_series(df_op, ["column4", "SoPhieu_BA", "sobenhan", "ma_lk"])
+                stn_list = [s for s in stn_series.dropna().unique() if str(s).strip()]
+                if stn_list:
+                    log(f"Đang lấy tên phòng khám cho {len(stn_list)} số tiếp nhận Ngoại trú...")
+                    pk_map = fetch_phong_kham_ngoai_tru(
+                        conn, stn_list, tu_ngay=tu_ngay, den_ngay=den_ngay, log_callback=log
+                    )
+                    if pk_map:
+                        def resolve_pk(val):
+                            if pd.isna(val) or val is None:
+                                return "Khám bệnh"
+                            k_str = str(val).strip()
+                            if not k_str:
+                                return "Khám bệnh"
+                            res = pk_map.get(k_str.upper()) or pk_map.get(chuan_hoa_ma_lk(k_str).upper())
+                            return res if res else "Khám bệnh"
+
+                        df_op["Ten_Phong_Kham"] = stn_series.apply(resolve_pk)
+                        log("  -> Đã lấy được tên phòng khám cho các ca Ngoại trú.")
 
         log(f"Bắt đầu gọi Stored Procedure Nội trú: {sp_ip} từ {tu_ngay} đến {den_ngay}...")
         df_ip = sql_exec_sp(conn, sp_ip, tu_ngay, den_ngay)

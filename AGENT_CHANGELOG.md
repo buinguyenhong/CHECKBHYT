@@ -56,6 +56,26 @@ Nguyên tắc:
 
 ## Nhật ký thay đổi
 
+## 2026-11-17 08:55 - Antigravity (Tối ưu Hiệu năng Đọc/Nạp `listbh`, Truy vấn Ngoại trú HIS & Đối soát RAM O(1))
+- **Vấn đề được giải quyết:**
+  1. Nạp `listbh.xlsx` (27.395 dòng) mất ~49 giây do đọc lại file Excel nhiều lần trên mỗi lần upload, hàm `parse_datetime_to_date()` lặp từng dòng gọi `pd.to_datetime()` 27.395 lần (~5s/lượt), và dễ chạm khóa SQLite khi đồng bộ đang chạy ngầm.
+  2. Chạy Stored Procedure lấy danh sách HIS theo khoảng ngày dài (1–2 tháng) bị chậm do `fetch_phong_kham_ngoai_tru()` bắn hàng chục/trăm câu query `WHERE tn.SoTiepNhan IN (...)` lô 500 mã liên tiếp không log tiến độ, và `process_comparison()` thực hiện hàng chục nghìn câu `SELECT` đơn lẻ vào SQLite trong vòng lặp `df_sql`.
+- **Thay đổi chi tiết:**
+  - `web_app/database.py`:
+    - Bật `PRAGMA journal_mode=WAL`, `PRAGMA synchronous=NORMAL`, `PRAGMA busy_timeout=30000` và `timeout=30` trên engine SQLite để cho phép đọc/ghi đồng thời không bị `database is locked`.
+  - `web_app/services/his_service.py`:
+    - Vector hóa `parse_datetime_to_date()` dùng `pd.to_datetime(..., errors="coerce", format="mixed")` kết hợp chuẩn hóa chuỗi 12/14 chữ số, giữ nguyên logic `dayfirst` theo đầu chuỗi.
+    - Tối ưu `fetch_phong_kham_ngoai_tru()` và `fetch_his_data_range()`: bỏ qua nếu `df_op` đã có sẵn cột khoa/phòng khám; ưu tiên truy vấn 1 lượt theo khoảng ngày `tn.NgayTiepNhan` (`DATEADD(day, -7, ...)` đến `+1`) kèm lọc bổ sung theo lô `1000` có log tiến độ nếu còn sót.
+  - `web_app/services/excel_service.py` & `web_app/main.py`:
+    - Cập nhật `read_excel_preserving_ma_lk()` dùng `openpyxl(..., read_only=True, data_only=True)` và bỏ qua lượt đọc thứ 2 đối với các tệp lưu trữ theo tháng `listbh_YYYY_MM.xlsx`.
+    - Cho phép `load_listbh()` nhận `pd.DataFrame` trực tiếp, `archive_listbh_by_months()` nhận `preloaded_df`, và `load_combined_listbh_for_range()` không đọc trùng `listbh.xlsx` khi đã tồn tại các tệp `listbh_YYYY_MM.xlsx`.
+    - Cập nhật `upload_listbh` và `_save_and_archive_listbh()` chỉ đọc byte Excel đúng **1 lần**, truyền `preloaded_raw_df` / `preloaded_lb_df` trực tiếp sang lưu trữ và gạch nợ (bỏ qua gạch nợ trùng nếu `SYNC_PROGRESS["active"]` đang chạy).
+  - `web_app/services/compare_service.py`:
+    - Nạp 1 lần toàn bộ bảng `records` vào RAM (`all_records_by_lk`, `fail_record_by_lk`, `loi_records_by_lk`) để tra cứu $O(1)$ trong `process_comparison()`, đồng thời dùng `new_rec.logs.append(...)` khi tạo mới nhóm `FAIL` thay cho `db.flush()` theo từng dòng.
+- **Kiểm chứng thực nghiệm (27.395 dòng `web_app/uploaded_files/listbh.xlsx`):**
+  - `read_excel_preserving_ma_lk`: `0.97s` | `load_listbh(df)`: `0.25s` | `archive_listbh_by_months`: `1.49s`–`2.06s` | `load_combined_listbh_for_range`: `0.76s` | `process_comparison`: `0.77s`.
+  - Đạt 100% cả 3 bộ kiểm thử: `tests/test_xml_v2.py`, `tests/test_safety_and_regression.py`, `tests/test_validation_integration.py`.
+
 ## 2026-11-17 08:10 - Antigravity (Khắc phục Nghẽn/Tranh cổng `[Errno 10048]`, Tối ưu Nạp `listbh`, Gạch nợ Tức thì & Chức năng Mở lại Sổ Tháng)
 - **Vấn đề được giải quyết:**
   1. Server thỉnh thoảng bị đơ (tưởng như tự tắt), khi bấm bật lại trên Launcher gặp lỗi `[Errno 10048] only one usage of each socket address (protocol/network address/port) is normally permitted` và tự chạy lại được sau khi tác vụ cũ xong.
